@@ -18,6 +18,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include <openssl/crypto.h>
 #include <openssl/pem.h>
 #include <openssl/conf.h>
 #include <openssl/pkcs12.h>
@@ -31,7 +32,6 @@ static const int SERIAL = 0;
 static const int NUM_YEARS = 10;
 
 int mkcert(X509 **x509p, EVP_PKEY **pkeyp, int bits, int serial, int years);
-int add_ext(X509 *cert, int nid, char *value);
 
 CERT_KEY_PAIR mkcert_generate() {
     BIO *bio_err;
@@ -39,30 +39,20 @@ CERT_KEY_PAIR mkcert_generate() {
     EVP_PKEY *pkey = NULL;
     PKCS12 *p12 = NULL;
 
-    printf("mkcert_generate\n");
-
-    CRYPTO_mem_ctrl(CRYPTO_MEM_CHECK_ON);
     bio_err = BIO_new_fp(stderr, BIO_NOCLOSE);
 
-    printf("bio_err %d 0x%x\n", bio_err, bio_err);
-
-    SSLeay_add_all_algorithms();
-    printf("add all algorithms\n");
+    OpenSSL_add_all_algorithms();
     ERR_load_crypto_strings();
-    printf("load crypto strings\n");
 
     mkcert(&x509, &pkey, NUM_BITS, SERIAL, NUM_YEARS);
-    printf("mkcert done\n");
 
     p12 = PKCS12_create("limelight", "GameStream", pkey, x509, NULL, 0, 0, 0, 0, 0);
-    printf("p12 = 0x%x\n", p12);
 
 #ifndef OPENSSL_NO_ENGINE
     ENGINE_cleanup();
 #endif
     CRYPTO_cleanup_all_ex_data();
 
-    CRYPTO_mem_leaks(bio_err);
     BIO_free(bio_err);
 
     return (CERT_KEY_PAIR) {x509, pkey, p12};
@@ -90,103 +80,50 @@ void mkcert_save(const char* certFile, const char* p12File, const char* keyPairF
 }
 
 int mkcert(X509 **x509p, EVP_PKEY **pkeyp, int bits, int serial, int years) {
-    X509 *x;
-    EVP_PKEY *pk;
-    RSA *rsa;
-    X509_NAME *name = NULL;
+    EVP_PKEY_CTX* ctx = EVP_PKEY_CTX_new_id(EVP_PKEY_RSA, NULL);
+    EVP_PKEY_keygen_init(ctx);
+    EVP_PKEY_CTX_set_rsa_keygen_bits(ctx, bits);
 
-    if (*pkeyp == NULL) {
-        if ((pk=EVP_PKEY_new()) == NULL) {
-            printf("abort1\n");
-            abort();
-            return(0);
-        }
-    } else {
-        pk = *pkeyp;
-    }
+    // pk must be initialized on input
+    EVP_PKEY *pk = NULL;;
+    EVP_PKEY_keygen(ctx, &pk);
 
-    if (*x509p == NULL) {
-        if ((x = X509_new()) == NULL) {
-            printf("goto err\n");
-            goto err;
-        }
-    } else {
-        x = *x509p;
-    }
+    EVP_PKEY_CTX_free(ctx);
 
-    rsa = RSA_generate_key(bits, RSA_F4, NULL, NULL);
-    if (!rsa) {
-        const char *file, *data;
-        int flags = ERR_TXT_STRING;
-        int line;
-        ERR_peek_last_error_line_data(&file, &line, &data, &flags);
-        printf("openssl error 0x%x => %s:%d %s\n", ERR_peek_last_error(), file, line, data);
-    }
-    printf("gen rsa %x\n", rsa);
-    if (!EVP_PKEY_assign_RSA(pk, rsa)) {
-        printf("abort 2\n");
-        abort();
-        goto err;
-    }
+    X509* cert = X509_new();
+    X509_set_version(cert, 2);
+    ASN1_INTEGER_set(X509_get_serialNumber(cert), serial);
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
+    X509_gmtime_adj(X509_get_notBefore(cert), 0);
+    X509_gmtime_adj(X509_get_notAfter(cert), 60 * 60 * 24 * 365 * years);
+#else
+    ASN1_TIME* before = ASN1_STRING_dup(X509_get0_notBefore(cert));
+    ASN1_TIME* after = ASN1_STRING_dup(X509_get0_notAfter(cert));
 
-    X509_set_version(x, 2);
-    ASN1_INTEGER_set(X509_get_serialNumber(x), serial);
-    X509_gmtime_adj(X509_get_notBefore(x), 0);
-    X509_gmtime_adj(X509_get_notAfter(x), (long)60*60*24*365*years);
-    X509_set_pubkey(x, pk);
+    X509_gmtime_adj(before, 0);
+    X509_gmtime_adj(after, 60 * 60 * 24 * 365 * years);
 
-    name = X509_get_subject_name(x);
+    X509_set1_notBefore(cert, before);
+    X509_set1_notAfter(cert, after);
 
-    /* This function creates and adds the entry, working out the
-     * correct string type and performing checks on its length.
-     */
+    ASN1_STRING_free(before);
+    ASN1_STRING_free(after);
+#endif
+
+    X509_set_pubkey(cert, pk);
+
+    X509_NAME* name = X509_get_subject_name(cert);
     X509_NAME_add_entry_by_txt(name,"CN", MBSTRING_ASC, (unsigned char*)"NVIDIA GameStream Client", -1, -1, 0);
+    X509_set_issuer_name(cert, name);
 
-    /* Its self signed so set the issuer name to be the same as the
-     * subject.
-     */
-    X509_set_issuer_name(x, name);
-
-    /* Add various extensions: standard extensions */
-    add_ext(x, NID_basic_constraints, "critical,CA:TRUE");
-    add_ext(x, NID_key_usage, "critical,keyCertSign,cRLSign");
-
-    add_ext(x, NID_subject_key_identifier, "hash");
-
-    if (!X509_sign(x, pk, EVP_sha1())) {
+    if (!X509_sign(cert, pk, EVP_sha256())) {
         goto err;
     }
 
-    *x509p = x;
+    *x509p = cert;
     *pkeyp = pk;
 
     return(1);
 err:
     return(0);
 }
-
-/* Add extension using V3 code: we can set the config file as NULL
- * because we wont reference any other sections.
- */
-
-int add_ext(X509 *cert, int nid, char *value)
-{
-    X509_EXTENSION *ex;
-    X509V3_CTX ctx;
-    /* This sets the 'context' of the extensions. */
-    /* No configuration database */
-    X509V3_set_ctx_nodb(&ctx);
-    /* Issuer and subject certs: both the target since it is self signed,
-     * no request and no CRL
-     */
-    X509V3_set_ctx(&ctx, cert, cert, NULL, NULL, 0);
-    ex = X509V3_EXT_conf_nid(NULL, &ctx, nid, value);
-    if (!ex) {
-        return 0;
-    }
-
-    X509_add_ext(cert, ex, -1);
-    X509_EXTENSION_free(ex);
-    return 1;
-}
-

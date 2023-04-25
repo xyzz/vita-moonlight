@@ -22,6 +22,7 @@
 #include "mkcert.h"
 #include "client.h"
 #include "errors.h"
+#include "limits.h"
 
 #include <Limelight.h>
 
@@ -29,7 +30,8 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
-#include <uuid.h>
+#include <arpa/inet.h>
+#include <uuid/uuid.h>
 #include <openssl/sha.h>
 #include <openssl/aes.h>
 #include <openssl/rand.h>
@@ -38,19 +40,11 @@
 #include <openssl/pem.h>
 #include <openssl/err.h>
 
-#include <psp2/io/stat.h>
-
 #define UNIQUE_FILE_NAME "uniqueid.dat"
 #define P12_FILE_NAME "client.p12"
 
 #define UNIQUEID_BYTES 8
 #define UNIQUEID_CHARS (UNIQUEID_BYTES*2)
-
-#define CHANNEL_COUNT_STEREO 2
-#define CHANNEL_COUNT_51_SURROUND 6
-
-#define CHANNEL_MASK_STEREO 0x3
-#define CHANNEL_MASK_51_SURROUND 0xFC
 
 static char unique_id[UNIQUEID_CHARS+1];
 static X509 *cert;
@@ -59,17 +53,21 @@ static EVP_PKEY *privateKey;
 
 const char* gs_error;
 
-#ifdef __vita__
-#include "../src/graphics.h"
-#endif
+#define LEN_AS_HEX_STR(x) ((x) * 2 + 1)
+#define SIZEOF_AS_HEX_STR(x) LEN_AS_HEX_STR(sizeof(x))
+
+#define SIGNATURE_LEN 256
+
+#define UUID_STRLEN 37
 
 static int mkdirtree(const char* directory) {
-  char buffer[1024];
+  char buffer[PATH_MAX];
   char* p = buffer;
 
   // The passed in string could be a string literal
   // so we must copy it first
-  strcpy(p, directory);
+  strncpy(p, directory, PATH_MAX - 1);
+  buffer[PATH_MAX - 1] = '\0';
 
   while (*p != 0) {
     // Find the end of the path element
@@ -81,8 +79,7 @@ static int mkdirtree(const char* directory) {
     *p = 0;
 
     // Create the directory if it doesn't exist already
-    int ret = sceIoMkdir(buffer, 0777);
-    if (ret < 0 && ret != 0x8001000d && ret != 0x80010011) {
+    if (mkdir(buffer, 0775) == -1 && errno != EEXIST) {
         return -1;
     }
 
@@ -93,23 +90,20 @@ static int mkdirtree(const char* directory) {
 }
 
 static int load_unique_id(const char* keyDirectory) {
-  char uniqueFilePath[4096];
-  sprintf(uniqueFilePath, "%s/%s", keyDirectory, UNIQUE_FILE_NAME);
+  char uniqueFilePath[PATH_MAX];
+  snprintf(uniqueFilePath, PATH_MAX, "%s/%s", keyDirectory, UNIQUE_FILE_NAME);
 
   FILE *fd = fopen(uniqueFilePath, "r");
-  if (fd == NULL) {
-    unsigned char unique_data[UNIQUEID_BYTES];
-    RAND_bytes(unique_data, UNIQUEID_BYTES);
-    for (int i = 0; i < UNIQUEID_BYTES; i++) {
-      sprintf(unique_id + (i * 2), "%02x", unique_data[i]);
-    }
+  if (fd == NULL || fread(unique_id, UNIQUEID_CHARS, 1, fd) != UNIQUEID_CHARS) {
+    snprintf(unique_id,UNIQUEID_CHARS+1,"0123456789ABCDEF");
+
+    if (fd)
+      fclose(fd);
     fd = fopen(uniqueFilePath, "w");
     if (fd == NULL)
       return GS_FAILED;
 
     fwrite(unique_id, UNIQUEID_CHARS, 1, fd);
-  } else {
-    fread(unique_id, UNIQUEID_CHARS, 1, fd);
   }
   fclose(fd);
   unique_id[UNIQUEID_CHARS] = 0;
@@ -118,21 +112,20 @@ static int load_unique_id(const char* keyDirectory) {
 }
 
 static int load_cert(const char* keyDirectory) {
-  char certificateFilePath[4096];
-  sprintf(certificateFilePath, "%s/%s", keyDirectory, CERTIFICATE_FILE_NAME);
+  char certificateFilePath[PATH_MAX];
+  snprintf(certificateFilePath, PATH_MAX, "%s/%s", keyDirectory, CERTIFICATE_FILE_NAME);
 
-  char keyFilePath[4096];
-  sprintf(&keyFilePath[0], "%s/%s", keyDirectory, KEY_FILE_NAME);
+  char keyFilePath[PATH_MAX];
+  snprintf(&keyFilePath[0], PATH_MAX, "%s/%s", keyDirectory, KEY_FILE_NAME);
 
   FILE *fd = fopen(certificateFilePath, "r");
   if (fd == NULL) {
     printf("Generating certificate...");
-    printf(" this is only done once and can take a long time on Vita, allow up to 5 minutes... ");
     CERT_KEY_PAIR cert = mkcert_generate();
     printf("done\n");
 
-    char p12FilePath[4096];
-    sprintf(p12FilePath, "%s/%s", keyDirectory, P12_FILE_NAME);
+    char p12FilePath[PATH_MAX];
+    snprintf(p12FilePath, PATH_MAX, "%s/%s", keyDirectory, P12_FILE_NAME);
 
     mkcert_save(certificateFilePath, p12FilePath, keyFilePath, cert);
     mkcert_free(cert);
@@ -173,109 +166,129 @@ static int load_cert(const char* keyDirectory) {
   return GS_OK;
 }
 
-static int load_server_status(PSERVER_DATA server) {
-
+static int load_serverinfo(PSERVER_DATA server, bool https) {
   uuid_t uuid;
-  char uuid_str[37];
-
-  int ret;
+  char uuid_str[UUID_STRLEN];
   char url[4096];
+  int ret = GS_INVALID;
+  char *pairedText = NULL;
+  char *currentGameText = NULL;
+  char *stateText = NULL;
+  char *serverCodecModeSupportText = NULL;
+  char *httpsPortText = NULL;
+
+  uuid_generate_random(uuid);
+  uuid_unparse(uuid, uuid_str);
+
+  snprintf(url, sizeof(url), "%s://%s:%d/serverinfo?uniqueid=%s&uuid=%s",
+    https ? "https" : "http", server->serverInfo.address, https ? server->httpsPort : server->httpPort, unique_id, uuid_str);
+
+  PHTTP_DATA data = http_create_data();
+  if (data == NULL) {
+    ret = GS_OUT_OF_MEMORY;
+    goto cleanup;
+  }
+  if (http_request(url, data) != GS_OK) {
+    ret = GS_IO_ERROR;
+    goto cleanup;
+  }
+
+  if (xml_status(data->memory, data->size) == GS_ERROR) {
+    ret = GS_ERROR;
+    goto cleanup;
+  }
+
+  if (xml_search(data->memory, data->size, "currentgame", &currentGameText) != GS_OK) {
+    goto cleanup;
+  }
+
+  if (xml_search(data->memory, data->size, "PairStatus", &pairedText) != GS_OK)
+    goto cleanup;
+
+  if (xml_search(data->memory, data->size, "appversion", (char**) &server->serverInfo.serverInfoAppVersion) != GS_OK)
+    goto cleanup;
+
+  if (xml_search(data->memory, data->size, "state", &stateText) != GS_OK)
+    goto cleanup;
+
+  if (xml_search(data->memory, data->size, "ServerCodecModeSupport", &serverCodecModeSupportText) != GS_OK)
+    goto cleanup;
+
+  if (xml_search(data->memory, data->size, "gputype", &server->gpuType) != GS_OK)
+    goto cleanup;
+
+  if (xml_search(data->memory, data->size, "GsVersion", &server->gsVersion) != GS_OK)
+    goto cleanup;
+
+  if (xml_search(data->memory, data->size, "GfeVersion", (char**) &server->serverInfo.serverInfoGfeVersion) != GS_OK)
+    goto cleanup;
+
+  if (xml_search(data->memory, data->size, "HttpsPort", &httpsPortText) != GS_OK)
+    goto cleanup;
+
+  if (xml_modelist(data->memory, data->size, &server->modes) != GS_OK)
+    goto cleanup;
+
+  // These fields are present on all version of GFE that this client supports
+  if (!strlen(currentGameText) || !strlen(pairedText) || !strlen(server->serverInfo.serverInfoAppVersion) || !strlen(stateText))
+    goto cleanup;
+
+  server->paired = pairedText != NULL && strcmp(pairedText, "1") == 0;
+  server->currentGame = currentGameText == NULL ? 0 : atoi(currentGameText);
+  server->supports4K = serverCodecModeSupportText != NULL;
+  server->serverMajorVersion = atoi(server->serverInfo.serverInfoAppVersion);
+  server->isNvidiaSoftware = strstr(stateText, "MJOLNIR") != NULL;
+
+  server->httpsPort = atoi(httpsPortText);
+  if (!server->httpsPort)
+    server->httpsPort = 47984;
+
+  if (strstr(stateText, "_SERVER_BUSY") == NULL) {
+    // After GFE 2.8, current game remains set even after streaming
+    // has ended. We emulate the old behavior by forcing it to zero
+    // if streaming is not active.
+    server->currentGame = 0;
+  }
+  ret = GS_OK;
+
+  cleanup:
+  if (data != NULL)
+    http_free_data(data);
+
+  if (pairedText != NULL)
+    free(pairedText);
+
+  if (currentGameText != NULL)
+    free(currentGameText);
+
+  if (serverCodecModeSupportText != NULL)
+    free(serverCodecModeSupportText);
+
+  if (httpsPortText != NULL)
+    free(httpsPortText);
+
+  return ret;
+}
+
+static int load_server_status(PSERVER_DATA server) {
+  int ret;
   int i;
 
-  i = 0;
-  do {
-    char *pairedText = NULL;
-    char *currentGameText = NULL;
-    char *stateText = NULL;
-    char *serverCodecModeSupportText = NULL;
+  /* Fetch the HTTPS port if we don't have one yet */
+  if (!server->httpsPort) {
+    ret = load_serverinfo(server, false);
+    if (ret != GS_OK)
+      return ret;
+  }
 
-    ret = GS_INVALID;
-
-    uuid_generate_random(uuid);
-    uuid_unparse(uuid, uuid_str);
-
-    // Modern GFE versions don't allow serverinfo to be fetched over HTTPS if the client
-    // is not already paired. Since we can't pair without knowing the server version, we
-    // make another request over HTTP if the HTTPS request fails. We can't just use HTTP
-    // for everything because it doesn't accurately tell us if we're paired.
-    sprintf(url, "%s://%s:%d/serverinfo?uniqueid=%s&uuid=%s",
-      i == 0 ? "https" : "http", server->serverInfo.address, i == 0 ? 47984 : 47989, unique_id, uuid_str);
-
-    PHTTP_DATA data = http_create_data();
-    if (data == NULL) {
-      ret = GS_OUT_OF_MEMORY;
-      goto cleanup;
-    }
-    if (http_request(url, data) != GS_OK) {
-      ret = GS_IO_ERROR;
-      goto cleanup;
-    }
-
-    if (xml_status(data->memory, data->size) == GS_ERROR) {
-      ret = GS_ERROR;
-      goto cleanup;
-    }
-
-    if (xml_search(data->memory, data->size, "currentgame", &currentGameText) != GS_OK) {
-      goto cleanup;
-    }
-
-    if (xml_search(data->memory, data->size, "PairStatus", &pairedText) != GS_OK)
-      goto cleanup;
-
-    if (xml_search(data->memory, data->size, "appversion", (char**) &server->serverInfo.serverInfoAppVersion) != GS_OK)
-      goto cleanup;
-
-    if (xml_search(data->memory, data->size, "state", &stateText) != GS_OK)
-      goto cleanup;
-
-    if (xml_search(data->memory, data->size, "ServerCodecModeSupport", &serverCodecModeSupportText) != GS_OK)
-      goto cleanup;
-
-    if (xml_search(data->memory, data->size, "gputype", &server->gpuType) != GS_OK)
-      goto cleanup;
-
-    if (xml_search(data->memory, data->size, "GsVersion", &server->gsVersion) != GS_OK)
-      goto cleanup;
-
-    if (xml_search(data->memory, data->size, "GfeVersion", (char**) &server->serverInfo.serverInfoGfeVersion) != GS_OK)
-      goto cleanup;
-
-    if (xml_modelist(data->memory, data->size, &server->modes) != GS_OK)
-      goto cleanup;
-
-    // These fields are present on all version of GFE that this client supports
-    if (!strlen(currentGameText) || !strlen(pairedText) || !strlen(server->serverInfo.serverInfoAppVersion) || !strlen(stateText))
-      goto cleanup;
-
-    server->paired = pairedText != NULL && strcmp(pairedText, "1") == 0;
-    server->currentGame = currentGameText == NULL ? 0 : atoi(currentGameText);
-    server->supports4K = serverCodecModeSupportText != NULL;
-    server->serverMajorVersion = atoi(server->serverInfo.serverInfoAppVersion);
-
-    if (strstr(stateText, "_SERVER_BUSY") == NULL) {
-      // After GFE 2.8, current game remains set even after streaming
-      // has ended. We emulate the old behavior by forcing it to zero
-      // if streaming is not active.
-      server->currentGame = 0;
-    }
-    ret = GS_OK;
-
-    cleanup:
-    if (data != NULL)
-      http_free_data(data);
-
-    if (pairedText != NULL)
-      free(pairedText);
-
-    if (currentGameText != NULL)
-      free(currentGameText);
-
-    if (serverCodecModeSupportText != NULL)
-      free(serverCodecModeSupportText);
-
-    i++;
-  } while (ret != GS_OK && i < 2);
+  // Modern GFE versions don't allow serverinfo to be fetched over HTTPS if the client
+  // is not already paired. Since we can't pair without knowing the server version, we
+  // make another request over HTTP if the HTTPS request fails. We can't just use HTTP
+  // for everything because it doesn't accurately tell us if we're paired.
+  ret = GS_INVALID;
+  for (i = 0; i < 2 && ret != GS_OK; i++) {
+    ret = load_serverinfo(server, i == 0);
+  }
 
   if (ret == GS_OK && !server->unsupported) {
     if (server->serverMajorVersion > MAX_SUPPORTED_GFE_VERSION) {
@@ -307,19 +320,7 @@ static int sign_it(const char *msg, size_t mlen, unsigned char **sig, size_t *sl
   if (ctx == NULL)
     return GS_FAILED;
 
-  const EVP_MD *md = EVP_get_digestbyname("SHA256");
-  if (md == NULL) {
-        printf("openssl error 0x%x\n", ERR_peek_last_error());
-
-    goto cleanup;
-  }
-
-  int rc = EVP_DigestInit_ex(ctx, md, NULL);
-  printf("rc = %d\n", rc);
-  if (rc != 1)
-    goto cleanup;
-
-  rc = EVP_DigestSignInit(ctx, NULL, md, NULL, pkey);
+  int rc = EVP_DigestSignInit(ctx, NULL, EVP_sha256(), NULL, pkey);
   if (rc != 1)
     goto cleanup;
 
@@ -376,18 +377,42 @@ static bool verifySignature(const char *data, int dataLength, char *signature, i
     return result > 0;
 }
 
+static void encrypt(const unsigned char *plaintext, int plaintextLen, const unsigned char *key, unsigned char *ciphertext) {
+  EVP_CIPHER_CTX* cipher = EVP_CIPHER_CTX_new();
+
+  EVP_EncryptInit(cipher, EVP_aes_128_ecb(), key, NULL);
+  EVP_CIPHER_CTX_set_padding(cipher, 0);
+
+  int ciphertextLen = 0;
+  EVP_EncryptUpdate(cipher, ciphertext, &ciphertextLen, plaintext, plaintextLen);
+
+  EVP_CIPHER_CTX_free(cipher);
+}
+
+static void decrypt(const unsigned char *ciphertext, int ciphertextLen, const unsigned char *key, unsigned char *plaintext) {
+  EVP_CIPHER_CTX* cipher = EVP_CIPHER_CTX_new();
+
+  EVP_DecryptInit(cipher, EVP_aes_128_ecb(), key, NULL);
+  EVP_CIPHER_CTX_set_padding(cipher, 0);
+
+  int plaintextLen = 0;
+  EVP_DecryptUpdate(cipher, plaintext, &plaintextLen, ciphertext, ciphertextLen);
+
+  EVP_CIPHER_CTX_free(cipher);
+}
+
 int gs_unpair(PSERVER_DATA server) {
   int ret = GS_OK;
   char url[4096];
   uuid_t uuid;
-  char uuid_str[37];
+  char uuid_str[UUID_STRLEN];
   PHTTP_DATA data = http_create_data();
   if (data == NULL)
     return GS_OUT_OF_MEMORY;
 
   uuid_generate_random(uuid);
   uuid_unparse(uuid, uuid_str);
-  sprintf(url, "http://%s:47989/unpair?uniqueid=%s&uuid=%s", server->serverInfo.address, unique_id, uuid_str);
+  snprintf(url, sizeof(url), "http://%s:%u/unpair?uniqueid=%s&uuid=%s", server->serverInfo.address, server->httpPort, unique_id, uuid_str);
   ret = http_request(url, data);
 
   http_free_data(data);
@@ -397,28 +422,23 @@ int gs_unpair(PSERVER_DATA server) {
 int gs_pair(PSERVER_DATA server, char* pin) {
   int ret = GS_OK;
   char* result = NULL;
-  char url[4096];
+  char url[5120];
   uuid_t uuid;
-  char uuid_str[37];
+  char uuid_str[UUID_STRLEN];
 
   if (server->paired) {
     gs_error = "Already paired";
     return GS_WRONG_STATE;
   }
 
-  if (server->currentGame != 0) {
-    gs_error = "The computer is currently in a game. You must close the game before pairing";
-    return GS_WRONG_STATE;
-  }
-
   unsigned char salt_data[16];
-  char salt_hex[33];
-  RAND_bytes(salt_data, 16);
-  bytes_to_hex(salt_data, salt_hex, 16);
+  char salt_hex[SIZEOF_AS_HEX_STR(salt_data)];
+  RAND_bytes(salt_data, sizeof(salt_data));
+  bytes_to_hex(salt_data, salt_hex, sizeof(salt_data));
 
   uuid_generate_random(uuid);
   uuid_unparse(uuid, uuid_str);
-  sprintf(url, "http://%s:47989/pair?uniqueid=%s&uuid=%s&devicename=roth&updateState=1&phrase=getservercert&salt=%s&clientcert=%s", server->serverInfo.address, unique_id, uuid_str, salt_hex, cert_hex);
+  snprintf(url, sizeof(url), "http://%s:%u/pair?uniqueid=%s&uuid=%s&devicename=roth&updateState=1&phrase=getservercert&salt=%s&clientcert=%s", server->serverInfo.address, server->httpPort, unique_id, uuid_str, salt_hex, cert_hex);
   PHTTP_DATA data = http_create_data();
   if (data == NULL)
     return GS_OUT_OF_MEMORY;
@@ -441,44 +461,40 @@ int gs_pair(PSERVER_DATA server, char* pin) {
   if ((ret = xml_search(data->memory, data->size, "plaincert", &result)) != GS_OK)
     goto cleanup;
 
-  if (strlen(result)/2 > 8191) {
+  char plaincert[8192];
+
+  if (strlen(result)/2 > sizeof(plaincert) - 1) {
     gs_error = "Server certificate too big";
     ret = GS_FAILED;
     goto cleanup;
   }
 
-  char plaincert[8192];
   for (int count = 0; count < strlen(result); count += 2) {
     sscanf(&result[count], "%2hhx", &plaincert[count / 2]);
   }
   plaincert[strlen(result)/2] = '\0';
-  printf("%d / %d\n", strlen(result)/2, strlen(plaincert));
 
-  unsigned char salt_pin[20];
-  unsigned char aes_key_hash[32];
-  AES_KEY enc_key, dec_key;
-  memcpy(salt_pin, salt_data, 16);
-  memcpy(salt_pin+16, pin, 4);
+  unsigned char salt_pin[sizeof(salt_data) + 4];
+  unsigned char aes_key[32]; // Must fit SHA256
+  memcpy(salt_pin, salt_data, sizeof(salt_data));
+  memcpy(salt_pin+sizeof(salt_data), pin, 4);
 
   int hash_length = server->serverMajorVersion >= 7 ? 32 : 20;
   if (server->serverMajorVersion >= 7)
-    SHA256(salt_pin, 20, aes_key_hash);
+    SHA256(salt_pin, sizeof(salt_pin), aes_key);
   else
-    SHA1(salt_pin, 20, aes_key_hash);
-
-  AES_set_encrypt_key((unsigned char *)aes_key_hash, 128, &enc_key);
-  AES_set_decrypt_key((unsigned char *)aes_key_hash, 128, &dec_key);
+    SHA1(salt_pin, sizeof(salt_pin), aes_key);
 
   unsigned char challenge_data[16];
-  unsigned char challenge_enc[16];
-  char challenge_hex[33];
-  RAND_bytes(challenge_data, 16);
-  AES_encrypt(challenge_data, challenge_enc, &enc_key);
-  bytes_to_hex(challenge_enc, challenge_hex, 16);
+  unsigned char challenge_enc[sizeof(challenge_data)];
+  char challenge_hex[SIZEOF_AS_HEX_STR(challenge_enc)];
+  RAND_bytes(challenge_data, sizeof(challenge_data));
+  encrypt(challenge_data, sizeof(challenge_data), aes_key, challenge_enc);
+  bytes_to_hex(challenge_enc, challenge_hex, sizeof(challenge_enc));
 
   uuid_generate_random(uuid);
   uuid_unparse(uuid, uuid_str);
-  sprintf(url, "http://%s:47989/pair?uniqueid=%s&uuid=%s&devicename=roth&updateState=1&clientchallenge=%s", server->serverInfo.address, unique_id, uuid_str, challenge_hex);
+  snprintf(url, sizeof(url), "http://%s:%u/pair?uniqueid=%s&uuid=%s&devicename=roth&updateState=1&clientchallenge=%s", server->serverInfo.address, server->httpPort, unique_id, uuid_str, challenge_hex);
   if ((ret = http_request(url, data)) != GS_OK)
     goto cleanup;
 
@@ -502,39 +518,45 @@ int gs_pair(PSERVER_DATA server, char* pin) {
     goto cleanup;
   }
 
-  char challenge_response_data_enc[48];
-  char challenge_response_data[48];
+  char challenge_response_data_enc[64];
+  char challenge_response_data[sizeof(challenge_response_data_enc)];
+
+  if (strlen(result) / 2 > sizeof(challenge_response_data_enc)) {
+    gs_error = "Server challenge response too big";
+    ret = GS_FAILED;
+    goto cleanup;
+  }
+
   for (int count = 0; count < strlen(result); count += 2) {
     sscanf(&result[count], "%2hhx", &challenge_response_data_enc[count / 2]);
   }
 
-  for (int i = 0; i < 48; i += 16) {
-    AES_decrypt(&challenge_response_data_enc[i], &challenge_response_data[i], &dec_key);
-  }
+  decrypt(challenge_response_data_enc, sizeof(challenge_response_data_enc), aes_key, challenge_response_data);
 
   char client_secret_data[16];
-  RAND_bytes(client_secret_data, 16);
+  RAND_bytes(client_secret_data, sizeof(client_secret_data));
 
-  char challenge_response[16 + 256 + 16];
+  const ASN1_BIT_STRING *asnSignature;
+  X509_get0_signature(&asnSignature, NULL, cert);
+
+  char challenge_response[16 + SIGNATURE_LEN + sizeof(client_secret_data)];
   char challenge_response_hash[32];
-  char challenge_response_hash_enc[32];
-  char challenge_response_hex[65];
+  char challenge_response_hash_enc[sizeof(challenge_response_hash)];
+  char challenge_response_hex[SIZEOF_AS_HEX_STR(challenge_response_hash_enc)];
   memcpy(challenge_response, challenge_response_data + hash_length, 16);
-  memcpy(challenge_response + 16, cert->signature->data, 256);
-  memcpy(challenge_response + 16 + 256, client_secret_data, 16);
+  memcpy(challenge_response + 16, asnSignature->data, asnSignature->length);
+  memcpy(challenge_response + 16 + asnSignature->length, client_secret_data, sizeof(client_secret_data));
   if (server->serverMajorVersion >= 7)
-    SHA256(challenge_response, 16 + 256 + 16, challenge_response_hash);
+    SHA256(challenge_response, 16 + asnSignature->length + sizeof(client_secret_data), challenge_response_hash);
   else
-    SHA1(challenge_response, 16 + 256 + 16, challenge_response_hash);
+    SHA1(challenge_response, 16 + asnSignature->length + sizeof(client_secret_data), challenge_response_hash);
 
-  for (int i = 0; i < 32; i += 16) {
-    AES_encrypt(&challenge_response_hash[i], &challenge_response_hash_enc[i], &enc_key);
-  }
-  bytes_to_hex(challenge_response_hash_enc, challenge_response_hex, 32);
+  encrypt(challenge_response_hash, sizeof(challenge_response_hash), aes_key, challenge_response_hash_enc);
+  bytes_to_hex(challenge_response_hash_enc, challenge_response_hex, sizeof(challenge_response_hash_enc));
 
   uuid_generate_random(uuid);
   uuid_unparse(uuid, uuid_str);
-  sprintf(url, "http://%s:47989/pair?uniqueid=%s&uuid=%s&devicename=roth&updateState=1&serverchallengeresp=%s", server->serverInfo.address, unique_id, uuid_str, challenge_response_hex);
+  snprintf(url, sizeof(url), "http://%s:%u/pair?uniqueid=%s&uuid=%s&devicename=roth&updateState=1&serverchallengeresp=%s", server->serverInfo.address, server->httpPort, unique_id, uuid_str, challenge_response_hex);
   if ((ret = http_request(url, data)) != GS_OK)
     goto cleanup;
 
@@ -558,12 +580,19 @@ int gs_pair(PSERVER_DATA server, char* pin) {
     goto cleanup;
   }
 
-  char pairing_secret[16 + 256];
+  char pairing_secret[16 + SIGNATURE_LEN];
+
+  if (strlen(result) / 2 > sizeof(pairing_secret)) {
+    gs_error = "Pairing secret too big";
+    ret = GS_FAILED;
+    goto cleanup;
+  }
+
   for (int count = 0; count < strlen(result); count += 2) {
     sscanf(&result[count], "%2hhx", &pairing_secret[count / 2]);
   }
 
-  if (!verifySignature(pairing_secret, 16, pairing_secret+16, 256, plaincert)) {
+  if (!verifySignature(pairing_secret, 16, pairing_secret+16, SIGNATURE_LEN, plaincert)) {
     gs_error = "MITM attack detected";
     ret = GS_FAILED;
     goto cleanup;
@@ -571,21 +600,21 @@ int gs_pair(PSERVER_DATA server, char* pin) {
 
   unsigned char *signature = NULL;
   size_t s_len;
-  if (sign_it(client_secret_data, 16, &signature, &s_len, privateKey) != GS_OK) {
+  if (sign_it(client_secret_data, sizeof(client_secret_data), &signature, &s_len, privateKey) != GS_OK) {
       gs_error = "Failed to sign data";
       ret = GS_FAILED;
       goto cleanup;
   }
 
-  char client_pairing_secret[16 + 256];
-  char client_pairing_secret_hex[(16 + 256) * 2 + 1];
-  memcpy(client_pairing_secret, client_secret_data, 16);
-  memcpy(client_pairing_secret + 16, signature, 256);
-  bytes_to_hex(client_pairing_secret, client_pairing_secret_hex, 16 + 256);
+  char client_pairing_secret[sizeof(client_secret_data) + SIGNATURE_LEN];
+  char client_pairing_secret_hex[SIZEOF_AS_HEX_STR(client_pairing_secret)];
+  memcpy(client_pairing_secret, client_secret_data, sizeof(client_secret_data));
+  memcpy(client_pairing_secret + sizeof(client_secret_data), signature, SIGNATURE_LEN);
+  bytes_to_hex(client_pairing_secret, client_pairing_secret_hex, sizeof(client_secret_data) + SIGNATURE_LEN);
 
   uuid_generate_random(uuid);
   uuid_unparse(uuid, uuid_str);
-  sprintf(url, "http://%s:47989/pair?uniqueid=%s&uuid=%s&devicename=roth&updateState=1&clientpairingsecret=%s", server->serverInfo.address, unique_id, uuid_str, client_pairing_secret_hex);
+  snprintf(url, sizeof(url), "http://%s:%u/pair?uniqueid=%s&uuid=%s&devicename=roth&updateState=1&clientpairingsecret=%s", server->serverInfo.address, server->httpPort, unique_id, uuid_str, client_pairing_secret_hex);
   if ((ret = http_request(url, data)) != GS_OK)
     goto cleanup;
 
@@ -604,7 +633,7 @@ int gs_pair(PSERVER_DATA server, char* pin) {
 
   uuid_generate_random(uuid);
   uuid_unparse(uuid, uuid_str);
-  sprintf(url, "https://%s:47984/pair?uniqueid=%s&uuid=%s&devicename=roth&updateState=1&phrase=pairchallenge", server->serverInfo.address, unique_id, uuid_str);
+  snprintf(url, sizeof(url), "https://%s:%u/pair?uniqueid=%s&uuid=%s&devicename=roth&updateState=1&phrase=pairchallenge", server->serverInfo.address, server->httpsPort, unique_id, uuid_str);
   if ((ret = http_request(url, data)) != GS_OK)
     goto cleanup;
 
@@ -632,6 +661,13 @@ int gs_pair(PSERVER_DATA server, char* pin) {
 
   http_free_data(data);
 
+  // If we failed when attempting to pair with a game running, that's likely the issue.
+  // Sunshine supports pairing with an active session, but GFE does not.
+  if (ret != GS_OK && server->currentGame != 0) {
+    gs_error = "The computer is currently in a game. You must close the game before pairing.";
+    ret = GS_WRONG_STATE;
+  }
+
   return ret;
 }
 
@@ -639,14 +675,14 @@ int gs_applist(PSERVER_DATA server, PAPP_LIST *list) {
   int ret = GS_OK;
   char url[4096];
   uuid_t uuid;
-  char uuid_str[37];
+  char uuid_str[UUID_STRLEN];
   PHTTP_DATA data = http_create_data();
   if (data == NULL)
     return GS_OUT_OF_MEMORY;
 
   uuid_generate_random(uuid);
   uuid_unparse(uuid, uuid_str);
-  sprintf(url, "https://%s:47984/applist?uniqueid=%s&uuid=%s", server->serverInfo.address, unique_id, uuid_str);
+  snprintf(url, sizeof(url), "https://%s:%u/applist?uniqueid=%s&uuid=%s", server->serverInfo.address, server->httpsPort, unique_id, uuid_str);
   if (http_request(url, data) != GS_OK)
     ret = GS_IO_ERROR;
   else if (xml_status(data->memory, data->size) == GS_ERROR)
@@ -662,13 +698,15 @@ int gs_start_app(PSERVER_DATA server, STREAM_CONFIGURATION *config, int appId, b
   int ret = GS_OK;
   uuid_t uuid;
   char* result = NULL;
-  char uuid_str[37];
+  char uuid_str[UUID_STRLEN];
 
   PDISPLAY_MODE mode = server->modes;
   bool correct_mode = false;
   while (mode != NULL) {
-    if (mode->width == config->width && mode->height == config->height && mode->refresh == config->fps)
-      correct_mode = true;
+    if (mode->width == config->width && mode->height == config->height) {
+      if (mode->refresh == config->fps)
+        correct_mode = true;
+    }
 
     mode = mode->next;
   }
@@ -679,44 +717,55 @@ int gs_start_app(PSERVER_DATA server, STREAM_CONFIGURATION *config, int appId, b
   if (config->height >= 2160 && !server->supports4K)
     return GS_NOT_SUPPORTED_4K;
 
-  RAND_bytes(config->remoteInputAesKey, 16);
-  memset(config->remoteInputAesIv, 0, 16);
+  RAND_bytes(config->remoteInputAesKey, sizeof(config->remoteInputAesKey));
+  memset(config->remoteInputAesIv, 0, sizeof(config->remoteInputAesIv));
 
-  srand(time(NULL));
   char url[4096];
-  uint32_t rikeyid = 0;
-  char rikey_hex[33];
-  bytes_to_hex(config->remoteInputAesKey, rikey_hex, 16);
+  u_int32_t rikeyid = 0;
+  RAND_bytes(config->remoteInputAesIv, sizeof(rikeyid));
+  memcpy(&rikeyid, config->remoteInputAesIv, sizeof(rikeyid));
+  rikeyid = htonl(rikeyid);
+  char rikey_hex[SIZEOF_AS_HEX_STR(config->remoteInputAesKey)];
+  bytes_to_hex(config->remoteInputAesKey, rikey_hex, sizeof(config->remoteInputAesKey));
 
   PHTTP_DATA data = http_create_data();
   if (data == NULL)
     return GS_OUT_OF_MEMORY;
 
-  printf("gs_start_app\n");
+  // Using an FPS value over 60 causes SOPS to default to 720p60,
+  // so force it to 0 to ensure the correct resolution is set. We
+  // used to use 60 here but that locked the frame rate to 60 FPS
+  // on GFE 3.20.3.
+  int fps = (server->isNvidiaSoftware && config->fps > 60) ? 0 : config->fps;
 
   uuid_generate_random(uuid);
   uuid_unparse(uuid, uuid_str);
-  if (server->currentGame == 0) {
-    int channelCounnt = config->audioConfiguration == AUDIO_CONFIGURATION_STEREO ? CHANNEL_COUNT_STEREO : CHANNEL_COUNT_51_SURROUND;
-    int mask = config->audioConfiguration == AUDIO_CONFIGURATION_STEREO ? CHANNEL_MASK_STEREO : CHANNEL_MASK_51_SURROUND;
-    snprintf(url, sizeof(url), "https://%s:47984/launch?uniqueid=%s&uuid=%s&appid=%d&mode=%dx%dx%d&additionalStates=1&sops=%d&rikey=%s&rikeyid=%d&localAudioPlayMode=%d&surroundAudioInfo=%d&remoteControllersBitmap=%d&gcmap=%d", server->serverInfo.address, unique_id, uuid_str, appId, config->width, config->height, config->fps, sops, rikey_hex, rikeyid, localaudio, (mask << 16) + channelCounnt, gamepad_mask, gamepad_mask);
-  } else
-    sprintf(url, "https://%s:47984/resume?uniqueid=%s&uuid=%s&rikey=%s&rikeyid=%d", server->serverInfo.address, unique_id, uuid_str, rikey_hex, rikeyid);
-
+  int surround_info = SURROUNDAUDIOINFO_FROM_AUDIO_CONFIGURATION(config->audioConfiguration);
+  snprintf(url, sizeof(url), "https://%s:%u/%s?uniqueid=%s&uuid=%s&appid=%d&mode=%dx%dx%d&additionalStates=1&sops=%d&rikey=%s&rikeyid=%d&localAudioPlayMode=%d&surroundAudioInfo=%d&remoteControllersBitmap=%d&gcmap=%d%s",
+           server->serverInfo.address, server->httpsPort, server->currentGame ? "resume" : "launch", unique_id, uuid_str, appId, config->width, config->height, fps, sops, rikey_hex, rikeyid, localaudio, surround_info, gamepad_mask, gamepad_mask,
+           config->enableHdr ? "&hdrMode=1&clientHdrCapVersion=0&clientHdrCapSupportedFlagsInUint32=0&clientHdrCapMetaDataId=NV_STATIC_METADATA_TYPE_1&clientHdrCapDisplayData=0x0x0x0x0x0x0x0x0x0x0" : "");
   if ((ret = http_request(url, data)) == GS_OK)
     server->currentGame = appId;
   else
     goto cleanup;
-  printf("ret = 0x%x\n", ret);
 
   if ((ret = xml_status(data->memory, data->size) != GS_OK))
     goto cleanup;
-  else if ((ret = xml_search(data->memory, data->size, "gamesession", &result)) != GS_OK)
+  else if ((ret = xml_search(data->memory, data->size, "gamesession", &result)) != GS_OK &&
+           (ret = xml_search(data->memory, data->size, "resume", &result)) != GS_OK)
     goto cleanup;
 
   if (!strcmp(result, "0")) {
     ret = GS_FAILED;
     goto cleanup;
+  }
+
+  free(result);
+  result = NULL;
+
+  if (xml_search(data->memory, data->size, "sessionUrl0", &result) == GS_OK) {
+    server->serverInfo.rtspSessionUrl = result;
+    result = NULL;
   }
 
   cleanup:
@@ -731,7 +780,7 @@ int gs_quit_app(PSERVER_DATA server) {
   int ret = GS_OK;
   char url[4096];
   uuid_t uuid;
-  char uuid_str[37];
+  char uuid_str[UUID_STRLEN];
   char* result = NULL;
   PHTTP_DATA data = http_create_data();
   if (data == NULL)
@@ -739,7 +788,7 @@ int gs_quit_app(PSERVER_DATA server) {
 
   uuid_generate_random(uuid);
   uuid_unparse(uuid, uuid_str);
-  sprintf(url, "https://%s:47984/cancel?uniqueid=%s&uuid=%s", server->serverInfo.address, unique_id, uuid_str);
+  snprintf(url, sizeof(url), "https://%s:%u/cancel?uniqueid=%s&uuid=%s", server->serverInfo.address, server->httpsPort, unique_id, uuid_str);
   if ((ret = http_request(url, data)) != GS_OK)
     goto cleanup;
 
@@ -761,7 +810,7 @@ int gs_quit_app(PSERVER_DATA server) {
   return ret;
 }
 
-int gs_init(PSERVER_DATA server, char *address, const char *keyDirectory, int log_level, bool unsupported) {
+int gs_init(PSERVER_DATA server, char *address, unsigned short httpPort, const char *keyDirectory, int log_level, bool unsupported) {
   mkdirtree(keyDirectory);
   if (load_unique_id(keyDirectory) != GS_OK)
     return GS_FAILED;
@@ -774,5 +823,7 @@ int gs_init(PSERVER_DATA server, char *address, const char *keyDirectory, int lo
   LiInitializeServerInformation(&server->serverInfo);
   server->serverInfo.address = address;
   server->unsupported = unsupported;
+  server->httpPort = httpPort ? httpPort : 47989;
+  server->httpsPort = 0; /* Populated by load_server_status() */
   return load_server_status(server);
 }

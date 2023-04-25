@@ -31,7 +31,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <arpa/inet.h>
-#include <uuid/uuid.h>
+#include <uuid.h>
 #include <openssl/sha.h>
 #include <openssl/aes.h>
 #include <openssl/rand.h>
@@ -59,6 +59,7 @@ const char* gs_error;
 #define SIGNATURE_LEN 256
 
 #define UUID_STRLEN 37
+#define PATH_MAX 1024
 
 static int mkdirtree(const char* directory) {
   char buffer[PATH_MAX];

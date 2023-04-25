@@ -30,6 +30,15 @@ void gs_sps_init(int width, int height) {
   initial_height = height;
 }
 
+void gs_sps_stop()
+{
+  if (h264_stream)
+  {
+    h264_free(h264_stream);
+    h264_stream = NULL;
+  }
+}
+
 void gs_sps_fix(PLENTRY sps, int flags, uint8_t* out_buf, uint32_t* out_offset) {
   int start_len = sps->data[2] == 0x01 ? 3 : 4;
 

@@ -236,7 +236,7 @@ int ui_connect(char *name, char *address) {
     char key_dir[4096];
     sprintf(key_dir, "%s/%s", config.key_dir, name);
 
-    ret = gs_init(&server, address, key_dir, 0, true);
+    ret = gs_init(&server, address, HOST_PORT, key_dir, 0, true);
     if (ret == GS_OUT_OF_MEMORY) {
       display_error("Not enough memory");
       return 0;
@@ -372,7 +372,7 @@ device_info_t* ui_connect_and_pairing(device_info_t *info) {
   sprintf(key_dir, "%s/%s", config.key_dir, info->name);
   sceIoMkdir(key_dir, 0777);
 
-  int ret = gs_init(&server, info->internal, key_dir, 0, true);
+  int ret = gs_init(&server, info->internal, HOST_PORT, key_dir, 0, true);
 
   if (ret == GS_OUT_OF_MEMORY) {
     display_error("Not enough memory");
@@ -463,7 +463,7 @@ bool check_connection(const char *name, char *addr) {
   char key_dir[4096];
   sprintf(key_dir, "%s/%s", config.key_dir, name);
 
-  if (gs_init(&server, addr, key_dir, 0, true) != GS_OK) {
+  if (gs_init(&server, addr, HOST_PORT, key_dir, 0, true) != GS_OK) {
     return false;
   }
   connection_terminate();

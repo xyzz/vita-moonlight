@@ -471,7 +471,8 @@ int gs_pair(PSERVER_DATA server, char* pin) {
   }
 
   for (int count = 0; count < strlen(result); count += 2) {
-    sscanf(&result[count], "%2hhx", &plaincert[count / 2]);
+    char hex_byte[3] = {result[count], result[count + 1], '\0'};
+    plaincert[count / 2] = (uint8_t)strtol(hex_byte, NULL, 16);
   }
   plaincert[strlen(result)/2] = '\0';
 
@@ -529,7 +530,8 @@ int gs_pair(PSERVER_DATA server, char* pin) {
   }
 
   for (int count = 0; count < strlen(result); count += 2) {
-    sscanf(&result[count], "%2hhx", &challenge_response_data_enc[count / 2]);
+    char hex_byte[3] = {result[count], result[count + 1], '\0'};
+    challenge_response_data_enc[count / 2] = (uint8_t)strtol(hex_byte, NULL, 16);
   }
 
   decrypt(challenge_response_data_enc, sizeof(challenge_response_data_enc), aes_key, challenge_response_data);
@@ -590,7 +592,8 @@ int gs_pair(PSERVER_DATA server, char* pin) {
   }
 
   for (int count = 0; count < strlen(result); count += 2) {
-    sscanf(&result[count], "%2hhx", &pairing_secret[count / 2]);
+    char hex_byte[3] = {result[count], result[count + 1], '\0'};
+    pairing_secret[count / 2] = (uint8_t)strtol(hex_byte, NULL, 16);
   }
 
   if (!verifySignature(pairing_secret, 16, pairing_secret+16, SIGNATURE_LEN, plaincert)) {

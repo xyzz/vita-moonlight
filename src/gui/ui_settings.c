@@ -512,13 +512,16 @@ static int settings_loop(int id, void *context, const input_data *input) {
       if (!left && !right) {
           break;
       }
-      char *settings[] = {"30", "60"};
+      char *settings[] = {"24", "30", "40", "50", "60"};
       sprintf(current, "%d", config.stream.fps);
       new_idx = _move_idx_in_array(settings, current, left ? -1 : +1);
 
       switch (new_idx) {
-        case 0: config.stream.fps = 30; break;
-        case 1: config.stream.fps = 60; break;
+        case 0: config.stream.fps = 24; break; // Movies
+        case 1: config.stream.fps = 30; break;
+        case 2: config.stream.fps = 40; break;
+        case 3: config.stream.fps = 50; break; // PAL
+        case 4: config.stream.fps = 60; break; // NTSC
       }
 
       did_change = 1;

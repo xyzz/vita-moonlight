@@ -517,7 +517,7 @@ static int settings_loop(int id, void *context, const input_data *input) {
       new_idx = _move_idx_in_array(settings, current, left ? -1 : +1);
 
       switch (new_idx) {
-        case 0: config.stream.fps = 24; break; //Movies
+        case 0: config.stream.fps = 24; break; // Movies
         case 1: config.stream.fps = 30; break;
         case 2: config.stream.fps = 40; break;
         case 3: config.stream.fps = 50; break; // PAL

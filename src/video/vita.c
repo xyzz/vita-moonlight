@@ -210,7 +210,7 @@ static int vita_pacer_thread_main(SceSize args, void *argp) {
     }
 
     curr_fps[0] = curr_frame_count;
-    curr_fps[1] = vblank_fps;
+    curr_fps[1] = max_fps;
 
     last_vblank_count = curr_vblank_count;
     uint64_t curr_check_time = sceKernelGetSystemTimeWide();

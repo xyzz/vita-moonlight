@@ -1,3 +1,18 @@
+## 0.13.2
+
+* added PS button capture
+  - when enabled, double-pressing the PS button will open the menu, single press is passed as PS/Xbox button to Sunshine
+  - This required disabling the safe (-s) flag in `vita-make-fself` and adding the `SceShell` permission (0x2800000000000001)
+* allow enabling/disabling touch zones independent of touch mode (separate setting)
+  - allows using front screen touch zones regardless of touch input mode. when a touch zone is pressed, the touch input is ignored. unused touch zones are ignored and function as normal touch area.
+
+Bug fixes:
+* fixed front touch zone L2/R2 special keys not working
+
+Refactor:
+* fix: Update subproject commits for enet, inih, and moonlight-common-c
+* split `vitainput_process` into multiple smaller functions for better code readability
+
 ## 0.13.1
 
 * fix: Split shortcuts into individual files for better code organization and maintainability.

@@ -2,13 +2,15 @@
 
 Vita Moonlight is a PlayStation Vita port of Moonlight, with major improvements for usability, pairing, device management, and now advanced touch, multitouch, and DS4 touchpad emulation.
 
-## Highlights (0.13.0)
+## Highlights (0.13.2)
 
 - **Touchscreen Modes Unified:** Select between three touchscreen modes from the settings menu:
   - **DS4 Touchpad:** Emulates a DualShock 4-style multitouch touchpad, compatible with gestures and Steam Input advanced controls.
   - **Absolute Mouse:** Use the Vita screen as a true absolute mouse (with improved gesture support).
   - **Tablet (Sunshine):** Native multitouch for Sunshine streaming, with true multi-finger gestures.
 - **DS4 Touchpad Sensitivity:** DS4 mode is now more sensitive and precise for a smoother experience.
+- **PS Button Capture:** Optional PS button capture implemented — double press opens the menu, single press forwarded to Sunshine as PS/Xbox button mapping (requires SceShell permission in the VPK).
+- **Touch Zones Independent of Mode:** Touch zone support allows using front-screen touch zones independent of the selected touch input mode; when a zone is active, touch input in that area is ignored.
 - **Wake-on-LAN (WOL) Integration:** Power on your remote PC directly from the Vita, with robust MAC address handling and cross-platform compatibility.
 - **Host MAC Management:** MAC addresses are now saved/loaded correctly, with all ARP/legacy logic removed.
 - **WOL Packet Debugging:** Includes a Python script (`tools/wol_sniffer.py`) to verify WOL packets on your network.
@@ -57,21 +59,22 @@ Stay tuned for more improvements!
 ---
 
 
-## What's New in 0.13.0
+ 
+## What's New in 0.13.2
 
-- **Unified Touchscreen Modes:** Choose between DS4 Touchpad, Absolute Mouse, and Tablet (Sunshine) modes from the settings menu.
-- **DS4 Touchpad Mode:** Vita screen acts as a DS4-style multitouch touchpad, supporting gestures and advanced controls in games and Steam Input.
-- **Improved DS4 Sensitivity:** Smoother and more precise touchpad emulation.
-- **Wake-on-LAN (WOL) Fully Integrated:** Power on your PC from the Vita, with robust MAC address handling and cross-platform support.
-- **Host MAC Address Management:** MAC addresses are now saved/loaded correctly; all ARP/legacy logic removed.
-- **WOL Packet Debugging:** Python script (`tools/wol_sniffer.py`) included to verify WOL packets on your network.
-- **UI Improvements:**
-  - Host Management menu: O/cancel returns to previous menu, improved feedback, unified status display.
-  - Special button overlays no longer interfere with absolute touch input.
-- **Combo Fixes:** L1+L2 and R1+R2 combos now work correctly, even with touchscreen or backtouch enabled.
-- **Many bugfixes, code cleanups, and internal refactors for stability and maintainability.
+- **PS button capture:** When enabled, double-pressing the PS button will open the menu; a single press is passed through as a PS/Xbox button press to Sunshine.
+  - Note: Implementing PS button capture required removing the `-s` (safe) flag from `vita-make-fself` and adding the `SceShell` permission (0x2800000000000001) to the VPK.
+- **Touch Zones Independent of Mode:** Added a setting to enable/disable touch zones independently of the touch input mode.
+  - Allows using front screen touch zones regardless of touch input mode. When a touch zone is pressed, the touch input in that area is ignored; unused touch zones work like normal touch areas.
 
----
+### Bug fixes (0.13.2)
+
+- Fixed front touch zone L2/R2 special keys not working.
+
+### Refactor & maintenance (0.13.2)
+
+- Updated subproject commits for `enet`, `inih`, and `moonlight-common-c`.
+- Split `vitainput_process` into multiple smaller functions for readability and maintainability.
 
 ---
 

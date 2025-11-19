@@ -1,0 +1,92 @@
+#!/bin/bash
+
+# Navegar al directorio del proyecto
+cd "$(dirname "$0")"
+
+# Obtener TITLE_ID desde CMakeLists.txt
+title_id=$(grep -Po 'set\(TITLE_ID\s+"\K[^"]+' CMakeLists.txt | head -n1)
+if [ -z "$title_id" ]; then
+    echo "[!] No se pudo encontrar TITLE_ID en CMakeLists.txt"
+    exit 1
+fi
+
+# Configuración
+# Leer la IP de la PS Vita desde ip_vita.txt
+if [ ! -f ip_vita.txt ]; then
+    echo "[!] No se encontró el archivo ip_vita.txt. Por favor, crea el archivo con la IP de tu PS Vita."
+    exit 1
+fi
+VITA_IP=$(head -n1 ip_vita.txt | tr -d '\r\n')
+VITA_PORT=1337
+VITA_CONTROL_PORT=1338
+VPK_PATH="build/moonlight.vpk"
+
+# Compilar con cmake y make
+echo "[+] Iniciando compilación para PS Vita..."
+mkdir -p build
+cd build
+cmake ..
+if [ $? -ne 0 ]; then
+    echo "[!] Error en cmake. Abortando."
+    exit 1
+fi
+make -j$(nproc)
+if [ $? -ne 0 ]; then
+    echo "[!] Error en la compilación. Abortando."
+    exit 1
+fi
+cd ..
+
+# Verificar si se generó el VPK
+if [ ! -f "$VPK_PATH" ]; then
+    echo "[!] Error: No se generó el VPK"
+    ls -la build/
+    exit 1
+fi
+
+VPK_SIZE=$(du -h "$VPK_PATH" | cut -f1)
+echo -e "\n[+] Compilación exitosa! VPK: $VPK_PATH ($VPK_SIZE)"
+
+
+# Menú de opciones de deploy
+echo -e "\n==========================================="
+echo "¿Cómo quieres enviar el VPK a la Vita?"
+echo "1) Enviar por FTP (VitaShell)"
+echo "2) Deploy rápido (makefast, para eboot.bin)"
+echo "3) Salir"
+echo "==========================================="
+read -p "Selecciona una opción [1-3]: " opt
+
+case "$opt" in
+    1)
+        echo -e "\n[+] Enviando VPK por FTP..."
+        curl --ftp-method nocwd -T "$VPK_PATH" "ftp://${VITA_IP}:${VITA_PORT}/ux0:/ABM/"
+        echo -e "\n[+] Abriendo VitaShell..."
+        echo "launch VITASHELL" | nc "$VITA_IP" "$VITA_CONTROL_PORT"
+        echo -e "\n==========================================="
+        echo "Instrucciones:"
+        echo "1. Ve a ux0:/ABM/ en VitaShell"
+        echo "2. Instala $(basename "$VPK_PATH")"
+        echo "3. Presiona O para volver al LiveArea"
+        echo "4. Presiona ENTER aquí para iniciar la aplicación"
+        echo "==========================================="
+        read -p "Presiona ENTER para iniciar la aplicación..."
+        echo -e "\n[+] Iniciando la aplicación ($title_id)..."
+        echo "launch $title_id" | nc "$VITA_IP" "$VITA_CONTROL_PORT"
+        echo "¡Aplicación iniciada! ($title_id)"
+        ;;
+    2)
+        echo -e "\n[+] Usando makefast para deploy rápido de eboot.bin..."
+        ./makefast build eboot.bin || { echo "[!] Error ejecutando makefast"; exit 1; }
+        ;;
+    3)
+        echo "Saliendo."
+        exit 0
+        ;;
+    *)
+        echo "Opción inválida. Saliendo."
+        exit 1
+        ;;
+esac
+
+echo -e "\nCompilación completada. Archivos generados en el directorio build/"

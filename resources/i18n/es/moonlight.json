@@ -1,0 +1,314 @@
+{
+    "title": "Moonlight Vita",
+    "tabs": {
+        "settings": "Configuración",
+        "about": "Acerca de Moonlight Vita",
+        "add_host": "Añadir PC",
+        "hosts": "PCs guardados"
+    },
+    "capunlocker_notify": "¡CapUnlocker detectado! Se habilitarán los 4 núcleos y RAM extendida.",
+    "welcome": "¡Bienvenido a la demo de borealis! Explora y descubre lo que la librería puede hacer.",
+    "components": {
+        "buttons_header": "Botones",
+        "button_primary": "Botón primario",
+        "button_highlight": "\uE13C  Botón destacado",
+        "button_wrapping": "Botón por defecto con texto largo",
+        "button_bordered": "Botón con borde",
+        "button_borderless": "Botón sin borde",
+        "slider_header": "Slider",
+        "labels_header": "Etiquetas",
+        "regular_label": "Esto es una etiqueta. Por defecto, se ajustan automáticamente y expanden su altura si hay espacio vertical. Si no, se truncarán, como algunas pestañas de la barra lateral.\nEsto es una etiqueta. Por defecto, se ajustan automáticamente y expanden su altura si hay espacio vertical. Si no, se truncarán, como algunas pestañas de la barra lateral.",
+        "label_left": "Esta etiqueta está alineada a la izquierda",
+        "label_center": "Esta etiqueta está centrada",
+        "label_right": "Esta etiqueta está alineada a la derecha",
+        "images_header_title": "Imágenes",
+        "images_header_subtitle": "Enfócalas para ver el método de escalado",
+        "images_downscaled": "Reducida",
+        "images_original": "Original",
+        "images_upscaled": "Aumentada",
+        "images_stretched": "Estirada",
+        "images_cropped": "Recortada"
+    },
+    "about": {
+        "title": "Moonlight Vita",
+        "description": "Cliente open source de NVIDIA GameStream para PlayStation Vita. Permite hacer streaming de juegos desde tu PC con Sunshine o GeForce Experience.",
+        "author": "Autor: AorsiniYT",
+        "original_creators": "Port original de Vita: xyzz, d3m3vilurr, cgutman",
+        "moonlight_repo": "Moonlight original: github.com/moonlight-stream",
+        "github": "Código fuente: github.com/xyzz/vita-moonlight",
+        "licence": "Licencia: GPLv3",
+        "logo_credit": "Logo y UI adaptados para Vita. Basado en Borealis."
+    },
+    "settings": {
+        "add_host": "Añadir PC",
+        "add_host_desc": "Agrega un nuevo PC para hacer streaming",
+        "add_host_title": "Añadir PC",
+        "add_host_manual": "Nombre del PC",
+        "add_host_auto": "Buscar PC automáticamente",
+        "add_host_manual_msg": "Función para añadir PC manualmente (pendiente)",
+        "add_host_auto_msg": "Función para buscar PC automáticamente (pendiente)",
+        "add_host_ip_placeholder": "Ej: 192.168.1.100",
+        "add_host_name_placeholder": "Nombre del PC",
+        "add_host_missing_fields": "Debes ingresar IP y nombre",
+        "add_host_added": "Host añadido",
+        "add_host_not_implemented": "(Aún no implementado)",
+        "ip": "IP",
+        "dns": "DNS",
+        "notify": "Mostrar notificación",
+        "language": "Idioma",
+        "moonlight/settings/language": "Idioma",
+        "add_host_connection_type": "Tipo de conexión",
+        "add_host_lan": "LAN (local)",
+        "add_host_online": "Online (externo)",
+        "hosts_list_title": "PCs guardados",
+        "hosts_list_empty": "No hay PCs guardados",
+        "rear_touch_detail": "Configura el panel trasero y sus acciones",
+        "add_host_connect_question_dialog": "¿Conectar con $(name) en $(ip)?",
+        "add_host_connect": "Conectar",
+        "add_host_cancel": "Cancelar"
+    },
+    "settings_tab": {
+            "header": "Configuración de streaming",
+            "controls_header": "Controles",
+            "system_header": "Sistema",
+        "render_mode": {
+            "title": "Modo de renderizado",
+                "legacy_option": "Legacy (SceVideodec)",
+            "modern_option": "Moderno (FFmpeg)",
+            "legacy_name": "Legacy",
+            "modern_name": "Moderno",
+            "unknown_name": "Desconocido",
+            "notify": "Modo de renderizado: {0}"
+        },
+        "pixel_format": {
+            "title": "Formato de píxel",
+            "rgba": "RGBA directo",
+            "yuv": "YUV420 (experimental)",
+            "notify": "Formato de píxel: {0}"
+        },
+        "resolution": {
+            "title": "Resolución",
+            "options": {
+                "0": "960x540 (16:9 QHD)",
+                "1": "960x544 (Vita nativa)",
+                "2": "1024x576 (16:9)",
+                "3": "1152x648 (16:9)",
+                "4": "1280x540 (21:9)",
+                "5": "1280x720 (720p HD)",
+                "6": "1366x768 (WXGA)",
+                "7": "1600x900 (900p HD+)",
+                "8": "1920x1080 (FHD)"
+            },
+            "saved": "Resolución guardada"
+        },
+        "fps": {
+            "title": "FPS",
+            "options": {
+                "0": "24 FPS (Cine)",
+                "1": "30 FPS (Estándar)",
+                "2": "40 FPS",
+                "3": "50 FPS (PAL)",
+                "4": "60 FPS (NTSC)"
+            },
+            "saved": "FPS guardado"
+        },
+        "bitrate": {
+            "title": "Bitrate (Kbps)",
+            "options": {
+                "0": "Auto (Recomendado)",
+                "1": "2000 Kbps (Bajo)",
+                "2": "5000 Kbps (Estándar)",
+                "3": "8000 Kbps (HD)",
+                "4": "10000 Kbps (HD+)",
+                "5": "15000 Kbps (Full HD)",
+                "6": "20000 Kbps (Full HD+)",
+                "7": "30000 Kbps (Ultra HD)",
+                "8": "50000 Kbps (Máximo)"
+            },
+            "saved": "Bitrate guardado"
+        },
+        "sops_title": "Optimización de stream",
+        "network_opt_title": "Optimizaciones de red",
+        "network_opt_enabled": "Optimizaciones de red activadas",
+        "network_opt_disabled": "Optimizaciones de red desactivadas",
+        "local_audio_title": "Audio local",
+        "fullscreen_title": "Pantalla completa",
+        "frame_pacer_title": "Frame pacer",
+        "center_region_title": "Solo región central",
+        "show_fps_title": "Mostrar FPS",
+        "save_debug_log_title": "Guardar log de depuración",
+        "ref_frame_title": "Invalidación de frame de referencia",
+        "vblank_wait_title": "Esperar VBlank Vita",
+        "motion_controls_title": "Controles de movimiento",
+        "double_tap_sprint_title": "Doble tap para correr",
+        "touchscreen_mode": {
+            "title": "Modo touchscreen",
+            "options": {
+                "0": "Desactivado",
+                "1": "Trackpad relativo",
+                "2": "Touchpad DS4 (PS4 solo)",
+                "3": "Mouse absoluto",
+                "4": "Tableta multitouch"
+            },
+            "saved": "Modo touchscreen guardado",
+            "changed": "Modo touchscreen cambiado a:"
+        },
+        "gamepad_type": {
+            "title": "Tipo de control",
+            "options": {
+                "xbox": "Xbox 360",
+                "ps4": "PlayStation 4"
+            },
+            "notify_prefix": "Tipo de control cambiado a: "
+        },
+        "mouse_accel": {
+            "title": "Aceleración del mouse"
+        },
+        "keyboard_layout": {
+            "title": "Distribución del teclado",
+            "saved": "Distribución de teclado guardada"
+        },
+        "languages": {
+            "es": "Español",
+            "en": "English"
+        },
+        "language_changed": "Idioma cambiado correctamente"
+    },
+    "rear_touch": {
+        "title": "Touch trasero",
+        "toggle": "Touch trasero",
+        "calibrate": "Calibrar touch trasero",
+        "calibration_zone_title": "Zona activa",
+        "calibration_zone_detail": "Ajusta los márgenes con la calibración",
+        "actions_header": "Acciones por esquina",
+        "action_nw": "Acción esquina NW",
+        "action_ne": "Acción esquina NE",
+        "action_sw": "Acción esquina SW",
+        "action_se": "Acción esquina SE",
+        "notify_enabled": "Touch trasero activado",
+        "notify_disabled": "Touch trasero desactivado",
+        "notify_action_saved": "Acción del touch trasero guardada",
+        "notify_calibration_saved": "Calibración del touch trasero guardada",
+        "detail_top": "Sup",
+        "detail_bottom": "Inf",
+        "detail_left": "Izq",
+        "detail_right": "Der",
+        "calibration": {
+            "title": "Calibrar Touch Trasero",
+            "overlay_title": "Ajuste Touch Trasero",
+            "status_enabled": "Estado: Activado",
+            "status_disabled": "Estado: Desactivado",
+            "selected_edge": "Lado seleccionado: ",
+            "current_action": "Acción actual: ",
+            "margins": "Márgenes (px)",
+            "margins_format": "{0} - {1}: {2} | {3}: {4} | {5}: {6} | {7}: {8}",
+            "assignments_prefix": "Asignaciones",
+            "assignments_top_format": "{0} - {1}: {2} | {3}: {4}",
+            "assignments_bottom_format": "{0}: {1} | {2}: {3}",
+            "instructions": "▲/▼ cambia lado • ◀/▶ ajusta margen • L/R cambia acción • △ activa/desactiva • □ restablece",
+            "zone_labels": {
+                "nw": "NO",
+                "ne": "NE",
+                "sw": "SO",
+                "se": "SE"
+            },
+            "edge_labels": ["Superior", "Derecha", "Inferior", "Izquierda"],
+            "actions": {
+                "save": "Guardar",
+                "cancel": "Cancelar",
+                "next_edge": "Lado siguiente",
+                "prev_edge": "Lado anterior",
+                "increase_margin": "Aumentar margen",
+                "decrease_margin": "Reducir margen",
+                "next_action": "Acción siguiente",
+                "prev_action": "Acción anterior",
+                "toggle_enabled": "Activar/Desactivar",
+                "reset": "Restablecer"
+            }
+        }
+    },
+    "hints": {
+        "cancel": "Cancelar"
+    },
+    "host_dialog/connecting": "Generando certificados...",
+    "main": {
+        "cancel": "Cancelar"
+    },
+    "trackpad": {
+        "header": "Configuración del Trackpad",
+            "pointer_speed": {
+                "title": "Velocidad del puntero",
+                "detail": "Ajusta el multiplicador de velocidad del cursor al deslizar"
+        },
+        "tap_to_click": {
+            "title": "Tocar para hacer clic",
+            "detail": "Haz clic tocando el trackpad sin presionar",
+            "enabled": "Tocar para hacer clic activado",
+            "disabled": "Tocar para hacer clic desactivado",
+            "required": "Tocar para hacer clic es obligatorio en PS Vita"
+        },
+        "gestures_header": "Gestos y opciones de clic",
+        "two_finger_right_click": {
+            "title": "Clic derecho con dos dedos",
+            "detail": "Realiza clic derecho con dos dedos",
+            "enabled": "Clic derecho con dos dedos activado",
+            "disabled": "Clic derecho con dos dedos desactivado"
+        },
+        "two_finger_scroll": {
+            "title": "Desplazamiento con dos dedos",
+            "detail": "Desplázate deslizando con dos dedos",
+            "enabled": "Desplazamiento con dos dedos activado",
+            "disabled": "Desplazamiento con dos dedos desactivado"
+        },
+        "invert_scroll": {
+            "title": "Invertir dirección de desplazamiento",
+            "detail": "Usa desplazamiento natural (estilo iOS) o tradicional",
+            "natural": "Desplazamiento natural activado (estilo iOS)",
+            "traditional": "Desplazamiento tradicional activado"
+        },
+        "multi_touch": {
+            "title": "Gestos multitáctiles",
+            "detail": "Activa gestos avanzados como pellizcar para hacer zoom",
+            "enabled": "Gestos multitáctiles activados",
+            "disabled": "Gestos multitáctiles desactivados"
+        },
+        "advanced_header": "Opciones avanzadas",
+        "edge_zone": {
+            "title": "Zonas muertas en los bordes",
+            "detail": "Define zonas en los bordes para ignorar toques accidentales"
+        },
+        "dead_zone": {
+            "title": "Zona muerta de movimiento",
+            "detail": "Umbral mínimo de movimiento antes de registrar como deslizamiento"
+        }
+    },
+    "session": {
+        "pause": {
+            "title": "Menú de pausa",
+            "resume": "Reanudar",
+            "disconnect": "Desconectar",
+            "close_app": "Cerrar app",
+            "notify_disconnected": "Desconectado del host",
+            "notify_app_closed": "Aplicación cerrada en el host"
+        }
+    ,
+        "app_select": {
+            "subtitle": "Selecciona una aplicación para iniciar",
+            "connecting": "Conectando...",
+            "starting": "Iniciando...",
+            "error_no_host": "Error: No se encontró la información del host.",
+            "no_apps": "No se encontraron aplicaciones en este host.",
+            "running_session": "Sesión en curso",
+            "error_connect": "Error al conectar con el servidor",
+            "paired": "Emparejado",
+            "pairing_failed": "Empareado cancelado/falló",
+            "error_start_app": "Error al iniciar la aplicación",
+            "error_start_stream": "Error al iniciar streaming",
+            "active_session_msg": "Sesión activa: $(app). ¿Deseas reanudarla o iniciar una nueva?",
+            "button_resume": "Reanudar",
+            "button_start_new": "Iniciar nueva",
+            "ending_session": "Cerrando sesión en el host...",
+            "error_end_session": "Error al cerrar la sesión en el host"
+        }
+    }
+}

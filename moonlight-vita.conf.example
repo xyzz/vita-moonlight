@@ -1,0 +1,32 @@
+[general]
+language = es
+
+[stream]
+width = 1280
+height = 720
+fps = 60
+bitrate = -1
+packetsize = 1024
+streaming_remotely = 0
+audio_config = 2
+video_formats = 1
+
+[video]
+sops = true
+localaudio = false
+fullscreen = true
+enable_frame_pacer = true
+center_region_only = false
+show_fps = false
+save_debug_log = false
+enable_ref_frame_invalidation = false
+enable_vita_vblank_wait = false
+enable_motion_controls = false
+enable_double_tap_sprint = false
+absolute_mouse = false
+touchscreen_mode = false
+double_tap_sprint_step_time = 200
+motion_controls_scalar_x = 1.2
+motion_controls_scalar_y = 0.8
+mouse_acceleration = 150
+keyboard_layout = 0

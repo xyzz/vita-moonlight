@@ -1,0 +1,137 @@
+<brls:AppletFrame
+    iconInterpolation="linear"
+    footerHidden="false">
+    <brls:TabFrame
+        title="@i18n/moonlight/title"
+        icon="@res/img/borealis_96.png">
+
+        <brls:Tab label="@i18n/moonlight/tabs/hosts">
+            <HostsTab />
+        </brls:Tab>
+
+        <brls:Tab label="@i18n/moonlight/tabs/add_host">
+            <AddHostTab />
+        </brls:Tab>
+
+        <brls:Tab label="@i18n/moonlight/tabs/settings">
+            <SettingsTab />
+        </brls:Tab>
+
+        <brls:Tab label="@i18n/moonlight/tabs/about" >
+
+            <brls:Box
+                width="auto"
+                height="auto"
+                axis="column"
+                paddingTop="@style/about/padding_top_bottom"
+                paddingBottom="@style/about/padding_top_bottom"
+                paddingLeft="@style/about/padding_sides"
+                paddingRight="@style/about/padding_sides" >
+
+                <brls:Image
+                    width="auto"
+                    height="33%"
+                    image="@res/img/borealis_256.png"
+                    marginBottom="@style/about/description_margin"/>
+
+                <brls:Box
+                    width="auto"
+                    height="auto"
+                    axis="row"
+                    marginBottom="@style/about/description_margin">
+
+                    <brls:Box
+                        width="40%"
+                        height="auto"
+                        axis="column"
+                        alignItems="flexStart"
+                        justifyContent="flexStart">
+
+                        <brls:Label
+                            width="auto"
+                            height="auto"
+                            text="@i18n/moonlight/about/title"
+                            fontSize="36"
+                            horizontalAlign="left"
+                            verticalAlign="top"
+                            marginBottom="20" />
+
+                        <brls:Label
+                            width="100%"
+                            height="auto"
+                            text="@i18n/moonlight/about/author"
+                            fontSize="22"
+                            textColor="#FFD700"
+                            horizontalAlign="left"
+                            marginBottom="8" />
+
+                        <brls:Label
+                            width="100%"
+                            height="auto"
+                            text="@i18n/moonlight/about/original_creators"
+                            fontSize="20"
+                            textColor="#00B0FF"
+                            horizontalAlign="left"
+                            marginBottom="8" />
+                    </brls:Box>
+
+                    <brls:Label
+                        width="auto"
+                        height="auto"
+                        text="@i18n/moonlight/about/description"
+                        fontSize="18"
+                        marginLeft="@style/about/description_margin"
+                        marginRight="@style/about/description_margin"
+                        horizontalAlign="left"
+                        verticalAlign="top" />
+
+                </brls:Box>
+
+                <brls:Box
+                    width="auto"
+                    height="auto"
+                    axis="column"
+                    alignItems="center"
+                    justifyContent="flexStart"
+                    grow="1.0" >
+
+                    <!-- Resto de información -->
+                    <brls:Label
+                        width="auto"
+                        height="auto"
+                        text="@i18n/moonlight/about/moonlight_repo"
+                        fontSize="20"
+                        textColor="#00C853"
+                        marginBottom="8" />
+
+                    <brls:Label
+                        width="auto"
+                        height="auto"
+                        text="@i18n/moonlight/about/github"
+                        fontSize="20"
+                        textColor="#FFA500"
+                        marginBottom="8" />
+
+                    <brls:Label
+                        width="auto"
+                        height="auto"
+                        text="@i18n/moonlight/about/licence"
+                        fontSize="18"
+                        textColor="#B0B0B0"
+                        marginBottom="8" />
+
+                    <brls:Label
+                        width="auto"
+                        height="auto"
+                        text="@i18n/moonlight/about/logo_credit"
+                        fontSize="16"
+                        textColor="#A0A0A0" />
+
+                </brls:Box>
+
+            </brls:Box>
+
+        </brls:Tab>
+
+    </brls:TabFrame>
+</brls:AppletFrame>

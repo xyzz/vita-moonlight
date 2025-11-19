@@ -1,0 +1,4 @@
+<brls:Box axis="column" padding="32">
+    <brls:Label text="@i18n/moonlight/tabs/hosts" fontSize="20" marginBottom="16" />
+    <brls:Box id="hosts_list" axis="column" />
+</brls:Box>

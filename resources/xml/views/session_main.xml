@@ -1,0 +1,6 @@
+<brls:Box width="auto" height="auto" axis="column" alignItems="center" justifyContent="center">
+    <brls:Label id="title" fontSize="22" text="Conectado a: ..." />
+    <brls:Label id="appLabel" fontSize="18" text="App: ..." />
+    <brls:Label id="info" fontSize="16" text="[Streaming en curso]" />
+    <brls:Button id="endBtn" text="Finalizar sesión" />
+</brls:Box>

@@ -290,5 +290,3 @@ int peek_nal_unit(h264_stream_t* h, uint8_t* buf, int size)
 
     return nal->nal_unit_type;
 }
-
-

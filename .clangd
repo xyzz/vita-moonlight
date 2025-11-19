@@ -1,0 +1,11 @@
+CompileFlags:
+  Add:
+    - -Ithird_party/borealis/library/include
+    - -Imoonlight/include
+    - -Ithird_party
+    - -D__PSV__
+    - -DPLATFORM_PS_VITA
+
+# Si quieres añadir más include paths o defines específicos de tu entorno,
+# añádelos a esta lista. clangd leerá compile_commands.json, pero estos flags
+# sirven como fallback cuando algo no está completamente cubierto por el JSON.

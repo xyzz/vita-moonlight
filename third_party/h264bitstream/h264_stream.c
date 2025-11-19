@@ -29,9 +29,9 @@
 #include "h264_stream.h"
 #include "h264_sei.h"
 
-/** 
- Calculate the log base 2 of the argument, rounded up. 
- Zero or negative arguments return zero 
+/**
+ Calculate the log base 2 of the argument, rounded up.
+ Zero or negative arguments return zero
  Idea from http://www.southwindsgames.com/blog/2009/01/19/fast-integer-log2-function-in-cc/
  */
 int intlog2(int x)

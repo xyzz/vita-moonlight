@@ -1,12 +1,35 @@
-[submodule "common"]
-	path = third_party/moonlight-common-c
-	url = https://github.com/moonlight-stream/moonlight-common-c.git
-[submodule "third_party/enet"]
-	path = third_party/enet
-	url = https://github.com/cgutman/enet.git
+[submodule "third_party/borealis"]
+	path = third_party/borealis
+	url = https://github.com/AorsiniYT/borealis.git
+	branch = vita
+[submodule "third_party/lib/extern/glfw"]
+	path = third_party/lib/extern/glfw
+	url = https://github.com/xfangfang/glfw.git
+[submodule "third_party/lib/extern/SDL"]
+	path = third_party/lib/extern/SDL
+	url = https://github.com/libsdl-org/SDL.git
 [submodule "third_party/inih"]
 	path = third_party/inih
-	url = https://github.com/benhoyt/inih.git
+	url = https://github.com/benhoyt/inih
+[submodule "third_party/moonlight-common-c"]
+	path = third_party/moonlight-common-c
+	url = https://github.com/moonlight-stream/moonlight-common-c.git
 [submodule "third_party/mdnsniff"]
 	path = third_party/mdnsniff
+	url = https://github.com/AorsiniYT/mdnsniff.git
+[submodule "third_party/moonlight-common-c/enet"]
+    path = third_party/moonlight-common-c/enet
+    url = https://github.com/cgutman/enet.git
+
+[submodule "legacy/third_party/moonlight-common-c"]
+	path = legacy/third_party/moonlight-common-c
+	url = https://github.com/moonlight-stream/moonlight-common-c.git
+[submodule "legacy/third_party/enet"]
+	path = legacy/third_party/enet
+	url = https://github.com/cgutman/enet.git
+[submodule "legacy/third_party/inih"]
+	path = legacy/third_party/inih
+	url = https://github.com/benhoyt/inih.git
+[submodule "legacy/third_party/mdnsniff"]
+	path = legacy/third_party/mdnsniff
 	url = https://github.com/AorsiniYT/mdnsniff.git

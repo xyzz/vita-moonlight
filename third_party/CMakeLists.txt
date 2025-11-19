@@ -1,16 +1,16 @@
-add_library(enet STATIC
-    enet/callbacks.c
-    enet/compress.c
-    enet/host.c
-    enet/list.c
-    enet/packet.c
-    enet/peer.c
-    enet/protocol.c
-    enet/unix.c
-)
 
-target_include_directories(enet PUBLIC enet/include)
 
+# ENET ahora es gestionado por moonlight-common-c como submódulo y no debe ser compilado aquí
+
+
+
+
+# moonlight-common-c static library (con opción de OpenSSL/MbedTLS)
+# La opción USE_MBEDTLS debe ser definida en el CMakeLists.txt principal si se desea usar MbedTLS
+add_subdirectory(moonlight-common-c)
+
+
+# h264bitstream static library
 add_library(h264bitstream STATIC
     h264bitstream/h264_nal.c
     h264bitstream/h264_sei.c
@@ -18,52 +18,26 @@ add_library(h264bitstream STATIC
 )
 target_include_directories(h264bitstream PUBLIC h264bitstream)
 
+# inih static library
 add_library(inih STATIC
     inih/ini.c
 )
 target_include_directories(inih PUBLIC inih)
 
-add_library(libuuid STATIC
-    libuuid/src/clear.c
-    libuuid/src/compare.c
-    libuuid/src/copy.c
-    libuuid/src/gen_uuid.c
-    libuuid/src/isnull.c
-    libuuid/src/pack.c
-    libuuid/src/parse.c
-    libuuid/src/unpack.c
-    libuuid/src/unparse.c
-    libuuid/src/uuid_time.c
-)
-target_include_directories(libuuid PUBLIC libuuid/src)
+add_subdirectory(borealis/library)
 
-add_library(moonlight-common-c STATIC
-    moonlight-common-c/src/AudioStream.c
-    moonlight-common-c/src/ByteBuffer.c
-    moonlight-common-c/src/Connection.c
-    moonlight-common-c/src/ConnectionTester.c
-    moonlight-common-c/src/ControlStream.c
-    moonlight-common-c/src/FakeCallbacks.c
-    moonlight-common-c/src/InputStream.c
-    moonlight-common-c/src/LinkedBlockingQueue.c
-    moonlight-common-c/src/Misc.c
-    moonlight-common-c/src/Platform.c
-    moonlight-common-c/src/PlatformCrypto.c
-    moonlight-common-c/src/PlatformSockets.c
-    moonlight-common-c/src/RecorderCallbacks.c
-    moonlight-common-c/src/RtpAudioQueue.c
-    moonlight-common-c/src/RtpVideoQueue.c
-    moonlight-common-c/src/RtspConnection.c
-    moonlight-common-c/src/RtspParser.c
-    moonlight-common-c/src/SdpGenerator.c
-    moonlight-common-c/src/SimpleStun.c
-    moonlight-common-c/src/VideoDepacketizer.c
-    moonlight-common-c/src/VideoStream.c
-    moonlight-common-c/reedsolomon/rs.c
-)
-target_include_directories(moonlight-common-c PUBLIC moonlight-common-c/src moonlight-common-c/reedsolomon)
+# libgamestream static library
+add_subdirectory(libgamestream)
 
+# mdnsniff portable library (Vita y Windows)
 add_library(mdnsniff STATIC
     mdnsniff/udp_sniffer_vita.c
+    mdnsniff/udp_sniffer_win.c
+    mdnsniff/common/debugScreen.c
 )
-target_include_directories(mdnsniff PUBLIC mdnsniff)
+target_include_directories(mdnsniff PUBLIC mdnsniff mdnsniff/common)
+
+# Enlazar stubs de Vita solo si se compila para PSVita
+if(CMAKE_SYSTEM_NAME STREQUAL "Vita" OR PLATFORM_PSV)
+    target_link_libraries(mdnsniff PUBLIC SceSysmodule_stub SceNet_stub SceNetCtl_stub SceCtrl_stub SceDisplay_stub)
+endif()

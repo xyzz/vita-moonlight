@@ -1,0 +1,10 @@
+<brls:Box width="auto" height="auto">
+    <brls:ScrollingFrame width="auto" height="auto" axis="column" alignItems="stretch" grow="1.0">
+        <brls:Box axis="column" padding="32">
+            <brls:Label text="Edit Host" fontSize="20" marginBottom="16" />
+            <brls:InputCell id="ip_field" title="IP Address" marginBottom="8" />
+            <brls:InputCell id="name_field" title="Host Name" marginBottom="8" />
+            <brls:Button id="save_button" text="Save Changes" marginBottom="24" />
+        </brls:Box>
+    </brls:ScrollingFrame>
+</brls:Box>

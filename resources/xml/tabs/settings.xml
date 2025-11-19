@@ -1,0 +1,185 @@
+<brls:Box
+    width="auto"
+    height="auto">
+
+    <brls:ScrollingFrame
+        width="auto"
+        height="auto"
+        axis="column"
+        alignItems="stretch"
+        scrollingBehavior="centered"
+        grow="1.0" >
+
+        <brls:Box
+            width="10000"
+            height="auto"
+            axis="column"
+            alignItems="stretch"
+            paddingTop="@style/brls/sidebar/padding_top"
+            paddingRight="@style/brls/sidebar/padding_right"
+            paddingBottom="@style/brls/sidebar/padding_bottom"
+            paddingLeft="@style/brls/sidebar/padding_left">
+
+            <!-- Sección de Configuración de Streaming -->
+            <brls:Header title="@i18n/moonlight/settings_tab/header"/>
+
+            <!-- Modo de renderizado -->
+            <brls:SelectorCell
+                id="renderModeSelector"
+                title="@i18n/moonlight/settings_tab/render_mode/title"/>
+
+            <!-- Formato de Pixel -->
+            <brls:SelectorCell
+                id="pixelFormatSelector"
+                title="@i18n/moonlight/settings_tab/pixel_format/title"/>
+
+            <!-- Resolución -->
+            <brls:SelectorCell
+                id="resolutionSelector"
+                title="@i18n/moonlight/settings_tab/resolution/title"/>
+
+            <!-- FPS -->
+            <brls:SelectorCell
+                id="fpsSelector"
+                title="@i18n/moonlight/settings_tab/fps/title"/>
+
+            <!-- Bitrate -->
+            <brls:SelectorCell
+                id="bitrateSelector"
+                title="@i18n/moonlight/settings_tab/bitrate/title"/>
+
+            <!-- Opciones de Video -->
+            <brls:BooleanCell
+                id="sopsToggle"
+                title="@i18n/moonlight/settings_tab/sops_title"/>
+
+            <brls:BooleanCell
+                id="networkOptimizationsToggle"
+                title="@i18n/moonlight/settings_tab/network_opt_title"/>
+
+            <brls:BooleanCell
+                id="localAudioToggle"
+                title="@i18n/moonlight/settings_tab/local_audio_title"/>
+
+            <brls:BooleanCell
+                id="fullscreenToggle"
+                title="@i18n/moonlight/settings_tab/fullscreen_title"/>
+
+            <!-- Low Latency eliminado -->
+
+            <brls:BooleanCell
+                id="framePacerToggle"
+                title="@i18n/moonlight/settings_tab/frame_pacer_title"/>
+
+            <brls:BooleanCell
+                id="centerRegionToggle"
+                title="@i18n/moonlight/settings_tab/center_region_title"/>
+
+            <brls:BooleanCell
+                id="showFpsToggle"
+                title="@i18n/moonlight/settings_tab/show_fps_title"/>
+
+            <brls:BooleanCell
+                id="debugLogToggle"
+                title="@i18n/moonlight/settings_tab/save_debug_log_title"/>
+
+            <brls:BooleanCell
+                id="refFrameInvalidationToggle"
+                title="@i18n/moonlight/settings_tab/ref_frame_title"/>
+
+            <brls:BooleanCell
+                id="vblankWaitToggle"
+                title="@i18n/moonlight/settings_tab/vblank_wait_title"/>
+
+            <!-- Opciones de Control -->
+            <brls:Header title="@i18n/moonlight/settings_tab/controls_header"/>
+
+            <brls:DetailCell
+                id="rearTouchSettingsEntry"
+                title="@i18n/moonlight/rear_touch/title"/>
+
+            <brls:DetailCell
+                id="trackpadSettingsEntry"
+                title="@i18n/moonlight/trackpad/header"/>
+
+            <brls:BooleanCell
+                id="motionControlsToggle"
+                title="@i18n/moonlight/settings_tab/motion_controls_title"/>
+
+            <brls:BooleanCell
+                id="doubleTapSprintToggle"
+                title="@i18n/moonlight/settings_tab/double_tap_sprint_title"/>
+
+            <brls:SelectorCell
+                id="touchscreenModeSelector"
+                title="@i18n/moonlight/settings_tab/touchscreen_mode/title"/>
+
+            <brls:SelectorCell
+                id="gamepadTypeSelector"
+                title="@i18n/moonlight/settings_tab/gamepad_type/title"/>
+
+            <!-- Layout del Teclado -->
+            <brls:SelectorCell
+                id="keyboardLayoutSelector"
+                title="@i18n/moonlight/settings_tab/keyboard_layout/title"/>
+
+            <!-- Opciones del Sistema (originales) -->
+            <brls:Header title="@i18n/moonlight/settings_tab/system_header"/>
+
+            <brls:RadioCell
+                id="radio"/>
+
+            <brls:BooleanCell
+                id="boolean"/>
+
+            <brls:SelectorCell
+                id="selector"/>
+
+            <brls:InputCell
+                id="input"/>
+
+            <brls:InputNumericCell
+                id="inputNumeric"/>
+
+            <brls:DetailCell
+                title="@i18n/moonlight/settings/ip"
+                id="ipAddress"/>
+
+            <brls:DetailCell
+                title="@i18n/moonlight/settings/dns"
+                id="dnsServer"/>
+
+            <brls:BooleanCell
+                id="debug"/>
+
+            <brls:BooleanCell
+                id="bottomBar"/>
+
+            <brls:BooleanCell
+                id="alwaysOnTop"/>
+
+            <brls:BooleanCell
+                id="fps"/>
+
+            <brls:SelectorCell
+                    id="swapInterval"/>
+
+            <brls:SliderCell
+                    id="slider"/>
+
+            <brls:DetailCell
+                    title="@i18n/moonlight/settings/notify"
+                    id="notify"/>
+
+            <brls:RadioCell id="radio2"/>
+            <brls:RadioCell id="radio3"/>
+
+            <brls:SelectorCell
+                id="languageSelector"
+                title="@i18n/moonlight/settings/language"/>
+
+        </brls:Box>
+
+    </brls:ScrollingFrame>
+
+</brls:Box>

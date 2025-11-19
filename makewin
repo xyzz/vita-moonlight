@@ -1,0 +1,77 @@
+# Verificar si curl para MinGW está instalado
+if [ ! -f "/usr/x86_64-w64-mingw32/include/curl/curl.h" ] || [ ! -f "/usr/x86_64-w64-mingw32/lib/libcurl.a" ]; then
+    echo "curl para MinGW no está instalado. ¿Deseas instalarlo ahora? (S/n)"
+    read -r resp
+    if [[ "$resp" =~ ^[sS]?$ ]]; then
+        bash ./setup_mingw_curl.sh
+    else
+        echo "No se instalará curl. La compilación puede fallar si es requerido."
+    fi
+fi
+
+# Verificar si expat para MinGW está instalado
+if [ ! -f "/usr/x86_64-w64-mingw32/include/expat.h" ] || [ ! -f "/usr/x86_64-w64-mingw32/lib/libexpat.dll.a" ]; then
+    echo "expat para MinGW no está instalado. ¿Deseas instalarlo ahora? (S/n)"
+    read -r resp
+    if [[ "$resp" =~ ^[sS]?$ ]]; then
+        bash ./install_expat_mingw.sh
+    else
+        echo "No se instalará expat. La compilación puede fallar si es requerido."
+    fi
+fi
+#!/bin/bash
+
+# Script de compilación para Windows (MinGW)
+# Uso:
+#   ./makewin           -> Compilación incremental (no borra nada)
+#   ./makewin clean     -> Limpia y recompila desde cero
+
+
+BUILD_DIR=build_mingw
+OPENSSL_DIR=openssl-mingw
+
+# Verificar si existe openssl-mingw
+if [[ ! -d "$OPENSSL_DIR" ]]; then
+    echo "\n[ADVERTENCIA] La carpeta $OPENSSL_DIR no existe. Es necesaria para compilar con soporte de pairing (OpenSSL) en Windows."
+    read -p "¿Deseas crearla y compilar OpenSSL automáticamente? (s/n): " resp
+    if [[ "$resp" =~ ^[sS]$ ]]; then
+        echo "Ejecutando install_openssl_mingw.sh..."
+        bash ./install_openssl_mingw.sh "$OPENSSL_DIR"
+    else
+        echo "Abortando compilación. Por favor, instala OpenSSL para Mingw-w64 antes de continuar."
+        exit 1
+    fi
+fi
+
+if [[ "$1" == "clean" ]]; then
+    echo "Limpiando y recompilando desde cero..."
+    rm -rf "$BUILD_DIR"
+fi
+
+mkdir -p "$BUILD_DIR"
+cd "$BUILD_DIR"
+
+# Configurar variables de entorno
+export PATH=/usr/x86_64-w64-mingw32/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+# Solo correr cmake si no existe el Makefile (primera vez o tras clean)
+if [[ ! -f Makefile ]]; then
+    echo "OPENSSL_ROOT_DIR=$(realpath ../$OPENSSL_DIR)"
+    echo "OPENSSL_INCLUDE_DIR=$(realpath ../$OPENSSL_DIR)/include"
+    # Las siguientes líneas están comentadas para builds con DLLs de OpenSSL:
+    # echo "OPENSSL_CRYPTO_LIBRARY=$(realpath ../$OPENSSL_DIR)/lib/libcrypto.a"
+    # echo "OPENSSL_SSL_LIBRARY=$(realpath ../$OPENSSL_DIR)/lib/libssl.a"
+
+    cmake .. \
+      -DPLATFORM_DESKTOP=ON \
+      -DCMAKE_BUILD_TYPE=Release \
+      -DCMAKE_TOOLCHAIN_FILE=../library/borealis/library/cmake/MinGWCross.cmake \
+      -DCMAKE_MAKE_PROGRAM=$(which make) \
+      -DOPENSSL_ROOT_DIR="$(realpath ../$OPENSSL_DIR)" \
+      -DOPENSSL_INCLUDE_DIR="$(realpath ../$OPENSSL_DIR)/include"
+      # -DOPENSSL_CRYPTO_LIBRARY="$(realpath ../$OPENSSL_DIR)/lib/libcrypto.a" \
+      # -DOPENSSL_SSL_LIBRARY="$(realpath ../$OPENSSL_DIR)/lib/libssl.a"
+fi
+
+# Compilar
+make -j$(nproc)

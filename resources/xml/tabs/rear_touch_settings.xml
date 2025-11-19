@@ -1,0 +1,79 @@
+<brls:Box
+    width="auto"
+    height="auto">
+
+    <brls:ScrollingFrame
+        width="auto"
+        height="auto"
+        axis="column"
+        alignItems="stretch"
+        scrollingBehavior="centered"
+        grow="1.0" >
+
+        <brls:Box
+            width="10000"
+            height="auto"
+            axis="column"
+            alignItems="stretch"
+            paddingTop="@style/brls/sidebar/padding_top"
+            paddingRight="@style/brls/sidebar/padding_right"
+            paddingBottom="@style/brls/sidebar/padding_bottom"
+            paddingLeft="@style/brls/sidebar/padding_left">
+
+            <brls:Header
+                width="auto"
+                height="auto"
+                title="@i18n/moonlight/rear_touch/title"
+                marginBottom="0px"/>
+
+            <brls:BooleanCell
+                id="rearTouchToggle"
+                title="@i18n/moonlight/rear_touch/toggle"/>
+
+            <brls:DetailCell
+                id="rearTouchCalibrationCell"
+                title="@i18n/moonlight/rear_touch/calibrate"/>
+
+            <brls:Label
+                width="auto"
+                height="auto"
+                horizontalAlign="left"
+                text="@i18n/moonlight/rear_touch/calibration_zone_title"
+                marginTop="8"
+                marginBottom="4"/>
+
+            <brls:Label
+                width="auto"
+                height="auto"
+                horizontalAlign="left"
+                text="@i18n/moonlight/rear_touch/calibration_zone_detail"
+                marginBottom="12"
+                fontSize="18"/>
+
+            <brls:Header
+                width="auto"
+                height="auto"
+                title="@i18n/moonlight/rear_touch/actions_header"
+                marginBottom="0px"/>
+
+            <brls:SelectorCell
+                id="rearTouchNWSelector"
+                title="@i18n/moonlight/rear_touch/action_nw"/>
+
+            <brls:SelectorCell
+                id="rearTouchNESelector"
+                title="@i18n/moonlight/rear_touch/action_ne"/>
+
+            <brls:SelectorCell
+                id="rearTouchSWSelector"
+                title="@i18n/moonlight/rear_touch/action_sw"/>
+
+            <brls:SelectorCell
+                id="rearTouchSESelector"
+                title="@i18n/moonlight/rear_touch/action_se"/>
+
+        </brls:Box>
+
+    </brls:ScrollingFrame>
+
+</brls:Box>

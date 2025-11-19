@@ -1,13 +1,16 @@
 #!/bin/bash
-# Script makefast: build y deploy rápido a PSVita usando vitacompanion
-# Requiere: vitacompanion activo en la Vita, eboot.bin generado, curl y netcat (nc)
 
-# set -e  # Desactivado para debug
+# Script makefast: build incremental y deploy rápido a PSVita usando vitacompanion
+# Versión genérica adaptada para Moonlight-Vita: incremental, sin clean y con envío automático
 
 cd "$(dirname "$0")"
 
-# Leer IP desde ip_vita.txt
+# Configuración
 IP_FILE="$(dirname "$0")/ip_vita.txt"
+BUILD_DIR="cmake-build-psv"
+EBOOT_PATH="${BUILD_DIR}/moonlight.self"
+
+# Leer IP desde ip_vita.txt
 echo "[makefast] Leyendo IP de $IP_FILE..."
 if [ -f "$IP_FILE" ]; then
     PSVITAIP=$(head -n 1 "$IP_FILE" | tr -d '\r\n')
@@ -17,107 +20,348 @@ else
 fi
 echo "[makefast] IP Vita: $PSVITAIP"
 
-
-# Obtener TITLEID desde CMakeLists.txt (PSN_TITLE_ID o TITLE_ID)
+# Obtener TITLEID desde CMakeLists.txt (buscar PSN_TITLE_ID o VITA_TITLEID)
 echo "[makefast] Obteniendo TITLEID de CMakeLists.txt..."
-TITLEID=$(grep -Po 'set\((PSN_TITLE_ID|TITLE_ID)\s+"\K[^"]+' CMakeLists.txt | head -n1)
+# Preferir PSN_TITLE_ID (usado en este proyecto), fallback a VITA_TITLEID
+TITLEID=$(grep -Po 'set\(PSN_TITLE_ID\s+"\K[^" ]+' CMakeLists.txt | head -n1)
 if [ -z "$TITLEID" ]; then
-    echo "[makefast] Error: No se pudo obtener el TITLEID de CMakeLists.txt."
+    TITLEID=$(grep -Po 'set\(VITA_TITLEID\s+"?\K[^"\) ]+' CMakeLists.txt | head -n1)
+fi
+if [ -z "$TITLEID" ]; then
+    echo "[makefast] Error: No se pudo obtener el TITLEID de CMakeLists.txt. Busque PSN_TITLE_ID o VITA_TITLEID."
     exit 1
 fi
 echo "[makefast] TITLEID: $TITLEID"
 
-BUILD_DIR="build"
-BIN_FILE="eboot.bin"
-EBOOT_FILE="eboot.bin"
+# Función para verificar dependencias del sistema
+check_dependencies() {
+    echo -e "\n[+] Verificando dependencias del sistema..."
 
-# Permitir argumentos: ./makefast <build_dir> <archivo>
-if [ $# -ge 1 ]; then
-    BUILD_DIR="$1"
-fi
-if [ $# -ge 2 ]; then
-    BIN_FILE="$2"
-fi
+    local missing_deps=0
+    local required_tools=(
+        "cmake"
+        "git"
+        "make"
+        "gcc"
+        "g++"
+        "pkg-config"
+        "vita-mksfoex"
+        "vita-make-fself"
+        "vita-pack-vpk"
+    )
 
-SELF_PATH="${BUILD_DIR}/${BIN_FILE}"
-EBOOT_PATH="${BUILD_DIR}/${EBOOT_FILE}"
+    for tool in "${required_tools[@]}"; do
+        if ! command -v "$tool" >/dev/null 2>&1; then
+            echo "[!] Error: $tool no está instalado o no está en el PATH"
+            missing_deps=$((missing_deps + 1))
+        else
+            echo "[✓] $tool encontrado"
+        fi
+    done
 
-# Preferir el eboot dentro del build dir. Si no existe allí, buscar en build/ el archivo más reciente
-echo "[makefast] Buscando eboot: preferir $SELF_PATH..."
-if [ -f "$SELF_PATH" ]; then
-    SELECTED_EBOOT="$SELF_PATH"
-elif [[ "$BIN_FILE" == */* ]] && [ -f "$BIN_FILE" ]; then
-    # If BIN_FILE includes a path (absolute/relative) and file exists, use it
-    echo "[makefast] Se proporcionó un path para eboot: $BIN_FILE, usando $BIN_FILE"
-    SELECTED_EBOOT="$BIN_FILE"
-else
-    # buscar en build/ el archivo más reciente con el mismo nombre
-    SELECTED_EBOOT=$(find "$BUILD_DIR" -maxdepth 2 -type f -name "$BIN_FILE" -printf '%T@ %p\n' 2>/dev/null | sort -nr | awk '{print $2; exit}')
-    if [ -n "$SELECTED_EBOOT" ]; then
-        echo "[makefast] Usando $SELECTED_EBOOT (en $BUILD_DIR)."
+    # Verificar VITASDK
+    if [ -z "$VITASDK" ]; then
+        echo "[!] Error: La variable de entorno VITASDK no está configurada"
+        missing_deps=$((missing_deps + 1))
     else
-        # buscar en el repo completo (excluyendo build/.git etc.) y tomar el más reciente
-        echo "[makefast] No se encontró $BIN_FILE en $BUILD_DIR, buscando en el repo..."
-        SELECTED_EBOOT=$(find . -maxdepth 4 -type f -name "$BIN_FILE" -printf '%T@ %p\n' 2>/dev/null | sort -nr | awk '{$1=""; sub(/^ /, ""); print; exit}')
-        if [ -n "$SELECTED_EBOOT" ]; then
-            echo "[makefast] Usando $SELECTED_EBOOT (fallback repo)."
+        echo "[✓] VITASDK configurado en: $VITASDK"
+    fi
+
+    if [ $missing_deps -gt 0 ]; then
+        echo -e "\n[!] Faltan $missing_deps dependencias. Por favor, instálalas antes de continuar."
+        return 1
+    fi
+
+    echo -e "\n[+] Todas las dependencias están instaladas."
+    return 0
+}
+
+# Función para verificar la memoria disponible y ajustar parámetros
+check_system_resources() {
+    echo -e "\n[+] Verificando recursos del sistema..."
+
+    # Obtener memoria RAM total en MB
+    if [ -f /proc/meminfo ]; then
+        TOTAL_MEM_MB=$(($(grep 'MemTotal:' /proc/meminfo | awk '{print $2}') / 1024))
+        echo "[+] Memoria RAM total: ${TOTAL_MEM_MB} MB"
+
+        # Configurar swap si hay menos de 6GB de RAM
+        if [ $TOTAL_MEM_MB -lt 6000 ]; then
+            setup_swap
+        fi
+
+        # Ajustar el número de núcleos según la memoria disponible
+        local total_cores=$(nproc)
+
+        if [ $TOTAL_MEM_MB -lt 4000 ]; then
+            echo "[!] Sistema con poca memoria detectado. Usando configuración equilibrada."
+            NUM_CORES=$((total_cores < 4 ? total_cores : 4))
+        elif [ $TOTAL_MEM_MB -lt 8000 ]; then
+            NUM_CORES=$((total_cores < 6 ? total_cores : 6))
+        else
+            NUM_CORES=$total_cores
+            [ $NUM_CORES -gt 8 ] && NUM_CORES=8
+        fi
+
+        [ $NUM_CORES -lt 2 ] && [ $total_cores -ge 2 ] && NUM_CORES=2
+
+        echo "[+] Memoria RAM por núcleo: ~$((TOTAL_MEM_MB / NUM_CORES)) MB"
+    else
+        NUM_CORES=1
+    fi
+
+    echo "[+] Usando ${NUM_CORES} núcleo(s) para la compilación"
+    export MAKEFLAGS="-j${NUM_CORES}"
+    export MFLAGS="-j${NUM_CORES}"
+}
+
+# Función para crear un archivo de intercambio temporal
+setup_swap() {
+    local swap_size_mb=2048
+    local swap_file="${BUILD_DIR}/.swapfile"
+
+    echo -e "\n[+] Configurando archivo de intercambio temporal..."
+
+    if ! check_sudo; then
+        echo "[!] No se pudo configurar el archivo de intercambio. Continuando sin él."
+        return 1
+    fi
+
+    if [ -f "$swap_file" ]; then
+        echo "[+] Usando archivo de intercambio existente"
+        sudo swapon "$swap_file" 2>/dev/null || {
+            sudo swapoff "$swap_file" 2>/dev/null || true
+            rm -f "$swap_file"
+        }
+    fi
+
+    if [ ! -f "$swap_file" ]; then
+        echo "[+] Creando archivo de intercambio de ${swap_size_mb}MB..."
+        if ! dd if=/dev/zero of="$swap_file" bs=1M count=$swap_size_mb status=progress; then
+            echo "[!] Error al crear el archivo de intercambio. Continuando sin él."
+            return 1
+        fi
+
+        chmod 600 "$swap_file"
+
+        if ! sudo mkswap "$swap_file"; then
+            echo "[!] Error al formatear el archivo de intercambio. Continuando sin él."
+            rm -f "$swap_file"
+            return 1
         fi
     fi
-fi
 
-if [ -z "$SELECTED_EBOOT" ]; then
-    echo "[makefast] Error: No se encontró ningún $BIN_FILE (ni en $BUILD_DIR ni en el repo). Compila primero."
+    if ! sudo swapon "$swap_file"; then
+        echo "[!] Error al activar el archivo de intercambio. Continuando sin él."
+        rm -f "$swap_file"
+        return 1
+    fi
+
+    echo "[+] Estado actual del swap:"
+    free -h | grep -i swap
+
+    trap '\
+        echo "[+] Desactivando archivo de intercambio...";\
+        sudo swapoff "$swap_file" 2>/dev/null || true;\
+        rm -f "$swap_file";\
+        echo "[+] Estado final del swap:";\
+        free -h | grep -i swap\
+    ' EXIT
+}
+
+# Modo: 'release' (por defecto), 'debug', o 'ffmpeg'
+MODE="${1:-${MODE:-release}}"
+MODE=$(echo "$MODE" | tr '[:upper:]' '[:lower:]')
+
+if [ "$MODE" != "debug" ] && [ "$MODE" != "release" ] && [ "$MODE" != "ffmpeg" ]; then
+    echo "[makefast] Modo inválido: $MODE. Use 'debug', 'release' o 'ffmpeg'."
     exit 1
 fi
 
-# Si el archivo seleccionado no está dentro del BUILD_DIR, lo copiaremos dentro para upload
-if [ "$SELECTED_EBOOT" = "$EBOOT_PATH" ]; then
-    echo "[makefast] EBOOT seleccionado: $SELECTED_EBOOT (ya en $EBOOT_PATH). No se copia."
+echo "[makefast] Modo de compilación: $MODE"
+
+# Configuración inicial de compilación
+check_system_resources
+
+# Optimizaciones para compilación
+if [ "$MODE" = "debug" ]; then
+    # Debug: añadir símbolos y no hacer strip
+    export CFLAGS="-O0 -g -fno-omit-frame-pointer -ffunction-sections -fdata-sections"
+    export CXXFLAGS="-O0 -g -fno-omit-frame-pointer -ffunction-sections -fdata-sections"
+    # No usar --strip-all en debug
+    export LDFLAGS="-Wl,--gc-sections -Wl,--as-needed -Wl,--no-undefined"
 else
-    echo "[makefast] Copiando $SELECTED_EBOOT -> $EBOOT_PATH"
-    mkdir -p "$(dirname "$EBOOT_PATH")"
-    cp "$SELECTED_EBOOT" "$EBOOT_PATH"
-    echo "[makefast] Copiado $SELECTED_EBOOT a $EBOOT_PATH"
+    # Release: optimizado y strip
+    export CFLAGS="-O2 -g0 -fomit-frame-pointer -ffunction-sections -fdata-sections -fno-unwind-tables -fno-asynchronous-unwind-tables -fno-ident -fno-stack-protector"
+    export CXXFLAGS="-O2 -g0 -fomit-frame-pointer -ffunction-sections -fdata-sections -fno-unwind-tables -fno-asynchronous-unwind-tables -fno-ident -fno-stack-protector"
+    export LDFLAGS="-Wl,--gc-sections -Wl,--as-needed -Wl,--strip-all -Wl,--no-undefined"
 fi
 
-# 1. Detener la app si está corriendo
-echo "[makefast] Enviando destroy..."
-(echo destroy | nc "$PSVITAIP" 1338) || echo "[makefast] destroy falló (puede ser normal si no hay app en ejecución)"
-echo "[makefast] Destroy enviado."
+# Configuración específica para PS Vita
+export PATH="$VITASDK/bin:$PATH"
+export CC="${VITASDK}/bin/arm-vita-eabi-gcc"
+export CXX="${VITASDK}/bin/arm-vita-eabi-g++"
+export AR="${VITASDK}/bin/arm-vita-eabi-gcc-ar"
+export RANLIB="${VITASDK}/bin/arm-vita-eabi-gcc-ranlib"
+export NM="${VITASDK}/bin/arm-vita-eabi-gcc-nm"
+export STRIP="${VITASDK}/bin/arm-vita-eabi-strip"
 
-# Esperar a que la Vita libere eboot.bin (máx 10s)
-WAIT=0
-while true; do
-    curl -s --user anonymous: --list-only "ftp://$PSVITAIP:1337/ux0:/app/$TITLEID/eboot.bin" | grep -q eboot.bin
-    if [ $? -eq 0 ]; then
-        curl -s --user anonymous: -Q "RNFR ux0:/app/$TITLEID/eboot.bin" -Q "RNTO ux0:/app/$TITLEID/eboot.bin" "ftp://$PSVITAIP:1337/" && break
+# Configuración de límites del sistema
+ulimit -s 32768
+ulimit -v $(( $(free -m | awk '/^Mem:/{print $2}') * 1024 * 9 / 10 ))
+
+export MAKEFLAGS="$MAKEFLAGS -s -r -R"
+
+echo -e "\n[=== Moonlight MakeFast ===]"
+echo "[+] Iniciando compilación incremental para PS Vita con ${NUM_CORES} núcleo(s)..."
+
+# Verificar dependencias
+if ! check_dependencies; then
+    echo -e "\n[!] Error: Faltan dependencias necesarias. Abortando."
+    exit 1
+fi
+
+# Función para compilar el proyecto (incremental, sin clean)
+build_project() {
+    echo -e "\n[+] Configurando proyecto con CMake..."
+
+    mkdir -p "$BUILD_DIR"
+
+    echo -e "[+] Configurando para PS Vita..."
+    local cmake_cmd="cmake -B \"$BUILD_DIR\" \
+        -DPLATFORM_PSV=ON \
+        -DCMAKE_BUILD_TYPE=$( [ \"$MODE\" = \"debug\" ] && echo Debug || echo Release ) \
+        -DUSE_SYSTEM_CURL=ON \
+        -DUSE_SYSTEM_SDL2=ON \
+        -DMPV_NO_FB=ON \
+        -DSIMPLE_HIGHLIGHT=ON \
+        -DUSE_GXM=ON \
+        -DBOREALIS_USE_GXM=ON \
+        -DCMAKE_TOOLCHAIN_FILE=\"${VITASDK}/share/vita.toolchain.cmake\" \
+        -DCMAKE_MAKE_PROGRAM=\"make\" \
+        -DCMAKE_C_COMPILER=\"${CC}\" \
+        -DCMAKE_CXX_COMPILER=\"${CXX}\" \
+        -DCMAKE_AR=\"${AR}\" \
+        -DCMAKE_RANLIB=\"${RANLIB}\" \
+        -DCMAKE_NM=\"${NM}\" \
+        -DCMAKE_STRIP=\"${STRIP}\" \
+        -DCMAKE_C_COMPILER_WORKS=ON \
+        -DCMAKE_CXX_COMPILER_WORKS=ON \
+        -DCMAKE_SYSTEM_NAME=\"Generic\" \
+        -DCMAKE_SYSTEM_PROCESSOR=\"arm\" \
+        -DCMAKE_FIND_ROOT_PATH=\"${VITASDK}/arm-vita-eabi\" \
+        -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER \
+        -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY \
+        -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY \
+        -DCMAKE_FIND_ROOT_PATH_MODE_PACKAGE=ONLY"
+
+    # Control explícito de BUILD_FFMPEG: por defecto OFF, activar sólo si se pidió 'ffmpeg'
+    if [ "$MODE" = "ffmpeg" ]; then
+        cmake_cmd="$cmake_cmd -DBUILD_FFMPEG=ON"
+        echo "[+] Habilitando BUILD_FFMPEG=ON"
     else
-        break
+        cmake_cmd="$cmake_cmd -DBUILD_FFMPEG=OFF"
+        echo "[+] BUILD_FFMPEG desactivado (pasado explícitamente -DBUILD_FFMPEG=OFF)"
     fi
-    sleep 1
-    WAIT=$((WAIT+1))
-    if [ $WAIT -ge 10 ]; then
-        echo "[makefast] Advertencia: eboot.bin sigue bloqueado tras 10s, intentando subir de todas formas..."
-        break
+
+    eval "$cmake_cmd" || {
+        echo "[!] Error al configurar el proyecto con CMake"
+        return 1
+    }
+
+    echo -e "\n[+] Configurando compilación con ${NUM_CORES} núcleos..."
+
+    local make_flags="-j${NUM_CORES} -l$(($(nproc) * 2))"
+
+    echo -e "[+] Iniciando compilación con flags: ${make_flags}"
+
+    cmake --build "$BUILD_DIR" -- $make_flags --output-sync=target
+    local build_status=$?
+
+    if [ $build_status -ne 0 ]; then
+        echo -e "\n[!] Error durante la compilación"
+        if [ $build_status -eq 137 ]; then
+            echo "[!] Error: Compilación terminada por falta de memoria"
+            echo "[!] Intentando con un solo núcleo..."
+            cmake --build "$BUILD_DIR" -- -j1 --output-sync=target
+            build_status=$?
+            if [ $build_status -ne 0 ]; then
+                echo "[!] Error persistente durante la compilación"
+                return $build_status
+            fi
+        else
+            return $build_status
+        fi
     fi
-    echo "[makefast] Esperando a que la Vita libere eboot.bin... ($WAIT s)"
-done
-echo "[makefast] Listo para subir eboot.bin"
 
-# 2. Subir eboot.bin vía FTP
-echo "[makefast] Subiendo $EBOOT_PATH a la Vita..."
-curl -v -T "$EBOOT_PATH" "ftp://$PSVITAIP:1337/ux0:/app/$TITLEID/eboot.bin"
-CURL_STATUS=$?
-echo "[makefast] curl terminó con código $CURL_STATUS"
+    return 0
+}
 
-# 3. Lanzar la app y mostrar respuesta
-echo "[makefast] Enviando comando de lanzamiento..."
-LAUNCH_RESPONSE=$(echo launch $TITLEID | nc "$PSVITAIP" 1338)
-echo "[makefast] Respuesta de vitacompanion: $LAUNCH_RESPONSE"
-if echo "$LAUNCH_RESPONSE" | grep -iq launched; then
-    echo "[makefast] Launched: $LAUNCH_RESPONSE"
+# Verificar si se generó el eboot.bin
+check_eboot() {
+    if [ ! -f "$EBOOT_PATH" ]; then
+        echo -e "\n[!] Error: No se encontró eboot.bin en $BUILD_DIR"
+        return 1
+    fi
+
+    EBOOT_SIZE=$(du -h "$EBOOT_PATH" | cut -f1)
+    echo -e "\n[+] Compilación exitosa! eboot.bin: $EBOOT_PATH ($EBOOT_SIZE)"
+    return 0
+}
+
+# Función para enviar a PS Vita (lógica de sendfast)
+deploy_to_vita() {
+    echo -e "\n[+] Verificando conexión con la PS Vita en ${PSVITAIP}..."
+    if ! ping -c 1 -w 2 "$PSVITAIP" &> /dev/null; then
+        echo "[!] No se pudo conectar a la PS Vita en ${PSVITAIP}"
+        return 1
+    fi
+
+    # 1. Detener la app si está corriendo
+    echo "[+] Enviando destroy..."
+    (echo destroy | nc "$PSVITAIP" 1338) || echo "[+] destroy falló (puede ser normal si no hay app en ejecución)"
+
+    # Esperar a que la Vita libere eboot.bin (máx 10s)
+    WAIT=0
+    while true; do
+        curl -s --user anonymous: --list-only "ftp://$PSVITAIP:1337/ux0:/app/$TITLEID/eboot.bin" | grep -q eboot.bin
+        if [ $? -eq 0 ]; then
+            curl -s --user anonymous: -Q "RNFR ux0:/app/$TITLEID/eboot.bin" -Q "RNTO ux0:/app/$TITLEID/eboot.bin" "ftp://$PSVITAIP:1337/" && break
+        else
+            break
+        fi
+        sleep 1
+        WAIT=$((WAIT+1))
+        if [ $WAIT -ge 10 ]; then
+            echo "[+] Advertencia: eboot.bin sigue bloqueado tras 10s, intentando subir de todas formas..."
+            break
+        fi
+        echo "[+] Esperando a que la Vita libere eboot.bin... ($WAIT s)"
+    done
+
+    # 2. Subir eboot.bin vía FTP
+    echo "[+] Subiendo $EBOOT_PATH a la Vita..."
+    curl -T "$EBOOT_PATH" "ftp://$PSVITAIP:1337/ux0:/app/$TITLEID/eboot.bin"
+    CURL_STATUS=$?
+    echo "[+] curl terminó con código $CURL_STATUS"
+
+    # 3. Lanzar la app
+    echo "[+] Enviando comando de lanzamiento..."
+    LAUNCH_RESPONSE=$(echo launch $TITLEID | nc "$PSVITAIP" 1338)
+    echo "[+] Respuesta de vitacompanion: $LAUNCH_RESPONSE"
+    if echo "$LAUNCH_RESPONSE" | grep -iq launched; then
+        echo "[+] ¡Aplicación lanzada exitosamente!"
+    else
+        echo "[+] Advertencia: No se recibió confirmación de lanzamiento."
+    fi
+}
+
+# Ejecutar compilación incremental del proyecto
+if build_project && check_eboot; then
+    echo -e "\n[+] Compilación completada. Enviando a PS Vita..."
+    deploy_to_vita
+    echo -e "\n[+] Proceso makefast completado."
 else
-    echo "[makefast] Advertencia: No se recibió confirmación de lanzamiento. Respuesta: $LAUNCH_RESPONSE"
+    echo -e "\n[!] Error en la compilación."
+    exit 1
 fi
-
-echo "[makefast] eboot.bin enviado y app lanzada en la Vita ($PSVITAIP, $TITLEID)"

@@ -81,6 +81,3 @@ void write_sei_payload(h264_stream_t* h, bs_t* b, int payloadType, int payloadSi
     for ( i = 0; i < s->payloadSize; i++ )
         bs_write_u(b, 8, s->payload[i]);
 }
-
-
-

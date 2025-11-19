@@ -1,0 +1,57 @@
+<brls:Box
+    width="auto"
+    height="auto"
+    axis="column"
+    alignItems="stretch"
+    grow="1.0"
+    paddingTop="30"
+    paddingRight="30"
+    paddingBottom="30"
+    paddingLeft="30">
+
+    <!-- Título y subtítulo -->
+    <brls:Label id="app_select_title" fontSize="22" marginBottom="5" />
+    <brls:Label id="app_select_subtitle" fontSize="16" marginBottom="20" />
+
+    <!-- Contenedor principal para la cuadrícula -->
+    <brls:Box id="app_grid_container" grow="1.0" axis="column" alignItems="stretch">
+        <!-- ScrollingFrame para permitir scroll si hay muchas apps -->
+        <brls:ScrollingFrame
+            width="auto"
+            height="auto"
+            axis="column"
+            scrollingBehavior="centered"
+            grow="1.0">
+
+            <!-- El GridView se añadirá aquí desde C++ -->
+            <brls:Box id="grid_placeholder" width="auto" height="auto" />
+
+        </brls:ScrollingFrame>
+
+        <!-- Spinner con tamaño restringido -->
+        <brls:Box
+            width="auto"
+            height="auto"
+            axis="column"
+            alignItems="center"
+            justifyContent="center"
+            marginTop="20">
+
+            <brls:ProgressSpinner
+                id="loading_spinner"
+                width="60"
+                height="60"
+                visibility="gone" />
+
+        </brls:Box>
+    </brls:Box>
+
+    <!-- Mensaje cuando no hay apps -->
+    <brls:Label
+        id="app_select_empty"
+        visibility="gone"
+        fontSize="16"
+        horizontalAlign="center"
+        marginTop="20" />
+
+</brls:Box>

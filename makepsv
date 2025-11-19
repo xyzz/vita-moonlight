@@ -3,90 +3,548 @@
 # Navegar al directorio del proyecto
 cd "$(dirname "$0")"
 
-# Obtener TITLE_ID desde CMakeLists.txt
-title_id=$(grep -Po 'set\(TITLE_ID\s+"\K[^"]+' CMakeLists.txt | head -n1)
-if [ -z "$title_id" ]; then
-    echo "[!] No se pudo encontrar TITLE_ID en CMakeLists.txt"
-    exit 1
-fi
 
 # Configuración
-# Leer la IP de la PS Vita desde ip_vita.txt
-if [ ! -f ip_vita.txt ]; then
-    echo "[!] No se encontró el archivo ip_vita.txt. Por favor, crea el archivo con la IP de tu PS Vita."
-    exit 1
+# Leer IP desde ip_vita.txt si existe, si no usar valor por defecto
+IP_FILE="$(dirname "$0")/ip_vita.txt"
+if [ -f "$IP_FILE" ]; then
+    VITA_IP=$(head -n 1 "$IP_FILE" | tr -d '\r\n')
+else
+    VITA_IP="192.168.0.192"  # Cambia esto por la IP de tu PS Vita
 fi
-VITA_IP=$(head -n1 ip_vita.txt | tr -d '\r\n')
 VITA_PORT=1337
 VITA_CONTROL_PORT=1338
-VPK_PATH="build/moonlight.vpk"
+BUILD_DIR="cmake-build-psv"
+VPK_PATH="${BUILD_DIR}/moonlight.vpk"
 
-# Compilar con cmake y make
-echo "[+] Iniciando compilación para PS Vita..."
-mkdir -p build
-cd build
-cmake ..
-if [ $? -ne 0 ]; then
-    echo "[!] Error en cmake. Abortando."
-    exit 1
+# Función para verificar dependencias del sistema
+check_dependencies() {
+    echo -e "\n[+] Verificando dependencias del sistema..."
+
+    local missing_deps=0
+    local required_tools=(
+        "cmake"
+        "git"
+        "make"
+        "gcc"
+        "g++"
+        "pkg-config"
+        "vita-mksfoex"
+        "vita-make-fself"
+        "vita-pack-vpk"
+    )
+
+    for tool in "${required_tools[@]}"; do
+        if ! command -v "$tool" >/dev/null 2>&1; then
+            echo "[!] Error: $tool no está instalado o no está en el PATH"
+            missing_deps=$((missing_deps + 1))
+        else
+            echo "[✓] $tool encontrado"
+        fi
+    done
+
+    # Verificar VITASDK
+    if [ -z "$VITASDK" ]; then
+        echo "[!] Error: La variable de entorno VITASDK no está configurada"
+        missing_deps=$((missing_deps + 1))
+    else
+        echo "[✓] VITASDK configurado en: $VITASDK"
+    fi
+
+    # Verificar si estamos en un sistema de 64 bits
+    if [ "$(getconf LONG_BIT)" != "64" ]; then
+        echo "[!] Advertencia: Se recomienda usar un sistema de 64 bits para la compilación"
+    fi
+
+    if [ $missing_deps -gt 0 ]; then
+        echo -e "\n[!] Faltan $missing_deps dependencias. Por favor, instálalas antes de continuar."
+        echo "[!] Puedes instalarlas con tu gestor de paquetes o siguiendo las instrucciones de VITASDK."
+        return 1
+    fi
+
+    echo -e "\n[+] Todas las dependencias están instaladas."
+    return 0
+}
+
+# Función para verificar permisos de sudo
+check_sudo() {
+    if ! command -v sudo >/dev/null 2>&1; then
+        echo "[!] sudo no está instalado. No se puede configurar el archivo de intercambio."
+        return 1
+    fi
+
+    # Verificar si el usuario tiene permisos de sudo sin contraseña
+    if ! sudo -n true 2>/dev/null; then
+        echo "[!] Se requieren permisos de sudo para configurar el archivo de intercambio."
+        echo "[!] Por favor, ingresa tu contraseña cuando se te solicite."
+        if ! sudo -v; then
+            echo "[!] No se pudo verificar el acceso a sudo. Continuando sin archivo de intercambio."
+            return 1
+        fi
+    fi
+    return 0
+}
+
+# Función para crear un archivo de intercambio temporal
+setup_swap() {
+    local swap_size_mb=2048  # 2GB de swap
+    local swap_file="${BUILD_DIR}/.swapfile"
+
+    echo -e "\n[+] Configurando archivo de intercambio temporal..."
+
+    # Verificar permisos de sudo
+    if ! check_sudo; then
+        echo "[!] No se pudo configurar el archivo de intercambio. Continuando sin él."
+        return 1
+    fi
+
+    # Verificar si ya existe un archivo de intercambio
+    if [ -f "$swap_file" ]; then
+        echo "[+] Usando archivo de intercambio existente"
+        sudo swapon "$swap_file" 2>/dev/null || {
+            echo "[!] Error al activar el archivo de intercambio existente. Intentando recrear..."
+            sudo swapoff "$swap_file" 2>/dev/null || true
+            rm -f "$swap_file"
+        }
+    fi
+
+    # Si el archivo no existe o fue eliminado, crearlo
+    if [ ! -f "$swap_file" ]; then
+        echo "[+] Creando archivo de intercambio de ${swap_size_mb}MB..."
+        if ! dd if=/dev/zero of="$swap_file" bs=1M count=$swap_size_mb status=progress; then
+            echo "[!] Error al crear el archivo de intercambio. Continuando sin él."
+            return 1
+        fi
+
+        chmod 600 "$swap_file"
+
+        # Formatear como área de intercambio
+        if ! sudo mkswap "$swap_file"; then
+            echo "[!] Error al formatear el archivo de intercambio. Continuando sin él."
+            rm -f "$swap_file"
+            return 1
+        fi
+    fi
+
+    # Activar el archivo de intercambio
+    if ! sudo swapon "$swap_file"; then
+        echo "[!] Error al activar el archivo de intercambio. Continuando sin él."
+        rm -f "$swap_file"
+        return 1
+    fi
+
+    # Mostrar información del swap
+    echo "[+] Estado actual del swap:"
+    free -h | grep -i swap
+
+    # Configurar para desactivar el swap al salir
+    trap '\
+        echo "[+] Desactivando archivo de intercambio...";\
+        sudo swapoff "$swap_file" 2>/dev/null || true;\
+        rm -f "$swap_file";\
+        echo "[+] Estado final del swap:";\
+        free -h | grep -i swap\
+    ' EXIT
+}
+
+# Función para verificar la memoria disponible y ajustar parámetros
+check_system_resources() {
+    echo -e "\n[+] Verificando recursos del sistema..."
+
+    # Obtener memoria RAM total en MB
+    if [ -f /proc/meminfo ]; then
+        TOTAL_MEM_MB=$(($(grep 'MemTotal:' /proc/meminfo | awk '{print $2}') / 1024))
+        echo "[+] Memoria RAM total: ${TOTAL_MEM_MB} MB"
+
+        # Configurar swap si hay menos de 6GB de RAM
+        if [ $TOTAL_MEM_MB -lt 6000 ]; then
+            setup_swap
+        fi
+
+        # Ajustar el número de núcleos según la memoria disponible
+        local total_cores=$(nproc)
+
+        if [ $TOTAL_MEM_MB -lt 4000 ]; then
+            echo "[!] Sistema con poca memoria detectado. Usando configuración equilibrada."
+            # Para sistemas con poca memoria, usar al menos 2 núcleos pero no más de 4
+            NUM_CORES=$((total_cores < 4 ? total_cores : 4))
+            export CFLAGS="${CFLAGS} -Os"  # Optimizar para tamaño
+        elif [ $TOTAL_MEM_MB -lt 8000 ]; then
+            # Para sistemas con memoria media, usar hasta 6 núcleos
+            NUM_CORES=$((total_cores < 6 ? total_cores : 6))
+        else
+            # Para sistemas con mucha memoria, usar todos los núcleos hasta un máximo de 8
+            NUM_CORES=$total_cores
+            [ $NUM_CORES -gt 8 ] && NUM_CORES=8
+        fi
+
+        # Asegurarnos de que al menos usamos 2 núcleos si están disponibles
+        [ $NUM_CORES -lt 2 ] && [ $total_cores -ge 2 ] && NUM_CORES=2
+
+        echo "[+] Memoria RAM por núcleo: ~$((TOTAL_MEM_MB / NUM_CORES)) MB"
+    else
+        # Valores por defecto si no se puede detectar la memoria
+        NUM_CORES=1
+    fi
+
+    echo "[+] Usando ${NUM_CORES} núcleo(s) para la compilación"
+    export MAKEFLAGS="-j${NUM_CORES}"
+    export MFLAGS="-j${NUM_CORES}"
+}
+
+# Configuración inicial de compilación
+check_system_resources
+
+# Optimizaciones para compilación
+# Usamos -O2 para un buen equilibrio entre tamaño y velocidad
+# -g0: Sin información de depuración para reducir el tamaño
+# -fomit-frame-pointer: Mejor rendimiento (no compatible con todos los archivos)
+# -ffunction-sections -fdata-sections: Para mejor eliminación de código muerto
+export CFLAGS="-O2 -g0 -fomit-frame-pointer -ffunction-sections -fdata-sections -fno-unwind-tables -fno-asynchronous-unwind-tables -fno-ident -fno-stack-protector"
+export CXXFLAGS="-O2 -g0 -fomit-frame-pointer -ffunction-sections -fdata-sections -fno-unwind-tables -fno-asynchronous-unwind-tables -fno-ident -fno-stack-protector"
+
+# Optimizaciones de enlazado
+# --gc-sections: Elimina secciones no utilizadas
+# --as-needed: Solo enlaza bibliotecas que son realmente necesarias
+# --strip-all: Elimina todos los símbolos (reduce tamaño)
+# --no-undefined: Reporta enlaces no resueltos
+export LDFLAGS="-Wl,--gc-sections -Wl,--as-needed -Wl,--strip-all -Wl,--no-undefined"
+
+# Configuración específica para PS Vita
+export CC="${VITASDK}/bin/arm-vita-eabi-gcc"
+export CXX="${VITASDK}/bin/arm-vita-eabi-g++"
+export AR="${VITASDK}/bin/arm-vita-eabi-gcc-ar"
+export RANLIB="${VITASDK}/bin/arm-vita-eabi-gcc-ranlib"
+export NM="${VITASDK}/bin/arm-vita-eabi-gcc-nm"
+export STRIP="${VITASDK}/bin/arm-vita-eabi-strip"
+
+# Configuración de paralelismo
+# Usamos el número de núcleos definido en check_system_resources
+export MFLAGS="-j${NUM_CORES}"
+export MAKEFLAGS="-j${NUM_CORES}"
+
+# Configuración de límites del sistema
+ulimit -s 32768  # Aumentar el límite de pila a 32MB
+ulimit -v $(( $(free -m | awk '/^Mem:/{print $2}') * 1024 * 9 / 10 ))  # 90% de la RAM disponible
+
+# Optimizar el uso de memoria de make
+# -s: Silencioso (menos salida)
+# -r: No reconstruir reglas incorporadas
+# -R: No reconstruir variables internas
+export MAKEFLAGS="$MAKEFLAGS -s -r -R"
+echo -e "\n[=== Moonlight PSV Builder ===]"
+echo "[+] Iniciando compilación para PS Vita con ${NUM_CORES} núcleos..."
+if [ "${BUILD_FFMPEG}" = "ON" ]; then
+    echo "[+] BUILD_FFMPEG=ON: FFmpeg integration will be included and PS Vita legacy will support 1920x1088 defaults"
 fi
-make -j$(nproc)
-if [ $? -ne 0 ]; then
-    echo "[!] Error en la compilación. Abortando."
-    exit 1
-fi
-cd ..
+
+# Función para limpiar compilación anterior
+clean_build() {
+    if [ -d "$BUILD_DIR" ]; then
+        echo -n "[+] Limpiando compilación anterior... "
+        rm -rf "$BUILD_DIR"
+        echo "Listo"
+    fi
+    return 0
+}
+
+# Función para compilar el proyecto
+build_project() {
+    echo -e "\n[+] Configurando proyecto con CMake..."
+
+    # Crear directorio de compilación si no existe
+    mkdir -p "$BUILD_DIR"
+
+    # Configurar con CMake
+    echo -e "[+] Configurando para PS Vita (Build Type: $1)..."
+    cmake -B "$BUILD_DIR" \
+        -DPLATFORM_PSV=ON \
+        -DUSE_SYSTEM_CURL=ON \
+        -DUSE_SYSTEM_SDL2=ON \
+        -DMPV_NO_FB=ON \
+        -DSIMPLE_HIGHLIGHT=ON \
+        -DUSE_GXM=$USE_GXM \
+        -DBUILD_FFMPEG=${BUILD_FFMPEG} \
+        -DUSE_VITA_SHARK=OFF \
+        -DCMAKE_BUILD_TYPE=${1:-Release} \
+        -DCMAKE_TOOLCHAIN_FILE="${VITASDK}/share/vita.toolchain.cmake" \
+        -DCMAKE_MAKE_PROGRAM="make" \
+        -DCMAKE_C_COMPILER="${CC}" \
+        -DCMAKE_CXX_COMPILER="${CXX}" \
+        -DCMAKE_AR="${AR}" \
+        -DCMAKE_RANLIB="${RANLIB}" \
+        -DCMAKE_NM="${NM}" \
+        -DCMAKE_STRIP="${STRIP}" \
+        -DCMAKE_C_COMPILER_WORKS=ON \
+        -DCMAKE_CXX_COMPILER_WORKS=ON \
+        -DCMAKE_ASM_FLAGS="-x assembler-with-cpp" \
+        -DCMAKE_SYSTEM_NAME="Generic" \
+        -DCMAKE_SYSTEM_PROCESSOR="arm" \
+        -DCMAKE_FIND_ROOT_PATH="${VITASDK}/arm-vita-eabi" \
+        -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER \
+        -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY \
+        -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY \
+        -DCMAKE_FIND_ROOT_PATH_MODE_PACKAGE=ONLY || {
+            echo "[!] Error al configurar el proyecto con CMake"
+            return 1
+        }
+
+    echo -e "\n[+] Configurando compilación con ${NUM_CORES} núcleos..."
+
+    # Configurar flags de compilación
+    local make_flags="-j${NUM_CORES} -l$(($(nproc) * 2))"
+
+    echo -e "[+] Iniciando compilación con flags: ${make_flags}"
+    echo -e "[+] Usando hasta ${NUM_CORES} núcleos de CPU"
+
+    # Compilar con los flags optimizados
+    cmake --build "$BUILD_DIR" -- $make_flags --output-sync=target
+    local build_status=$?
+
+    if [ $build_status -ne 0 ]; then
+        echo -e "\n[!] Error durante la compilación con ${NUM_CORES} núcleos"
+
+        # Verificar si el error fue por falta de memoria
+        if [ $build_status -eq 137 ]; then
+            echo "[!] Error: Compilación terminada por falta de memoria"
+            echo "[!] Intentando con un solo núcleo..."
+
+            # Intentar de nuevo con un solo núcleo
+            cmake --build "$BUILD_DIR" -- -j1 --output-sync=target
+            build_status=$?
+
+            if [ $build_status -ne 0 ]; then
+                echo "[!] Error persistente durante la compilación"
+                echo "[!] Intenta liberar memoria RAM o aumentar el espacio de intercambio (swap)"
+                return $build_status
+            fi
+        else
+            return $build_status
+        fi
+    fi
+
+    return 0
+}
 
 # Verificar si se generó el VPK
-if [ ! -f "$VPK_PATH" ]; then
-    echo "[!] Error: No se generó el VPK"
-    ls -la build/
+check_vpk() {
+    # Buscar el VPK, aunque el nombre no sea exactamente el esperado
+    local vpk_file=""
+    if [ -f "$VPK_PATH" ]; then
+        vpk_file="$VPK_PATH"
+    else
+        # Buscar cualquier .vpk en el directorio de build
+        vpk_file=$(find "$BUILD_DIR" -maxdepth 1 -type f -name "*.vpk" | head -n 1)
+    fi
+
+    if [ -z "$vpk_file" ] || [ ! -f "$vpk_file" ]; then
+        echo -e "\n[!] Error: No se encontró el VPK en $BUILD_DIR"
+        echo -e "[!] Archivos en $BUILD_DIR/:"
+        ls -la "$BUILD_DIR/"
+        echo -e "\n[!] Buscando archivos .vpk..."
+        find "$BUILD_DIR/" -name "*.vpk" -type f -ls
+        return 1
+    fi
+
+    VPK_SIZE=$(du -h "$vpk_file" | cut -f1)
+    echo -e "\n[+] Compilación exitosa! VPK: $vpk_file ($VPK_SIZE)"
+    # Actualizar la variable global VPK_PATH para el deploy
+    VPK_PATH="$vpk_file"
+    export VPK_PATH
+    return 0
+}
+
+# Obtener TITLE_ID dinámicamente desde CMakeLists.txt
+TITLE_ID=$(grep -Po 'set\(PSN_TITLE_ID\s+"\K[^"]+' CMakeLists.txt | head -n1)
+if [ -z "$TITLE_ID" ]; then
+    echo "[!] No se pudo encontrar PSN_TITLE_ID en CMakeLists.txt"
     exit 1
 fi
 
-VPK_SIZE=$(du -h "$VPK_PATH" | cut -f1)
-echo -e "\n[+] Compilación exitosa! VPK: $VPK_PATH ($VPK_SIZE)"
+# Función para enviar a PS Vita
+deploy_to_vita() {
+    echo -e "\n[+] Verificando conexión con la PS Vita en ${VITA_IP}..."
+    if ! ping -c 1 -w 2 "$VITA_IP" &> /dev/null; then
+        echo "[!] No se pudo conectar a la PS Vita en ${VITA_IP}"
+        echo "[!] Verifica la IP y que la PS Vita esté encendida y en la misma red"
+        return 1
+    fi
+
+    # Verificar si netcat está disponible para el control
+    if ! command -v nc &> /dev/null; then
+        echo "[!] Error: netcat (nc) no está instalado. No se puede controlar la PS Vita."
+        return 1
+    fi
+
+    # Crear directorio ABM si no existe
+    echo -e "\n[+] Creando directorio ABM en la PS Vita..."
+    curl -sSf -m 10 -Q "MKD ux0:/ABM" "ftp://${VITA_IP}:${VITA_PORT}/" 2>/dev/null || true
 
 
-# Menú de opciones de deploy
-echo -e "\n==========================================="
-echo "¿Cómo quieres enviar el VPK a la Vita?"
-echo "1) Enviar por FTP (VitaShell)"
-echo "2) Deploy rápido (makefast, para eboot.bin)"
-echo "3) Salir"
-echo "==========================================="
-read -p "Selecciona una opción [1-3]: " opt
+    # Definir el nombre personalizado para el VPK a enviar
+    VPK_NAME="moonlight.vpk"
 
-case "$opt" in
-    1)
-        echo -e "\n[+] Enviando VPK por FTP..."
-        curl --ftp-method nocwd -T "$VPK_PATH" "ftp://${VITA_IP}:${VITA_PORT}/ux0:/ABM/"
-        echo -e "\n[+] Abriendo VitaShell..."
-        echo "launch VITASHELL" | nc "$VITA_IP" "$VITA_CONTROL_PORT"
-        echo -e "\n==========================================="
-        echo "Instrucciones:"
-        echo "1. Ve a ux0:/ABM/ en VitaShell"
-        echo "2. Instala $(basename "$VPK_PATH")"
-        echo "3. Presiona O para volver al LiveArea"
-        echo "4. Presiona ENTER aquí para iniciar la aplicación"
-        echo "==========================================="
-        read -p "Presiona ENTER para iniciar la aplicación..."
-        echo -e "\n[+] Iniciando la aplicación ($title_id)..."
-        echo "launch $title_id" | nc "$VITA_IP" "$VITA_CONTROL_PORT"
-        echo "¡Aplicación iniciada! ($title_id)"
-        ;;
-    2)
-        echo -e "\n[+] Usando makefast para deploy rápido de eboot.bin..."
-        ./makefast build eboot.bin || { echo "[!] Error ejecutando makefast"; exit 1; }
-        ;;
-    3)
-        echo "Saliendo."
-        exit 0
-        ;;
-    *)
-        echo "Opción inválida. Saliendo."
-        exit 1
-        ;;
-esac
+    # Enviar VPK con el nombre personalizado
+    echo -e "\n[+] Enviando $VPK_NAME a la PS Vita..."
+    if ! curl --ftp-method nocwd -T "$VPK_PATH" "ftp://${VITA_IP}:${VITA_PORT}/ux0:/ABM/$VPK_NAME" --connect-timeout 10; then
+        echo "[!] Error al enviar el VPK a la PS Vita"
+        echo "[!] Verifica que el servidor FTP está activo en la PS Vita"
+        return 1
+    fi
 
-echo -e "\nCompilación completada. Archivos generados en el directorio build/"
+    echo -e "\n[+] Abriendo VitaShell..."
+    echo "launch VITASHELL" | nc "$VITA_IP" "$VITA_CONTROL_PORT"
+
+    echo -e "\n==========================================="
+    echo "Instrucciones:"
+    echo "1. Ve a ux0:/ABM/ en VitaShell"
+    echo "2. Selecciona $VPK_NAME y presiona X para instalar"
+    echo "3. Espera a que se complete la instalación"
+    echo "4. Presiona X para instalar"
+    echo ""
+    echo "==========================================="
+
+    # Esperar a que el usuario termine de instalar
+    read -p "Presiona ENTER para iniciar la aplicación (o Ctrl+C para salir)..."
+
+    # Iniciar la aplicación automáticamente
+    echo -e "\n[+] Iniciando la aplicación ($TITLE_ID)..."
+    echo "launch MNLHTVITA" | nc "$VITA_IP" "$VITA_CONTROL_PORT"
+    echo "¡Aplicación iniciada! ($TITLE_ID)"
+    return 0
+}
+
+# Función principal
+main() {
+    local start_time=$(date +%s)
+
+    # Mostrar banner informativo
+    echo -e "\n\033[1;34m=== Moonlight PSV Builder ===\033[0m"
+    echo "Sistema: $(uname -a)"
+    echo "Hora de inicio: $(date)"
+
+    # Verificar dependencias
+    if ! check_dependencies; then
+        echo -e "\n\033[1;31m[!] Error: Faltan dependencias necesarias. Abortando.\033[0m"
+        return 1
+    fi
+
+    # Parse optional args
+    # If user passed first argument 'ffmpeg' or '--ffmpeg', enable BUILD_FFMPEG
+    BUILD_FFMPEG=OFF
+    if [ "$1" = "ffmpeg" ] || [ "$1" = "--ffmpeg" ]; then
+        BUILD_FFMPEG=ON
+        echo "[+] Habilitando BUILD_FFMPEG=ON (arg: $1)"
+    fi
+
+    # Menú de plataforma gráfica
+    echo -e "\n\033[1;34m[+] Select graphics backend:\033[0m"
+    echo "1. GLS (OpenGL)"
+    echo "2. GXM (Vita HW)"
+    read -p "Select an option [1-2]: " GFX_OPTION
+
+    USE_GXM=OFF
+    PLATFORM_NAME="GLS"
+    if [ "$GFX_OPTION" = "2" ]; then
+        USE_GXM=ON
+        PLATFORM_NAME="GXM"
+    fi
+
+    # Menú de tipo de build
+    echo -e "\n\033[1;34m[+] Build options:\033[0m"
+    echo "1. Normal build (incremental, resumes from last build)"
+    echo "2. Clean and full rebuild (from scratch)"
+    read -p "Select an option [1-2]: " OPTION
+
+    local CMAKE_BUILD_TYPE="Release"
+    local DO_CLEAN=0
+
+    case $OPTION in
+        1)
+            CMAKE_BUILD_TYPE="Release"
+            echo -e "\n\033[1;34m[+] Normal build selected (incremental) [$PLATFORM_NAME].\033[0m"
+            ;;
+        2)
+            DO_CLEAN=1
+            echo -e "\n\033[1;34m[+] Clean and full rebuild selected [$PLATFORM_NAME].\033[0m"
+            ;;
+        *)
+            echo "Invalid option. Exiting."
+            return 1
+            ;;
+    esac
+
+    # Si elige limpiar o es la primera vez
+    if [ $DO_CLEAN -eq 1 ] || [ ! -d "$BUILD_DIR" ]; then
+        echo -e "\n\033[1;34m[+] Cleaning and full rebuild...\033[0m"
+        clean_build
+    else
+        echo -e "\n\033[1;34m[+] Continuing with existing build... [$PLATFORM_NAME]\033[0m"
+    fi
+
+    # Mostrar información del sistema
+    echo -e "\n\033[1;34m[+] Información del sistema:\033[0m"
+    echo "Núcleos disponibles: $(nproc)"
+    echo "Memoria RAM: $(free -h | awk '/^Mem:/{print $2}')"
+    echo "Espacio en disco: $(df -h . | awk 'NR==2{print $4}')"
+
+    # Iniciar compilación
+    if build_project "$CMAKE_BUILD_TYPE" && check_vpk; then
+        local end_time=$(date +%s)
+        local duration=$((end_time - start_time))
+        local minutes=$((duration / 60))
+        local seconds=$((duration % 60))
+
+        echo -e "\n\033[1;32m[+] Build completed successfully in ${minutes}m ${seconds}s\033[0m"
+        echo -e "\033[1;34m[+] VPK size: $(du -h "$VPK_PATH" | cut -f1)\033[0m"
+
+        # Opciones post-compilación
+        echo -e "\n\033[1;34m[+] What do you want to do next?\033[0m"
+        echo "1. Install to PS Vita (FTP)"
+        echo "2. Open VPK directory"
+        echo "3. Exit"
+        echo -n "Select an option [1-3]: "
+        read -n 1 -r
+        echo
+
+        case $REPLY in
+            1)
+                deploy_to_vita
+                ;;
+            2)
+                xdg-open "$(dirname "$VPK_PATH")" 2>/dev/null || echo "Could not open directory"
+                ;;
+            *)
+                echo -e "\n[+] VPK generated at: \033[1;34m$VPK_PATH\033[0m"
+                echo "[+] You can copy it manually to your PS Vita"
+                ;;
+        esac
+
+        return 0
+    else
+        local end_time=$(date +%s)
+        local duration=$((end_time - start_time))
+        local minutes=$((duration / 60))
+        local seconds=$((duration % 60))
+
+        echo -e "\n\033[1;31m[!] Error durante la compilación (Duración: ${minutes}m ${seconds}s)\033[0m"
+
+        # Mostrar sugerencias para solucionar problemas comunes
+        echo -e "\n\033[1;33m[!] Posibles soluciones:\033[0m"
+        echo "1. Intenta limpiar y recompilar desde cero"
+        echo "2. Verifica que tienes suficiente espacio en disco"
+        echo "3. Revisa los permisos de los archivos"
+        echo "4. Consulta el archivo de registro en ${BUILD_DIR}/CMakeFiles/CMakeOutput.log"
+
+        return 1
+    fi
+}
+
+# Ejecutar la función principal
+if main; then
+    echo -e "\n[+] Proceso completado con éxito"
+    exit 0
+else
+    echo -e "\n[!] El proceso ha fallado"
+    exit 1
+fi

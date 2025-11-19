@@ -1,0 +1,71 @@
+<brls:Box
+    width="auto"
+    height="auto">
+
+    <brls:ScrollingFrame
+        width="auto"
+        height="auto"
+        axis="column"
+        alignItems="stretch"
+        scrollingBehavior="centered"
+        grow="1.0" >
+
+        <brls:Box
+            width="10000"
+            height="auto"
+            axis="column"
+            alignItems="stretch"
+            paddingTop="@style/brls/sidebar/padding_top"
+            paddingRight="@style/brls/sidebar/padding_right"
+            paddingBottom="@style/brls/sidebar/padding_bottom"
+            paddingLeft="@style/brls/sidebar/padding_left">
+
+            <!-- Trackpad Configuration Header -->
+            <brls:Header title="@i18n/moonlight/trackpad/header"/>
+
+            <!-- Pointer Speed -->
+            <brls:SliderCell
+                id="pointerSpeedSlider"
+                title="@i18n/moonlight/trackpad/pointer_speed/title"/>
+
+            <!-- Click & Gesture Options Header -->
+            <brls:Header title="@i18n/moonlight/trackpad/gestures_header"/>
+
+            <!-- Two Finger Right Click -->
+            <brls:BooleanCell
+                id="twoFingerRightClickToggle"
+                title="@i18n/moonlight/trackpad/two_finger_right_click/title"/>
+
+            <!-- Two Finger Scrolling -->
+            <brls:BooleanCell
+                id="twoFingerScrollToggle"
+                title="@i18n/moonlight/trackpad/two_finger_scroll/title"/>
+
+            <!-- Invert Scroll Direction -->
+            <brls:BooleanCell
+                id="invertScrollToggle"
+                title="@i18n/moonlight/trackpad/invert_scroll/title"/>
+
+            <!-- Multi-Touch Gestures -->
+            <brls:BooleanCell
+                id="multiTouchGesturesToggle"
+                title="@i18n/moonlight/trackpad/multi_touch/title"/>
+
+            <!-- Advanced Options Header -->
+            <brls:Header title="@i18n/moonlight/trackpad/advanced_header"/>
+
+            <!-- Edge Zones -->
+            <brls:SliderCell
+                id="edgeZoneSlider"
+                title="@i18n/moonlight/trackpad/edge_zone/title"/>
+
+            <!-- Dead Zone -->
+            <brls:SliderCell
+                id="deadZoneSlider"
+                title="@i18n/moonlight/trackpad/dead_zone/title"/>
+
+        </brls:Box>
+
+    </brls:ScrollingFrame>
+
+</brls:Box>

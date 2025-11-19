@@ -1,0 +1,123 @@
+#!/bin/bash
+# Script makefast: build y deploy rápido a PSVita usando vitacompanion
+# Requiere: vitacompanion activo en la Vita, eboot.bin generado, curl y netcat (nc)
+
+# set -e  # Desactivado para debug
+
+cd "$(dirname "$0")"
+
+# Leer IP desde ip_vita.txt
+IP_FILE="$(dirname "$0")/ip_vita.txt"
+echo "[makefast] Leyendo IP de $IP_FILE..."
+if [ -f "$IP_FILE" ]; then
+    PSVITAIP=$(head -n 1 "$IP_FILE" | tr -d '\r\n')
+else
+    echo "[makefast] Error: ip_vita.txt no encontrado."
+    exit 1
+fi
+echo "[makefast] IP Vita: $PSVITAIP"
+
+
+# Obtener TITLEID desde CMakeLists.txt (PSN_TITLE_ID o TITLE_ID)
+echo "[makefast] Obteniendo TITLEID de CMakeLists.txt..."
+TITLEID=$(grep -Po 'set\((PSN_TITLE_ID|TITLE_ID)\s+"\K[^"]+' CMakeLists.txt | head -n1)
+if [ -z "$TITLEID" ]; then
+    echo "[makefast] Error: No se pudo obtener el TITLEID de CMakeLists.txt."
+    exit 1
+fi
+echo "[makefast] TITLEID: $TITLEID"
+
+BUILD_DIR="build"
+BIN_FILE="eboot.bin"
+EBOOT_FILE="eboot.bin"
+
+# Permitir argumentos: ./makefast <build_dir> <archivo>
+if [ $# -ge 1 ]; then
+    BUILD_DIR="$1"
+fi
+if [ $# -ge 2 ]; then
+    BIN_FILE="$2"
+fi
+
+SELF_PATH="${BUILD_DIR}/${BIN_FILE}"
+EBOOT_PATH="${BUILD_DIR}/${EBOOT_FILE}"
+
+# Preferir el eboot dentro del build dir. Si no existe allí, buscar en build/ el archivo más reciente
+echo "[makefast] Buscando eboot: preferir $SELF_PATH..."
+if [ -f "$SELF_PATH" ]; then
+    SELECTED_EBOOT="$SELF_PATH"
+elif [[ "$BIN_FILE" == */* ]] && [ -f "$BIN_FILE" ]; then
+    # If BIN_FILE includes a path (absolute/relative) and file exists, use it
+    echo "[makefast] Se proporcionó un path para eboot: $BIN_FILE, usando $BIN_FILE"
+    SELECTED_EBOOT="$BIN_FILE"
+else
+    # buscar en build/ el archivo más reciente con el mismo nombre
+    SELECTED_EBOOT=$(find "$BUILD_DIR" -maxdepth 2 -type f -name "$BIN_FILE" -printf '%T@ %p\n' 2>/dev/null | sort -nr | awk '{print $2; exit}')
+    if [ -n "$SELECTED_EBOOT" ]; then
+        echo "[makefast] Usando $SELECTED_EBOOT (en $BUILD_DIR)."
+    else
+        # buscar en el repo completo (excluyendo build/.git etc.) y tomar el más reciente
+        echo "[makefast] No se encontró $BIN_FILE en $BUILD_DIR, buscando en el repo..."
+        SELECTED_EBOOT=$(find . -maxdepth 4 -type f -name "$BIN_FILE" -printf '%T@ %p\n' 2>/dev/null | sort -nr | awk '{$1=""; sub(/^ /, ""); print; exit}')
+        if [ -n "$SELECTED_EBOOT" ]; then
+            echo "[makefast] Usando $SELECTED_EBOOT (fallback repo)."
+        fi
+    fi
+fi
+
+if [ -z "$SELECTED_EBOOT" ]; then
+    echo "[makefast] Error: No se encontró ningún $BIN_FILE (ni en $BUILD_DIR ni en el repo). Compila primero."
+    exit 1
+fi
+
+# Si el archivo seleccionado no está dentro del BUILD_DIR, lo copiaremos dentro para upload
+if [ "$SELECTED_EBOOT" = "$EBOOT_PATH" ]; then
+    echo "[makefast] EBOOT seleccionado: $SELECTED_EBOOT (ya en $EBOOT_PATH). No se copia."
+else
+    echo "[makefast] Copiando $SELECTED_EBOOT -> $EBOOT_PATH"
+    mkdir -p "$(dirname "$EBOOT_PATH")"
+    cp "$SELECTED_EBOOT" "$EBOOT_PATH"
+    echo "[makefast] Copiado $SELECTED_EBOOT a $EBOOT_PATH"
+fi
+
+# 1. Detener la app si está corriendo
+echo "[makefast] Enviando destroy..."
+(echo destroy | nc "$PSVITAIP" 1338) || echo "[makefast] destroy falló (puede ser normal si no hay app en ejecución)"
+echo "[makefast] Destroy enviado."
+
+# Esperar a que la Vita libere eboot.bin (máx 10s)
+WAIT=0
+while true; do
+    curl -s --user anonymous: --list-only "ftp://$PSVITAIP:1337/ux0:/app/$TITLEID/eboot.bin" | grep -q eboot.bin
+    if [ $? -eq 0 ]; then
+        curl -s --user anonymous: -Q "RNFR ux0:/app/$TITLEID/eboot.bin" -Q "RNTO ux0:/app/$TITLEID/eboot.bin" "ftp://$PSVITAIP:1337/" && break
+    else
+        break
+    fi
+    sleep 1
+    WAIT=$((WAIT+1))
+    if [ $WAIT -ge 10 ]; then
+        echo "[makefast] Advertencia: eboot.bin sigue bloqueado tras 10s, intentando subir de todas formas..."
+        break
+    fi
+    echo "[makefast] Esperando a que la Vita libere eboot.bin... ($WAIT s)"
+done
+echo "[makefast] Listo para subir eboot.bin"
+
+# 2. Subir eboot.bin vía FTP
+echo "[makefast] Subiendo $EBOOT_PATH a la Vita..."
+curl -v -T "$EBOOT_PATH" "ftp://$PSVITAIP:1337/ux0:/app/$TITLEID/eboot.bin"
+CURL_STATUS=$?
+echo "[makefast] curl terminó con código $CURL_STATUS"
+
+# 3. Lanzar la app y mostrar respuesta
+echo "[makefast] Enviando comando de lanzamiento..."
+LAUNCH_RESPONSE=$(echo launch $TITLEID | nc "$PSVITAIP" 1338)
+echo "[makefast] Respuesta de vitacompanion: $LAUNCH_RESPONSE"
+if echo "$LAUNCH_RESPONSE" | grep -iq launched; then
+    echo "[makefast] Launched: $LAUNCH_RESPONSE"
+else
+    echo "[makefast] Advertencia: No se recibió confirmación de lanzamiento. Respuesta: $LAUNCH_RESPONSE"
+fi
+
+echo "[makefast] eboot.bin enviado y app lanzada en la Vita ($PSVITAIP, $TITLEID)"

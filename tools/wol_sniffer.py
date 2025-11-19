@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 import socket
 
-# Configuración
-PORT = 9  # Puerto estándar de Wake-on-LAN
-BIND_IP = ''  # Escucha en todas las interfaces
+PORT = 9
+BIND_IP = ''
 
 print(f"Escuchando paquetes WOL en UDP puerto {PORT}...")
 

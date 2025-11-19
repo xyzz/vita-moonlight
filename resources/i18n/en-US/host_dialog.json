@@ -1,0 +1,64 @@
+{
+  "dialog": {
+    "title": "Host Options",
+    "close": "Close",
+    "connect": "Connect",
+    "info": "Info",
+    "settings": "Settings",
+    "ok": "OK"
+  },
+  "info": {
+    "title": "Host Information",
+    "name": "Name",
+    "ip": "IP",
+    "mac": "MAC Address"
+  },
+  "settings": {
+    "title": "Settings"
+  },
+  "dropdown": {
+    "edit_host": "Edit host",
+    "delete": "Delete host",
+    "pair_online": "Pair online (outside home)",
+    "title": "Actions for"
+  },
+  "connecting": "Generating certificates...",
+  "host_list_empty": "No hosts saved",
+  "confirm_delete_msg": "Do you want to delete the host?",
+  "yes": "Yes",
+  "no": "No",
+  "add_host_paired_success": "Host $(name) paired and saved successfully!",
+  "add_host_paired_error_deviceini": "Error: device.ini not found after pairing.",
+  "add_host_paired_error_failed": "Pairing failed. Host was not saved.",
+  "pairing_title": "Pairing...",
+  "pairing_connecting": "Connecting to host and waiting for PIN...",
+  "pairing_enter_pin": "Enter this PIN in Sunshine: $(pin)",
+  "pairing_success": "Pairing successful",
+  "pairing_force_warning": "Host is busy: forcing pairing. If it fails, sign out on the PC and try again.",
+  "active_session_mismatch": "This host reports an active session ($(app)) but it doesn't recognize your device pairing. You can forget the host to reset pairing state.",
+  "button_forget_host": "Forget Host",
+  "forgot_host": "Host forgotten",
+  "forget_failed": "Failed to forget host",
+  "pairing_error_init": "Error initializing connection to host",
+  "pairing_error": "Pairing error: $(error)",
+  "error_host_busy": "The host has an active session. Close it on the PC or wait for it to finish, or pair this client before trying to start.",
+  "notification_deleted": "Host deleted successfully",
+  "change_ip_title": "Update host IP",
+  "change_ip_hint": "Enter the new IP or IP:Port",
+  "change_ip_empty_error": "The IP can't be empty",
+  "change_ip_same": "That IP is already set",
+  "change_ip_success": "Host IP updated",
+  "change_ip_failure": "Couldn't update the host IP"
+  ,
+  "edit_host_title": "Edit Host",
+  "edit_host_name_hint": "Host name",
+  "edit_host_ip_hint": "Host IP or IP:Port",
+  "edit_host_save": "Save Changes",
+  "edit_host_name_empty_error": "Host name can't be empty",
+  "edit_host_ip_empty_error": "Host IP can't be empty",
+  "edit_host_success": "Host updated successfully",
+  "edit_host_failure": "Failed to update host",
+  "actions": {
+    "refresh": "Refresh hosts"
+  }
+}

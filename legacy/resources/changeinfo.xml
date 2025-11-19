@@ -1,0 +1,230 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<changeinfo>
+<changes app_ver="00.13"><![CDATA[
+## 0.13.1<br>
+* fix: Split shortcuts into individual files for better code organization and maintainability.<br>
+* fix: Resolved ghost/phantom button presses when handling overlays and shortcuts. Button state is now correctly reset and restored.<br>
+<br>
+## 0.13.0<br>
+* You can now choose between three touchscreen modes: DS4 Touchpad, Absolute Mouse, and Tablet (Sunshine) from the settings menu.<br>
+* "DS4 Touchpad" mode lets you use the Vita screen as a DualShock 4-style multitouch touchpad, compatible with gestures and advanced controls in games and Steam Input.<br>
+* DS4 Touchpad mode is now more sensitive and precise for a smoother experience.<br>
+* Wake-on-LAN (WOL) fully integrated into the host management menu: allows you to power on the remote PC from the Vita using the saved MAC and automatically calculated broadcast address.<br>
+* The host MAC address is now saved and loaded correctly from the device.ini file, with all ARP/legacy logic removed.<br>
+* WOL packet sending is robust and compatible with local networks, with cross-platform MAC parsing and detailed debug logs.<br>
+* Added Python script (`tools/wol_sniffer.py`) to receive and verify Wake-on-LAN packets on the network, useful for testing without powering off the PC.<br>
+* Minor UI fixes and improved visual feedback in the host management menu.<br>
+* Fixed: Combos like L1+L2 and R1+R2 now work correctly even when used together with either touchscreen or backtouch. Pressing both at the same time no longer causes one to be lifted; both can be held simultaneously as expected.<br>
+* Fixed: In absolute touch mode, special button overlays no longer interfere with touch input. If a special button is detected, the corresponding touchscreen input is ignored, allowing for true absolute touch and making all screen corners usable.<br>
+<br>
+## 0.12.3<br>
+* Moonlight now automatically selects and creates the best available folder for config and cache (supports ux0:/data/moonlight, ux0:/moonlight, uma0:/data/moonlight, and fallback to ux0:data).<br>
+* The chosen folder location is logged at startup for easier debugging.<br>
+* The config file (moonlight.conf) is always created in the selected folder, improving compatibility for users with missing folders.<br>
+* Improved error handling and debug logging for folder creation and config file setup.<br>
+* All folder and config path logic is now centralized and robust, reducing crashes and edge cases.<br>
+* Bugfix: Prevented crashes on startup due to buffer or path issues in folder selection logic.<br>
+* New Host Management menu: manage paired hosts with improved status display, unified status text, and direct actions (connect, force connect, change IP/name, delete).<br>
+  - Now allows:<br>
+    - Changing the host name<br>
+    - Changing the host IP<br>
+    - Forcing connection even if the host is not shown as online<br>
+    - Deleting hosts<br>
+* The connection and host management menus now show the port next to the IP (uses httpPort if available, otherwise httpsPort).<br>
+* Host Management menu now shows host status (paired/unpaired, online/offline, IP changed) in a unified way, matching the main menu logic.<br>
+* Visual feedback and menu options for host management are now clearer and more robust.<br>
+* Internal refactor: main.c and check_dir.c now use a shared macro for path buffer size and a helper for folder selection.<br>
+<br>
+## 0.12.2<br>
+* Added option to swap L1/R1 and L2/R2 button functions from the settings menu.<br>
+* Added option to select gamepad type: Xbox or PlayStation layout, configurable from the settings menu.<br>
+* Improved host scan logic: scan is always restarted cleanly when returning to the main menu or after leaving any submenu.<br>
+* UI and config logic for swap and mapping exclusivity is now robust and bidirectional.<br>
+* Controller type selection in UI now saves/loads correctly and updates immediately.<br>
+* Touch Mouse and Touchscreen toggles now update their subname in the menu immediately after toggling.<br>
+* Main menu always restarts host scan and waits for thread readiness before allowing host selection.<br>
+* Cleaned up and stabilized code, especially around host scan thread handling and function declarations.<br>
+* Many bugfixes and code cleanups.<br>
+<br>
+## 0.12.1<br>
+* Add support for multi-touch touchscreen mode (Sunshine compatible) and absolute mouse mode.<br>
+* New settings: choose between "Touch Mouse Absolute" (gestures, mouse) and "Touchscreen (Sunshine multitouch)" (tablet mode).<br>
+* In touchscreen mode: true multitouch, native gestures (e.g. zoom), no mouse cursor/ghost, no mouse clicks.<br>
+* In absolute mouse mode: improved gestures (right click with two-finger tap, scroll with two fingers), cursor always follows main finger.<br>
+* Physical controls (gamepad) work in both modes.<br>
+* Improved logic for right click and scroll gestures.<br>
+* Many bugfixes and refinements to touch and gesture experience.<br>
+]]></changes>
+<changes app_ver="00.11"><![CDATA[
+## 0.11.4<br>
+* Host status indicator dots: green (online), yellow (IP change pending), red (offline/disconnected).<br>
+* Robust host status checking with background scan thread and mDNS sniffer.<br>
+* Manual refresh of host status with TRIANGLE (△) in main menu and device search.<br>
+* IP change confirmation dialog now always shows old and new IP, and always asks for confirmation.<br>
+* Host status and menu only refresh when status actually changes or user requests it.<br>
+* Improved debug logging for all host and menu transitions.<br>
+* UI and logic are now robust even if host fields are empty or uninitialized.<br>
+* All UI messages for search device and refresh are now in English.<br>
+* Added screenshots to documentation (see docs/):<br>
+  * keyboard.png: Floating keyboard in a Steam app using Moonlight.<br>
+  * ip1.png: Host waiting for IP update (yellow).<br>
+  * ip2.png: Host online (green).<br>
+  * ip3.png: Host offline/disconnected (red).<br>
+  * ip4.png: IP change confirmation dialog (shows old/new IP).<br>
+  * ip5.png: Search device function showing a found local device.<br>
+## 0.11.2<br>
+* More reliable and user-friendly automatic pairing.<br>
+* Experimental absolute touch controls (beta).<br>
+* Floating virtual keyboard that no longer covers the main screen.<br>
+* Updated libraries and dependencies for improved compatibility and stability.<br>
+* New modular UDP mDNS sniffer for device discovery (replaces legacy mdns code).<br>
+* Improved debug logging, especially for device search and reconnect flows.<br>
+* Cleanup of legacy code and dependencies.<br>
+]]></changes>
+<changes app_ver="00.10"><![CDATA[
+## 0.10.1<br>
+* Fix pairing issue (Same one from v0.9.3)<br>
+## 0.10.0<br>
+* Add double tap to sprint option<br>
+* Add motion controls<br>
+* Fork moonlight-common-c and enet<br>
+]]></changes>
+<changes app_ver="00.09"><![CDATA[
+## 0.9.3<br>
+* Fix pairing issue (#231, 5494d93)<br>
+* Update latest moonlight-common-c & enet (902cbed)<br>
+* Update latest libgamestream (#232)<br>
+<br>
+## 0.9.2<br>
+* Fixed disconnects after stream is started (#222)<br>
+<br>
+## 0.9.1<br>
+* Support GFE 3.22 (2452e98)<br>
+<br>
+## 0.9.0<br>
+* Expose local audio setting to the end user (#173)<br>
+* Remember the currently connected address (7998108)<br>
+* Add a 21:9 resolution (1280x540) to Settings (f1eb931)<br>
+* Properly display stream in the correct display ratio, and place in the middle of the screen (14e3a2c)<br>
+* Since GFE will add blackbars to the stream even when a non-16:9 monitor is using 16:9 resolution,<br>
+there is another option to use along the 21:9 resolution to only display the center 16:9 region (5b7a2cc)<br>
+* Detect supported resolutions (#193)<br>
+* Add new option to enable/disable of the vita vblank waiting (#197)<br>
+]]></changes>
+<changes app_ver="00.08"><![CDATA[
+## 0.8.0<br>
+* Add new option for swapping O/X buttons (#168)<br>
+* Add new option for drawing FPS value (#167)<br>
+* Fix `RTSP message too long` (#164, fbe3d06)<br>
+]]></changes>
+<changes app_ver="00.07"><![CDATA[
+## 0.7.0<br>
+* Support 960x540 resolution (#162, fc7e19c)<br>
+* Support GFE 3.20 (97a6a0b)<br>
+]]></changes>
+<changes app_ver="00.06"><![CDATA[
+## 0.6.1<br>
+* Fix the stream delay issue (f791b3d); thanks @AlC4pwn to confirm fixing the bug<br>
+<br>
+## 0.6.0<br>
+* Update latest moonlight-common-c (cfadd84, ffe8c15)<br>
+* Update latest inih (a2e38bb)<br>
+* Fix invalid variable initializations<br>
+* Apply SPS changes of moonlight-embedded<br>
+* Use nerdfont instead VITA system font (7e2b682)<br>
+* Use vita2d instead direct framebuffer handling (70330e2)<br>
+* Implement poor network indicator (749aaaf)<br>
+]]></changes>
+<changes app_ver="00.05"><![CDATA[
+## 0.5.0<br>
+* Support to discover stream server via mDNS (#143)<br>
+* Implement frame pacer (#147)<br>
+* Update latest enet & moonlight-common-c (904a5d1, 7f63f0d)<br>
+]]></changes>
+<changes app_ver="00.04"><![CDATA[
+## 0.4.1<br>
+* Update latest moonlight-common-c (2c9d61c)<br>
+<br>
+## 0.4.0<br>
+* Sort app list alphabetically (#127)<br>
+* Improve special button settings (#130)<br>
+* Implement video cleanup for fixing connection issue (#131)<br>
+]]></changes>
+<changes app_ver="00.03"><![CDATA[
+## 0.3.3<br>
+* Update latest moonlight-common-c (8e77710)<br>
+* Cherry pick upstream change about gamepad masking (933d700)<br>
+* Reduce mismatch between upstream (e2d7910, e3cad393)<br>
+<br>
+## 0.3.2<br>
+* New configure option about streaming optimization (d2c974a)<br>
+* Fix cannot use 960x544 resolution (653afa6)<br>
+<br>
+## 0.3.1<br>
+* Fix cannot connect with new devices (b838278)<br>
+<br>
+## 0.3.0<br>
+* Support GFE 3.11<br>
+* New configure option about reference frame invalidation (#89, #91)<br>
+* Fix unset resolution configure (#90)<br>
+]]></changes>
+<changes app_ver="00.02"><![CDATA[
+## 0.2.0<br>
+* Support newer vitasdk (94988ab)<br>
+* Support forward error correction (f8631b5, 184bdbe)<br>
+* No more build uncompress binary (6fd22e7)<br>
+]]></changes>
+<changes app_ver="00.01"><![CDATA[
+## 0.1.2<br>
+* Compress binary (#75)<br>
+* Support GFE 3.2 (#76)<br>
+<br>
+## 0.1.1<br>
+* Fix connection problem on the GFE 2.2.3 (#66)<br>
+* Improve logging datas (#67, #68)<br>
+* Support newer vitasdk (#70)<br>
+<br>
+## 0.1.0<br>
+* Add new option for store debugging log (#53)<br>
+* Fix crash at quit application (#54)<br>
+* Add livearea (#62)<br>
+* Add new option for mouse acceleration (#63)<br>
+* Cleanup codes. (#60)<br>
+* Now remove alpha mark. but still lower version :) (#64)<br>
+]]></changes>
+<changes app_ver="00.00"><![CDATA[
+## alpha6<br>
+* Reimplement input & config process for the improve stability (#47)<br>
+* Fix little memory leaks (#47)<br>
+* Fix crash if have too many moonlight supporting games (#47)<br>
+* Fix crash at press circle button on the connect menu (#47)<br>
+* Fix bug about not detect device model (#50)<br>
+* Fix cannot use analog sticks on the VITA 2000 (#50)<br>
+* Change priority of input thread for the high bitrate connection (#50)<br>
+* Update mapping values & add new mapping file for the PSTV (#51)<br>
+<br>
+## alpha5<br>
+* Fix crash at first time (dcd1dc8)<br>
+* Improve input packet handle (#24)<br>
+* Change connection option (#26)<br>
+* Code cleanup for input handling (#27, #30, #31)<br>
+* Support L2/R2/L3/R3 Buttons on PSTV (#36)<br>
+* Update build toolchains & Fix connection problems under GFE 3.0 (#39)<br>
+<br>
+## alpha4<br>
+* Support GUI (#13)<br>
+* Support editing config file (#4)<br>
+* Support input mapping (#5)<br>
+* Add new config options for power saving (#6)<br>
+* Turn safe application (#7)<br>
+<br>
+## alpha3<br>
+* Support virtual button for L2/R2/L3/R3 using touchscreen (#1, #2)<br>
+* Support mouse move and click using touchscreen (#3)<br>
+<br>
+## alpha2<br>
+* Support custom settings; screen resolution, framerate and bitrate (d145403)<br>
+<br>
+## alpha1<br>
+* Initial release (04a7c1d)]]></changes>
+</changeinfo>

@@ -1,0 +1,64 @@
+{
+  "dialog": {
+    "connect": "Conectar",
+    "info": "Información",
+    "settings": "Ajustes",
+    "close": "Cerrar",
+    "title": "Opciones del host",
+    "ok": "Aceptar"
+  },
+  "info": {
+    "title": "Información del Host",
+    "name": "Nombre",
+    "ip": "IP",
+    "mac": "Dirección MAC"
+  },
+  "settings": {
+    "title": "Configuración"
+  },
+  "dropdown": {
+    "edit_host": "Editar host",
+    "delete": "Eliminar host",
+    "pair_online": "Emparejar online fuera de casa",
+    "title": "Acciones para"
+  },
+  "actions": {
+    "refresh": "Actualizar hosts"
+  },
+  "connecting": "Generando certificados...",
+  "host_list_empty": "No hay hosts guardados",
+  "confirm_delete_msg": "¿Deseas eliminar el host?",
+  "yes": "Sí",
+  "no": "No",
+  "add_host_paired_success": "¡Host $(name) emparejado y guardado correctamente!",
+  "add_host_paired_error_deviceini": "Error: No se encontró device.ini tras el emparejamiento.",
+  "add_host_paired_error_failed": "Emparejamiento fallido. No se guardó el host.",
+  "pairing_title": "Emparejando...",
+  "pairing_connecting": "Conectando con el host y esperando PIN...",
+  "pairing_enter_pin": "Introduce este PIN en Sunshine: $(pin)",
+  "pairing_success": "Emparejamiento exitoso",
+  "pairing_force_warning": "Host ocupado: forzando emparejado. Si falla, cierra la sesión en el PC e inténtalo de nuevo.",
+  "active_session_mismatch": "Este host reporta una sesión activa ($(app)) pero no reconoce el emparejamiento de tu dispositivo. Puedes olvidar el host para restablecer el estado de emparejado.",
+  "button_forget_host": "Olvidar host",
+  "forgot_host": "Host olvidado",
+  "forget_failed": "Error al olvidar el host",
+  "pairing_error_init": "Error inicializando conexión con el host",
+  "pairing_error": "Error de emparejamiento: $(error)",
+  "error_host_busy": "El host tiene una sesión activa. Ciérrala en el PC o espera a que termine, o empareja el cliente antes de intentar iniciar.",
+  "notification_deleted": "Host eliminado con éxito",
+  "change_ip_title": "Actualizar IP del host",
+  "change_ip_hint": "Ingresa la nueva IP o IP:Puerto",
+  "change_ip_empty_error": "La IP no puede estar vacía",
+  "change_ip_same": "La IP ya está configurada con ese valor",
+  "change_ip_success": "IP del host actualizada",
+  "change_ip_failure": "No se pudo actualizar la IP del host"
+  ,
+  "edit_host_title": "Editar Host",
+  "edit_host_name_hint": "Nombre del host",
+  "edit_host_ip_hint": "IP del host o IP:Puerto",
+  "edit_host_save": "Guardar Cambios",
+  "edit_host_name_empty_error": "El nombre del host no puede estar vacío",
+  "edit_host_ip_empty_error": "La IP del host no puede estar vacía",
+  "edit_host_success": "Host actualizado correctamente",
+  "edit_host_failure": "Error al actualizar el host"
+}

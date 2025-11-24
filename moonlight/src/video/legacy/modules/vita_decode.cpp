@@ -1,6 +1,8 @@
 #include <psp2/gxm.h>
+#include <psp2/kernel/clib.h>
 #include <psp2/kernel/sysmem.h>
 #include <psp2/kernel/threadmgr.h>
+#include <psp2/sysmodule.h>
 #include <psp2/videodec.h>
 #include <stdlib.h>
 #include <string.h>
@@ -22,11 +24,76 @@ extern gs::SpsContext* g_sps_ctx;
 #include "network/NetworkOptimizations.hpp"
 #include "session/vita_session.hpp"
 #include "video/VideoFrameHolder.hpp"
-// Zero-copy y DirectGxm eliminados; flujo simplificado estilo Moonlight-Switch
-// (VideoPlane.hpp ya no es necesario)
-// DirectGxmVideoRenderer eliminado (modo directo depurado)
 #include "video/render_mode_cache.hpp"
-// (SPS context omitido en este TU para simplificar: no aplicamos fixups SPS aquí)
+#include "vita_sceAvcInternal.hpp"
+
+typedef struct ScePafInit
+{
+    SceSize global_heap_size;
+    int a2;
+    int a3;
+    int cdlg_mode;
+    int heap_opt_param1;
+    int heap_opt_param2;
+} ScePafInit;
+
+// Función para inicializar soporte 1080p con API Internal
+// Carga módulos PAF/AVCDEC y configura el decoder para resoluciones > 720p
+int vitavideo_init_1080p_internal_api(int width, int height, SceVideodecQueryInitInfoHwAvcdec* init)
+{
+    static bool modules_loaded = false;
+
+    // Solo cargar módulos una vez
+    if (!modules_loaded)
+    {
+        SceSysmoduleOpt sysmodule_opt;
+        ScePafInit init_param;
+        memset(&init_param, 0, sizeof(init_param));
+        init_param.global_heap_size = 4 * 1024 * 1024;
+        init_param.a2               = 0x0000EA60;
+        init_param.a3               = 0x00040000;
+        init_param.cdlg_mode        = 0;
+        init_param.heap_opt_param1  = 0;
+        init_param.heap_opt_param2  = 0;
+
+        memset(&sysmodule_opt, 0, sizeof(sysmodule_opt));
+        sysmodule_opt.flags = 0;
+
+        int ret_paf = sceSysmoduleLoadModuleInternalWithArg(SCE_SYSMODULE_INTERNAL_PAF, sizeof(init_param), &init_param, &sysmodule_opt);
+        VITA_DEBUG_LOG("[Video][1080p] sceSysmoduleLoadModuleInternalWithArg(PAF): 0x%x", ret_paf);
+
+        int ret_ini = sceSysmoduleLoadModuleInternal(SCE_SYSMODULE_INTERNAL_INI_FILE_PROCESSOR);
+        VITA_DEBUG_LOG("[Video][1080p] sceSysmoduleLoadModuleInternal(INI_FILE_PROCESSOR): 0x%x", ret_ini);
+
+        int ret_avc = sceSysmoduleLoadModule(SCE_SYSMODULE_AVCDEC);
+        VITA_DEBUG_LOG("[Video][1080p] sceSysmoduleLoadModule(SCE_SYSMODULE_AVCDEC): 0x%x", ret_avc);
+
+        // Configuración Internal
+        int ret_config = sceVideodecSetConfigInternal(SCE_VIDEODEC_TYPE_HW_AVCDEC, 2);
+        VITA_DEBUG_LOG("[Video][1080p] sceVideodecSetConfigInternal: 0x%x", ret_config);
+
+        int ret_mode = sceAvcdecSetDecodeModeInternal(SCE_VIDEODEC_TYPE_HW_AVCDEC, SCE_AVCDEC_MODE_EXTENDED);
+        VITA_DEBUG_LOG("[Video][1080p] sceAvcdecSetDecodeModeInternal: 0x%x", ret_mode);
+
+        modules_loaded = true;
+    }
+
+    // Inicializar con API Internal
+    int ret = sceVideodecInitLibraryInternal(SCE_VIDEODEC_TYPE_HW_AVCDEC, init);
+    if (ret == 0x80620808)
+    {
+        VITA_DEBUG_LOG("[Video][1080p] sceVideodecInitLibraryInternal already initialized");
+        return 0;
+    }
+    else if (ret < 0)
+    {
+        VITA_DEBUG_LOG("[Video][1080p] Error sceVideodecInitLibraryInternal: 0x%x", ret);
+        return ret;
+    }
+
+    VITA_DEBUG_LOG("[Video][1080p] sceVideodecInitLibraryInternal success");
+    return 0;
+}
 
 // Externs ya están en vita_globals.hpp
 
@@ -266,6 +333,12 @@ extern "C" int vitavideo_submit_decode_unit(PDECODE_UNIT decodeUnit)
     {
         frameHeightForDecoder = baseH;
     }
+    // FIX: Forzar 1088 si baseH es 1088 (evitar mismatch con SPS parcheado)
+    if (baseH == 1088 && frameHeightForDecoder == 1080)
+    {
+        frameHeightForDecoder = 1088;
+    }
+
     picture.frame.frameHeight  = frameHeightForDecoder;
     picture.frame.verticalSize = frameHeightForDecoder;
 

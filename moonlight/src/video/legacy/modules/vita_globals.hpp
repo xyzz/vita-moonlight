@@ -197,5 +197,6 @@ void yuv_write_canaries();
 bool yuv_check_canaries();
 uint64_t vita_monotonic_ms();
 int vita_pacer_thread_main(SceSize args, void* argp);
+int vitavideo_init_1080p_internal_api(int width, int height, SceVideodecQueryInitInfoHwAvcdec* init);
 
 #endif // VITA_GLOBALS_H

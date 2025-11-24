@@ -43,8 +43,17 @@ void SpsContext::fix(PLENTRY sps, int flags, uint8_t* out_buf, uint32_t* out_off
     }
     if (m_w == 1280 && m_h == 720)
         m_stream->sps->level_idc = 32;
-    else if (m_w == 1920 && m_h == 1080)
+    else if (m_w == 1920 && m_h == 1080) {
         m_stream->sps->level_idc = 42;
+        // Force height to 1088 (68 macroblocks) to satisfy Vita decoder alignment requirements
+        m_stream->sps->pic_height_in_map_units_minus1 = 67;
+        // Add cropping to display only 1080 lines
+        m_stream->sps->frame_cropping_flag = 1;
+        m_stream->sps->frame_crop_left_offset = 0;
+        m_stream->sps->frame_crop_right_offset = 0;
+        m_stream->sps->frame_crop_top_offset = 0;
+        m_stream->sps->frame_crop_bottom_offset = 4; // 4 * 2 (SubHeightC) = 8 pixels cropped from bottom
+    }
     m_stream->sps->num_ref_frames = 1;
     if (flags & GS_SPS_REMOVE_VST_FIXUP)
         m_stream->sps->vui.video_signal_type_present_flag = 0;

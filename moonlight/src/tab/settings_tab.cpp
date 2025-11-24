@@ -157,7 +157,7 @@ SettingsTab::SettingsTab()
                 {1280, 720},
                 {1360, 768},
                 {1600, 896},
-                {1920, 1088}
+                {1920, 1080}
             };
 
             std::vector<std::string> filteredLabels;
@@ -168,7 +168,7 @@ SettingsTab::SettingsTab()
                 bool include = true;
                 if (mode == 0) { // legacy
                     // only include resolutions 1280x720 and below
-                    if (w > 1280 || h > 720) include = false;
+                    if (w > 1920 || h > 1080) include = false; // test upper bound
                 }
                 if (include) {
                     filteredLabels.push_back(resolutions[i]);
@@ -260,7 +260,7 @@ SettingsTab::SettingsTab()
         { 1280, 720 }, // 16:9, 720p HD
         { 1360, 768 }, // Ajustada a múltiplo de 16 (1366x768 -> 1360x768)
         { 1600, 896 }, // Ajustada a múltiplo de 16 (1600x900 -> 1600x896)
-        { 1920, 1088 } // Ajustada a múltiplo de 16 (1920x1080 -> 1920x1088)
+        { 1920, 1080 } // 1080p Full HD (se ajustará internamente a 1088 por el decoder)
     };
 
     int currentRes = 5; // Default 1280x720 (índice 5)
@@ -276,7 +276,7 @@ SettingsTab::SettingsTab()
         currentRes = 6;
     else if (streamConfig.width == 1600 && streamConfig.height == 896)
         currentRes = 7;
-    else if (streamConfig.width == 1920 && streamConfig.height == 1088)
+    else if (streamConfig.width == 1920 && streamConfig.height == 1080)
         currentRes = 8;
 
     // Build an initial filtered list of resolutions depending on the initial render mode.
@@ -291,7 +291,7 @@ SettingsTab::SettingsTab()
             bool include = true;
             if (mode == 0)
             { // legacy -> only <= 1280x720
-                if (w > 1280 || h > 720)
+                if (w > 1920 || h > 1080)
                     include = false;
             }
             if (include)

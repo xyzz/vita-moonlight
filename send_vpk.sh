@@ -5,21 +5,31 @@
 
 # Parsear argumentos
 VPK_FILE=""
+USE_GL_BUILD=false
+
 while [[ $# -gt 0 ]]; do
     case $1 in
         --file)
             VPK_FILE="$2"
             shift 2
             ;;
+        -gl)
+            USE_GL_BUILD=true
+            shift
+            ;;
         *)
-            echo "Uso: $0 --file <ubicacion_del_archivo>"
+            echo "Uso: $0 [--file <ubicacion_del_archivo>] [-gl]"
             exit 1
             ;;
     esac
 done
 
 if [ -z "$VPK_FILE" ]; then
-    VPK_FILE="cmake-build-psv/moonlight.vpk"
+    if [ "$USE_GL_BUILD" = true ]; then
+        VPK_FILE="cmake-build-psv-gl/moonlight.vpk"
+    else
+        VPK_FILE="cmake-build-psv/moonlight.vpk"
+    fi
 fi
 
 if [ -z "$PSVITAIP" ]; then

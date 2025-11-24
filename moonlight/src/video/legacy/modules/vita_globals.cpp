@@ -13,6 +13,7 @@ char* decoder_buffer                    = NULL;
 size_t decoder_buffer_size              = 0;
 SceAvcdecCtrl* decoder                  = NULL;
 int decoderblock                        = -1;
+size_t decoder_block_size               = 0;
 SceAvcdecQueryDecoderInfo* decoder_info = NULL;
 SceVideodecQueryInitInfoHwAvcdec* init  = NULL;
 

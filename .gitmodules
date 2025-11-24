@@ -2,12 +2,6 @@
 	path = third_party/borealis
 	url = https://github.com/AorsiniYT/borealis.git
 	branch = vita
-[submodule "third_party/lib/extern/glfw"]
-	path = third_party/lib/extern/glfw
-	url = https://github.com/xfangfang/glfw.git
-[submodule "third_party/lib/extern/SDL"]
-	path = third_party/lib/extern/SDL
-	url = https://github.com/libsdl-org/SDL.git
 [submodule "third_party/inih"]
 	path = third_party/inih
 	url = https://github.com/benhoyt/inih

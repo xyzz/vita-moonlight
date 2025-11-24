@@ -4,6 +4,7 @@
 #include <psp2/display.h>
 #include <psp2/gxm.h>
 #include <psp2/kernel/processmgr.h>
+#include <psp2/kernel/sysmem.h>
 #include <psp2/kernel/threadmgr.h>
 #include <psp2/videodec.h>
 #include <stdio.h>
@@ -14,6 +15,9 @@
 #include <borealis/core/application.hpp>
 
 #include "network/NetworkOptimizations.hpp"
+#include "video/pixel_format/pixel_format.hpp"
+// External pixel processor
+extern PixelFormat::IPixelProcessor* g_pixelProcessor;
 
 // Definir constantes que pueden faltar
 #ifndef SCE_VIDEODEC_TYPE_HW_AVCDEC
@@ -127,26 +131,15 @@ extern "C" void vita_cleanup()
         decoder_buffer      = nullptr;
         decoder_buffer_size = 0;
     }
-    if (decoder_yuv_raw)
+
+    // No liberar texturas aquí para evitar crash de GPU si Borealis aún las usa.
+    // Se liberarán en vita_init si la resolución cambia.
+
+    // Liberar procesador de píxeles
+    if (g_pixelProcessor)
     {
-        free(decoder_yuv_raw);
-        decoder_yuv_raw         = nullptr;
-        decoder_yuv_buffer      = nullptr;
-        decoder_yuv_buffer_size = 0;
-        decoder_yuv_total_alloc = 0;
-    }
-    if (decoder_linear_rgba)
-    {
-        if (decoder_linear_rgba_memblock >= 0)
-        {
-            sceKernelFreeMemBlock(decoder_linear_rgba_memblock);
-            decoder_linear_rgba_memblock = -1;
-        }
-        decoder_linear_rgba             = nullptr;
-        decoder_linear_rgba_size        = 0;
-        decoder_linear_rgba_guard       = nullptr;
-        decoder_linear_rgba_guard_size  = 0;
-        decoder_linear_rgba_total_alloc = 0;
+        PixelFormat::destroyProcessor(g_pixelProcessor);
+        g_pixelProcessor = nullptr;
     }
     if (decoder_output_phys_mapped && decoder_output_phys_ptr)
     {

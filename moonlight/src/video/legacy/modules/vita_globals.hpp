@@ -107,6 +107,7 @@ extern char* decoder_buffer;
 extern size_t decoder_buffer_size;
 extern SceAvcdecCtrl* decoder;
 extern int decoderblock;
+extern size_t decoder_block_size;
 extern SceAvcdecQueryDecoderInfo* decoder_info;
 extern SceVideodecQueryInitInfoHwAvcdec* init;
 

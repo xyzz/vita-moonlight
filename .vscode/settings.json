@@ -100,6 +100,9 @@
         "videodec.h": "c",
         "unordered_set": "cpp",
         "future": "cpp",
-        "avcodec.h": "c"
+        "avcodec.h": "c",
+        "pgf.h": "c",
+        "stdio.h": "c",
+        "types.h": "c"
     }
 }

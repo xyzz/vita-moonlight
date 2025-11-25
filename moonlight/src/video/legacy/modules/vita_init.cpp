@@ -364,11 +364,22 @@ extern "C" int vitavideo_setup(int videoFormat, int width, int height, int redra
             }
             VITA_DEBUG_LOG("[Video][INIT] Creadas texturas %dx%d para rendering", width, height);
             vita2d_texture_set_alloc_memblock_type(prevTexMemType);
+
+            // [OPTIMIZATION] Set Nearest Neighbor filtering for sharper 1080p -> 544p scaling
+            for (int i = 0; i < 2; i++)
+            {
+                if (frame_textures[i])
+                {
+                    sceGxmTextureSetMinFilter(&frame_textures[i]->gxm_tex, SCE_GXM_TEXTURE_FILTER_POINT);
+                    sceGxmTextureSetMagFilter(&frame_textures[i]->gxm_tex, SCE_GXM_TEXTURE_FILTER_POINT);
+                }
+            }
+
             if (!texturesOk)
             {
                 goto cleanup;
             }
-            VITA_DEBUG_LOG("[Video] Creadas nuevas texturas %ux%u en CDRAM", width, height);
+            VITA_DEBUG_LOG("[Video] Creadas nuevas texturas %ux%u en CDRAM con filtro POINT", width, height);
         }
 
         frame_front_idx                 = 0;

@@ -6,9 +6,11 @@
 #include <chrono>
 #include <thread>
 
+#include "ConfigManager.hpp"
 #include "GameStreamClient.hpp"
 #include "activity/main_activity.hpp"
 #include "controller/ControllerInput.hpp"
+#include "controller/keyboard/keyboard.hpp"
 #include "debug.hpp"
 #include "session/session_app_select.hpp"
 #include "session/session_main.hpp"
@@ -47,15 +49,7 @@ bool dismissSessionAppSelectIfPresent()
     return true;
 }
 
-void finalizeReturnToHosts()
-{
-    if (!dismissSessionAppSelectIfPresent())
-    {
-        HostsTab::requestGlobalRefresh();
-    }
-}
-
-// Schedules the removal of the SessionMain activity once the overlay is gone.
+// Schedules the removal of the SessionMain and SessionAppSelect activities once the overlay is gone.
 void returnToMainMenuAsync(int retries = 8)
 {
     brls::delay(30, [retries]() mutable
@@ -76,22 +70,36 @@ void returnToMainMenuAsync(int retries = 8)
         if (!stack.empty()) {
             brls::Activity* top = stack.back();
             if (top && dynamic_cast<SessionMainView*>(top->getContentView())) {
+                // Pop SessionMain first
                 brls::Application::popActivity(brls::TransitionAnimation::NONE, []() {
-                    vita_debug_log("[VitaPauseOverlay] Session activity popped, finalizing return");
-                    finalizeReturnToHosts();
+                    vita_debug_log("[VitaPauseOverlay] SessionMain popped, dismissing SessionAppSelect");
+                    // SessionAppSelect is not an activity, it's a view inside MainActivity
+                    // We need to dismiss it programmatically with a small delay
+                    brls::delay(50, []() {
+                        if (dismissSessionAppSelectIfPresent()) {
+                            vita_debug_log("[VitaPauseOverlay] SessionAppSelect dismissed successfully");
+                            HostsTab::requestGlobalRefresh();
+                        } else {
+                            vita_debug_log("[VitaPauseOverlay] SessionAppSelect not found, refreshing hosts anyway");
+                            HostsTab::requestGlobalRefresh();
+                        }
+                    });
                 });
                 return;
             }
         }
 
+        // Fallback: try to dismiss SessionAppSelect if we didn't find SessionMain
         if (dismissSessionAppSelectIfPresent()) {
+            vita_debug_log("[VitaPauseOverlay] Dismissed SessionAppSelect via fallback");
             return;
         }
 
         if (retries > 0) {
             returnToMainMenuAsync(retries - 1);
         } else {
-            finalizeReturnToHosts();
+            vita_debug_log("[VitaPauseOverlay] Max retries reached, refreshing hosts");
+            HostsTab::requestGlobalRefresh();
         } });
 }
 
@@ -108,6 +116,8 @@ VitaPauseOverlay::VitaPauseOverlay(std::function<void()> onClose, const HostInfo
     std::vector<std::string> labels = {
         brls::getStr("moonlight/session/pause/resume"),
         brls::getStr("moonlight/tabs/settings"),
+        // Opción para abrir el teclado overlay
+        brls::getStr("moonlight/session/pause/keyboard"),
         brls::getStr("moonlight/session/pause/disconnect"),
         brls::getStr("moonlight/session/pause/close_app")
     };
@@ -128,10 +138,33 @@ VitaPauseOverlay::VitaPauseOverlay(std::function<void()> onClose, const HostInfo
                     brls::Application::pushActivity(activity, brls::TransitionAnimation::FADE);
                 }
                 break;
-            case 2: // Disconnect
+            case 2: // Keyboard
+                {
+                    if (this->onClose) {
+                        try {
+                            auto cb = std::move(this->onClose);
+                            this->onClose = nullptr;
+                            cb();
+                        } catch(...) {}
+                    }
+
+                    // Construir la ruta al CSS en data/moonlight/keyboard/style.css
+                    std::string cfgPath = ConfigManager::getConfigPath();
+                    size_t p = cfgPath.find_last_of("/\\");
+                    std::string cfgDir = (p != std::string::npos) ? cfgPath.substr(0, p) : std::string(".");
+                    std::string cssPath = cfgDir + "/keyboard/style.css";
+
+                    // Crear y mostrar el overlay del teclado
+                    KeyboardOverlay* kb = new KeyboardOverlay(cssPath);
+                    auto* activity = new brls::Activity(kb);
+                    brls::Application::pushActivity(activity);
+                    brls::Application::giveFocus(kb->getDefaultFocus());
+                }
+                break;
+            case 3: // Disconnect
                 this->disconnect();
                 break;
-            case 3: // Close App
+            case 4: // Close App
                 this->closeApp();
                 break;
         } });

@@ -27,12 +27,17 @@ class VitaVideoRenderer final
     VitaVideoRenderer()    = default;
     bool fullscreenStretch = true; // sincronizado con global video_fullscreen_stretch
     // Recursos para imagen NVG (textura GXM directa)
-    // Patrón Borealis: crear una sola vez, reutilizar hasta cambio de contexto (resolución)
-    int nvgImageId                       = -1;
-    const vita2d_texture* currentTexture = nullptr;
-    const void* currentGxmDataPtr        = nullptr;
-    int storedW                          = 0;
-    int storedH                          = 0;
+    struct NvgImageCacheEntry
+    {
+        const vita2d_texture* tex = nullptr;
+        int imageId               = -1;
+        int width                 = 0;
+        int height                = 0;
+    };
+
+    // Cache simple (max 2-3 entradas usualmente)
+    NvgImageCacheEntry imageCache[4];
+    int imageCacheSize = 0;
 
     // Diagnósticos
     uint32_t nvgImageCreateCount = 0;

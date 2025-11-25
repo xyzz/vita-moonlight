@@ -154,6 +154,19 @@ extern "C" void vita_cleanup()
         decoder_output_phys_size  = 0;
     }
 
+    // Destroy decoder instance before terminating library
+    if (decoder)
+    {
+        sceAvcdecDeleteDecoder(decoder);
+        free(decoder);
+        decoder = nullptr;
+    }
+    if (decoder_info)
+    {
+        free(decoder_info);
+        decoder_info = nullptr;
+    }
+
     // Terminate the AVC library to allow re-initialization in next session
     if (init)
     {

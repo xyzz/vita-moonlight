@@ -21,6 +21,7 @@
 
 #include <borealis.hpp>
 #include <cstdlib>
+#include <fstream>
 #include <iostream>
 #include <string>
 #ifndef _WIN32
@@ -79,6 +80,48 @@ int main(int argc, char* argv[])
 #else
         mkdir(keysParentDir.c_str(), 0755);
 #endif
+    }
+
+    // Crear carpeta para keyboard en data/moonlight y copiar CSS por defecto si no existe
+    {
+        std::string cfgPath     = ConfigManager::getConfigPath();
+        size_t p                = cfgPath.find_last_of("/\\");
+        std::string cfgDir      = (p != std::string::npos) ? cfgPath.substr(0, p) : ".";
+        std::string keyboardDir = cfgDir + "/keyboard";
+#ifdef _WIN32
+        CreateDirectoryA(keyboardDir.c_str(), NULL);
+#else
+        mkdir(keyboardDir.c_str(), 0755);
+#endif
+        std::string destCss = keyboardDir + "/style.css";
+        struct stat st {};
+        if (stat(destCss.c_str(), &st) != 0)
+        {
+            // No existe el css en data, copiar desde resources
+            std::string srcCss = "resources/keyboard/style.css";
+            std::ifstream src(srcCss, std::ios::binary);
+            if (src.is_open())
+            {
+                std::ofstream dst(destCss, std::ios::binary);
+                if (dst.is_open())
+                {
+                    dst << src.rdbuf();
+#if defined(__PSV__)
+                    brls::Logger::info("[main] Copiado CSS teclado por defecto a {}", destCss);
+#else
+                    std::cout << "[main] Copiado CSS teclado por defecto a " << destCss << std::endl;
+#endif
+                }
+            }
+            else
+            {
+#if defined(__PSV__)
+                brls::Logger::info("[main] No se encontró resources/keyboard/style.css para copiar");
+#else
+                std::cout << "[main] No se encontró resources/keyboard/style.css para copiar" << std::endl;
+#endif
+            }
+        }
     }
 
     std::string lang = moonlight::settings::getLanguageFromConfig();

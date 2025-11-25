@@ -22,6 +22,7 @@
 #include "session/session_main.hpp"
 #include "session/vita_session.hpp"
 #include "utils/dialog_utils.h"
+#include "video/legacy/modules/vita_globals.hpp" // For VITA_STREAM constants
 #include "view/pccard.hpp"
 
 namespace
@@ -407,26 +408,34 @@ void SessionAppSelect::AppSelected(const RemoteAppInfo& app, bool forceStart)
         streamSettings.width, streamSettings.height, streamSettings.fps, streamSettings.bitrate);
     brls::Logger::info("[SessionAppSelect] - Video: render_mode={}", videoSettings.render_mode);
 
-    // Usar configuración del usuario o valores por defecto
-    streamConfig.width  = streamSettings.width > 0 ? streamSettings.width : 960;
-    streamConfig.height = streamSettings.height > 0 ? streamSettings.height : 544;
-    streamConfig.fps    = streamSettings.fps > 0 ? streamSettings.fps : 30;
+    // FORCE 960x544 stream for PS Vita (optimal quality)
+    // Settings resolution values are saved for HOST monitor control only
+    // Sunshine will downscale from displayWidth x displayHeight to 960x544 with high quality
+    streamConfig.width  = VITA_STREAM_WIDTH;
+    streamConfig.height = VITA_STREAM_HEIGHT;
+    streamConfig.fps    = streamSettings.fps > 0 ? streamSettings.fps : VITA_STREAM_DEFAULT_FPS;
+
+    // Save display resolution hint for passing to gs_start_app
+    // If width/height from settings is 0 (Auto), Sunshine uses current host display
+    // Otherwise, Sunshine will change host display to these dimensions before streaming
+    int displayWidth  = streamSettings.width; // Host monitor width
+    int displayHeight = streamSettings.height; // Host monitor height
 
     // Calcular bitrate: si es automático (-1), usar fórmula basada en resolución y fps
     if (streamSettings.bitrate == -1)
     {
         // Fórmula aproximada: (ancho * alto * fps * bits_per_pixel) / 1000000 para Mbps
-        // Usando 0.2 bits por pixel como aproximación conservadora para H.264
+        // Usando VITA_STREAM_BITS_PER_PIXEL bits por pixel como aproximación conservadora para H.264
         // Calcular paso a paso para evitar pérdida de precisión
         long long total_pixels          = (long long)streamConfig.width * streamConfig.height * streamConfig.fps;
-        long long total_bits_per_second = (total_pixels * 2) / 10; // 0.2 * total_pixels = (2/10) * total_pixels
+        long long total_bits_per_second = (total_pixels * (long long)(VITA_STREAM_BITS_PER_PIXEL * 10)) / 10;
         int calculatedBitrate           = (int)(total_bits_per_second / 1000); // Convertir a Kbps directamente
-        // Limitar a un rango razonable
-        streamConfig.bitrate = std::max(5000, std::min(50000, calculatedBitrate));
+        // Limitar a un rango razonable usando constantes globales
+        streamConfig.bitrate = std::max(VITA_STREAM_MIN_BITRATE, std::min(VITA_STREAM_MAX_BITRATE, calculatedBitrate));
     }
     else
     {
-        streamConfig.bitrate = streamSettings.bitrate > 0 ? streamSettings.bitrate : 8000;
+        streamConfig.bitrate = streamSettings.bitrate > 0 ? streamSettings.bitrate : VITA_STREAM_DEFAULT_BITRATE;
     }
 
     streamConfig.audioConfiguration = AUDIO_CONFIGURATION_STEREO;
@@ -470,12 +479,14 @@ void SessionAppSelect::AppSelected(const RemoteAppInfo& app, bool forceStart)
     HostInfo hostCopy            = this->host;
     RemoteAppInfo appCopy        = app;
     STREAM_CONFIGURATION cfgCopy = streamConfig;
-    std::thread([hostCopy, appCopy, cfgCopy, loadingDialog, this, prevGridVis, forceStart]() mutable
+    int displayW                 = displayWidth;
+    int displayH                 = displayHeight;
+    std::thread([hostCopy, appCopy, cfgCopy, displayW, displayH, loadingDialog, this, prevGridVis, forceStart]() mutable
         {
         brls::Logger::info("[SessionAppSelect][async] Iniciando conexión en hilo de fondo para {}", hostCopy.ip);
         bool connected = GameStreamClient::instance().connect(hostCopy);
         // Actualizar UI en hilo principal
-    brls::sync([connected, hostCopy, appCopy, cfgCopy, loadingDialog, prevGridVis, forceStart, this]() mutable {
+    brls::sync([connected, hostCopy, appCopy, cfgCopy, displayW, displayH, loadingDialog, prevGridVis, forceStart, this]() mutable {
             // Nota: no cerramos inmediatamente el diálogo de 'connecting' si
             // estamos conectados — lo reutilizaremos cambiando su texto a
             // 'starting'. Solo cerramos si la conexión falló.
@@ -506,14 +517,14 @@ void SessionAppSelect::AppSelected(const RemoteAppInfo& app, bool forceStart)
             // continuamos con startApp.
 
             // Ejecutar startApp y VitaSession en un hilo para no bloquear UI
-            std::thread([hostCopy, appCopy, cfgCopy, loadingDialog, this, prevGridVis, forceStart]() mutable {
+            std::thread([hostCopy, appCopy, cfgCopy, displayW, displayH, loadingDialog, this, prevGridVis, forceStart]() mutable {
                 bool started = false;
                 if (forceStart) {
                     // Si se forzó (Resume), intentar resume explícito
-                    started = GameStreamClient::instance().startApp(hostCopy.ip, cfgCopy, std::stoi(appCopy.id), GameStreamClient::StartMode::RESUME_ONLY);
+                    started = GameStreamClient::instance().startApp(hostCopy.ip, cfgCopy, std::stoi(appCopy.id), GameStreamClient::StartMode::RESUME_ONLY, displayW, displayH);
                 } else {
                     // Normal: permitir auto behavior (resume o launch según servidor)
-                    started = GameStreamClient::instance().startApp(hostCopy.ip, cfgCopy, std::stoi(appCopy.id), GameStreamClient::StartMode::AUTO);
+                    started = GameStreamClient::instance().startApp(hostCopy.ip, cfgCopy, std::stoi(appCopy.id), GameStreamClient::StartMode::AUTO, displayW, displayH);
                 }
                 brls::sync([started, hostCopy, appCopy, loadingDialog, this, prevGridVis]() {
                     if (loadingDialog) loadingDialog->close();

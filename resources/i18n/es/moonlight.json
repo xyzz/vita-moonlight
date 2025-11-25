@@ -68,12 +68,12 @@
         "add_host_cancel": "Cancelar"
     },
     "settings_tab": {
-            "header": "Configuración de streaming",
-            "controls_header": "Controles",
-            "system_header": "Sistema",
+        "header": "Configuración de streaming",
+        "controls_header": "Controles",
+        "system_header": "Sistema",
         "render_mode": {
             "title": "Modo de renderizado",
-                "legacy_option": "Legacy (SceVideodec)",
+            "legacy_option": "Legacy (SceVideodec)",
             "modern_option": "Moderno (FFmpeg)",
             "legacy_name": "Legacy",
             "modern_name": "Moderno",
@@ -87,19 +87,20 @@
             "notify": "Formato de píxel: {0}"
         },
         "resolution": {
-            "title": "Resolución",
+            "title": "Resolución del Monitor Host",
+            "description": "Controla solo la resolución del monitor del HOST. El stream siempre es 960x544 para óptima calidad.",
             "options": {
-                "0": "960x540 (16:9 QHD)",
-                "1": "960x544 (Vita nativa)",
-                "2": "1024x576 (16:9)",
-                "3": "1152x648 (16:9)",
-                "4": "1280x540 (21:9)",
-                "5": "1280x720 (720p HD)",
-                "6": "1366x768 (WXGA)",
-                "7": "1600x900 (900p HD+)",
-                "8": "1920x1080 (FHD)"
+                "0": "Auto (Actual del Host)",
+                "1": "960x544",
+                "2": "1024x576",
+                "3": "1152x648",
+                "4": "1280x540",
+                "5": "1280x720",
+                "6": "1366x768",
+                "7": "1600x900",
+                "8": "1920x1080"
             },
-            "saved": "Resolución guardada"
+            "saved": "Resolución del monitor host guardada"
         },
         "fps": {
             "title": "FPS",
@@ -212,7 +213,12 @@
                 "sw": "SO",
                 "se": "SE"
             },
-            "edge_labels": ["Superior", "Derecha", "Inferior", "Izquierda"],
+            "edge_labels": [
+                "Superior",
+                "Derecha",
+                "Inferior",
+                "Izquierda"
+            ],
             "actions": {
                 "save": "Guardar",
                 "cancel": "Cancelar",
@@ -236,9 +242,9 @@
     },
     "trackpad": {
         "header": "Configuración del Trackpad",
-            "pointer_speed": {
-                "title": "Velocidad del puntero",
-                "detail": "Ajusta el multiplicador de velocidad del cursor al deslizar"
+        "pointer_speed": {
+            "title": "Velocidad del puntero",
+            "detail": "Ajusta el multiplicador de velocidad del cursor al deslizar"
         },
         "tap_to_click": {
             "title": "Tocar para hacer clic",
@@ -285,13 +291,13 @@
     "session": {
         "pause": {
             "title": "Menú de pausa",
+            "keyboard": "Teclado",
             "resume": "Reanudar",
             "disconnect": "Desconectar",
             "close_app": "Cerrar app",
             "notify_disconnected": "Desconectado del host",
             "notify_app_closed": "Aplicación cerrada en el host"
-        }
-    ,
+        },
         "app_select": {
             "subtitle": "Selecciona una aplicación para iniciar",
             "connecting": "Conectando...",

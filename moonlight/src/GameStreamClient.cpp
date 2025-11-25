@@ -233,17 +233,22 @@ std::string GameStreamClient::getKeyDirFor(const std::string& address) const
 
 bool GameStreamClient::startApp(const std::string& address, STREAM_CONFIGURATION& config, int appId)
 {
-    return startApp(address, config, appId, StartMode::AUTO);
+    return startApp(address, config, appId, StartMode::AUTO, 0, 0);
 }
 
-bool GameStreamClient::startApp(const std::string& address, STREAM_CONFIGURATION& config, int appId, StartMode mode)
+bool GameStreamClient::startApp(const std::string& address, STREAM_CONFIGURATION& config, int appId, int displayWidth, int displayHeight)
+{
+    return startApp(address, config, appId, StartMode::AUTO, displayWidth, displayHeight);
+}
+
+bool GameStreamClient::startApp(const std::string& address, STREAM_CONFIGURATION& config, int appId, StartMode mode, int displayWidth, int displayHeight)
 {
     if (m_server_data.count(address) == 0)
     {
         brls::Logger::error("[GameStreamClient] No conectado a {}", address);
         return false;
     }
-    brls::Logger::info("[GameStreamClient] Iniciando aplicación {} en {} (mode={})", appId, address, (int)mode);
+    brls::Logger::info("[GameStreamClient] Iniciando aplicación {} en {} (mode={}) display={}x{}", appId, address, (int)mode, displayWidth, displayHeight);
 
     // Si pedimos RESUME_ONLY, comprobar que hay currentGame
     if (mode == StartMode::RESUME_ONLY)
@@ -276,7 +281,7 @@ bool GameStreamClient::startApp(const std::string& address, STREAM_CONFIGURATION
     if (mode == StartMode::NEW_ONLY)
         g_force_fresh_launch_h264 = true;
 
-    int status = gs_start_app(&m_server_data[address], &config, appId, true, true, 0x1);
+    int status = gs_start_app(&m_server_data[address], &config, appId, true, true, 0x1, displayWidth, displayHeight);
 
     // Restaurar flag global
     if (mode == StartMode::NEW_ONLY)

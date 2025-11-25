@@ -138,19 +138,19 @@ SettingsTab::SettingsTab()
     auto updateResOptions = [this, filteredIndicesPtr](int mode) {
             // Recreate the vitaResolutions and labels exactly as initial construction in this TU
             std::vector<std::string> resolutions = {
-                brls::getStr("moonlight/settings_tab/resolution/options/0"),
-                brls::getStr("moonlight/settings_tab/resolution/options/1"),
+                brls::getStr("moonlight/settings_tab/resolution/options/0"),  // Auto
+                brls::getStr("moonlight/settings_tab/resolution/options/1"),  // 960x544
                 brls::getStr("moonlight/settings_tab/resolution/options/2"),
                 brls::getStr("moonlight/settings_tab/resolution/options/3"),
                 brls::getStr("moonlight/settings_tab/resolution/options/4"),
-                brls::getStr("moonlight/settings_tab/resolution/options/5"),
+                brls::getStr("moonlight/settings_tab/resolution/options/5"),  // 1280x720
                 brls::getStr("moonlight/settings_tab/resolution/options/6"),
                 brls::getStr("moonlight/settings_tab/resolution/options/7"),
-                brls::getStr("moonlight/settings_tab/resolution/options/8")
+                brls::getStr("moonlight/settings_tab/resolution/options/8")   // 1920x1080
             };
             std::vector<std::pair<int, int>> vitaResolutions = {
-                {960, 544},
-                {960, 544},
+                {0, 0},       // Auto (host current)
+                {960, 544},   // Vita native (recommended)
                 {1024, 576},
                 {1152, 656},
                 {1280, 544},
@@ -239,39 +239,44 @@ SettingsTab::SettingsTab()
 
     // Configurar selectores de resolución con valores permitidos para PS Vita
     std::vector<std::string> resolutions = {
-        brls::getStr("moonlight/settings_tab/resolution/options/0"),
-        brls::getStr("moonlight/settings_tab/resolution/options/1"),
+        brls::getStr("moonlight/settings_tab/resolution/options/0"), // Auto (host current)
+        brls::getStr("moonlight/settings_tab/resolution/options/1"), // 960x544 recommended
         brls::getStr("moonlight/settings_tab/resolution/options/2"),
         brls::getStr("moonlight/settings_tab/resolution/options/3"),
         brls::getStr("moonlight/settings_tab/resolution/options/4"),
-        brls::getStr("moonlight/settings_tab/resolution/options/5"),
+        brls::getStr("moonlight/settings_tab/resolution/options/5"), // 1280x720
         brls::getStr("moonlight/settings_tab/resolution/options/6"),
         brls::getStr("moonlight/settings_tab/resolution/options/7"),
-        brls::getStr("moonlight/settings_tab/resolution/options/8")
+        brls::getStr("moonlight/settings_tab/resolution/options/8") // 1920x1080
     };
 
-    // Resoluciones permitidas para PS Vita (deben ser múltiplos de 16)
+    // Resoluciones permitidas para PS Vita / HOST control
     std::vector<std::pair<int, int>> vitaResolutions = {
-        { 960, 544 }, // Vita native (ya ajustada a múltiplo de 16)
-        { 960, 544 }, // Vita native
-        { 1024, 576 }, // 16:9
-        { 1152, 656 }, // Ajustada a múltiplo de 16 (1152x648 -> 1152x656)
-        { 1280, 544 }, // Ajustada a múltiplo de 16 (1280x540 -> 1280x544)
-        { 1280, 720 }, // 16:9, 720p HD
-        { 1360, 768 }, // Ajustada a múltiplo de 16 (1366x768 -> 1360x768)
-        { 1600, 896 }, // Ajustada a múltiplo de 16 (1600x900 -> 1600x896)
-        { 1920, 1080 } // 1080p Full HD (se ajustará internamente a 1088 por el decoder)
+        { 0, 0 }, // Auto (host keeps current resolution)
+        { 960, 544 }, // Vita native (recommended for best quality)
+        { 1024, 576 },
+        { 1152, 656 },
+        { 1280, 544 },
+        { 1280, 720 },
+        { 1360, 768 },
+        { 1600, 896 },
+        { 1920, 1080 }
     };
 
-    int currentRes = 5; // Default 1280x720 (índice 5)
-    if (streamConfig.width == 960 && streamConfig.height == 544)
-        currentRes = 0;
+    // Default to Auto (index 0) or 960x544 (index 1)
+    int currentRes = 0; // Default to Auto
+    if (streamConfig.width == 0 && streamConfig.height == 0)
+        currentRes = 0; // Auto
+    else if (streamConfig.width == 960 && streamConfig.height == 544)
+        currentRes = 1;
     else if (streamConfig.width == 1024 && streamConfig.height == 576)
         currentRes = 2;
     else if (streamConfig.width == 1152 && streamConfig.height == 656)
         currentRes = 3;
     else if (streamConfig.width == 1280 && streamConfig.height == 544)
         currentRes = 4;
+    else if (streamConfig.width == 1280 && streamConfig.height == 720)
+        currentRes = 5;
     else if (streamConfig.width == 1360 && streamConfig.height == 768)
         currentRes = 6;
     else if (streamConfig.width == 1600 && streamConfig.height == 896)

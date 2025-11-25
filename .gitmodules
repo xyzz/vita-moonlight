@@ -14,6 +14,9 @@
 [submodule "third_party/moonlight-common-c/enet"]
     path = third_party/moonlight-common-c/enet
     url = https://github.com/cgutman/enet.git
+[submodule "libmoonmic"]
+	path = third_party/libmoonmic
+	url = https://github.com/AorsiniYT/libmoonmic.git
 
 [submodule "legacy/third_party/moonlight-common-c"]
 	path = legacy/third_party/moonlight-common-c

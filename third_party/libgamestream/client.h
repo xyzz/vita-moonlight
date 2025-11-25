@@ -54,7 +54,7 @@ std::string gs_error();
 
 int gs_init(PSERVER_DATA server, const std::string address, const std::string& keyDir);
 int gs_app_boxart(PSERVER_DATA server, int app_id, Data* out);
-int gs_start_app(PSERVER_DATA server, PSTREAM_CONFIGURATION config, int appId, bool sops, bool localaudio, int gamepad_mask);
+int gs_start_app(PSERVER_DATA server, PSTREAM_CONFIGURATION config, int appId, bool sops, bool localaudio, int gamepad_mask, int displayWidth, int displayHeight);
 int gs_applist(PSERVER_DATA server, PAPP_LIST* app_list);
 int gs_unpair(PSERVER_DATA server);
 int gs_pair(PSERVER_DATA server, char* pin);

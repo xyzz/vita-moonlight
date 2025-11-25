@@ -50,16 +50,18 @@ class GameStreamClient
     // Obtener datos del servidor
     SERVER_DATA& serverData(const std::string& address);
 
-    // Lanzar aplicación
+    // Iniciar aplicación (devuelve true si se inició correctamente)
     bool startApp(const std::string& address, STREAM_CONFIGURATION& config, int appId);
+    bool startApp(const std::string& address, STREAM_CONFIGURATION& config, int appId, int displayWidth, int displayHeight);
 
+    // Enum para controlar el comportamiento de startApp
     enum class StartMode
     {
-        AUTO = 0,
-        RESUME_ONLY,
-        NEW_ONLY
+        AUTO        = 0, // Permitir resume automático si hay sesión activa
+        RESUME_ONLY = 1, // Solo resume, fallar si no hay sesión activa
+        NEW_ONLY    = 2 // Siempre fresh launch, ignorar sesión activa
     };
-    bool startApp(const std::string& address, STREAM_CONFIGURATION& config, int appId, StartMode mode);
+    bool startApp(const std::string& address, STREAM_CONFIGURATION& config, int appId, StartMode mode, int displayWidth = 0, int displayHeight = 0);
     // Recuperar última configuración usada (incluye remoteInputAesKey/IV si ya se generó)
     bool lastStreamConfig(const std::string& address, STREAM_CONFIGURATION& out) const;
 

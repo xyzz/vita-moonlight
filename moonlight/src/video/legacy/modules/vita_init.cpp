@@ -346,9 +346,8 @@ extern "C" int vitavideo_setup(int videoFormat, int width, int height, int redra
 
         if (!reusingTextures)
         {
-            // Crear nuevas texturas
+            // Crear nuevas texturas a resolución del stream
             auto prevTexMemType = vita2d_texture_get_alloc_memblock_type();
-            // Crear nuevas texturas a resolución nativa del stream
             vita2d_texture_set_alloc_memblock_type(SCE_KERNEL_MEMBLOCK_TYPE_USER_CDRAM_RW);
             for (int i = 0; i < 2; i++)
             {
@@ -362,24 +361,13 @@ extern "C" int vitavideo_setup(int videoFormat, int width, int height, int redra
                     goto cleanup;
                 }
             }
-            VITA_DEBUG_LOG("[Video][INIT] Creadas texturas %dx%d para rendering", width, height);
+            VITA_DEBUG_LOG("[Video][INIT] Creadas texturas %dx%d (stream resolution)", width, height);
             vita2d_texture_set_alloc_memblock_type(prevTexMemType);
-
-            // [OPTIMIZATION] Set Nearest Neighbor filtering for sharper 1080p -> 544p scaling
-            for (int i = 0; i < 2; i++)
-            {
-                if (frame_textures[i])
-                {
-                    sceGxmTextureSetMinFilter(&frame_textures[i]->gxm_tex, SCE_GXM_TEXTURE_FILTER_POINT);
-                    sceGxmTextureSetMagFilter(&frame_textures[i]->gxm_tex, SCE_GXM_TEXTURE_FILTER_POINT);
-                }
-            }
 
             if (!texturesOk)
             {
                 goto cleanup;
             }
-            VITA_DEBUG_LOG("[Video] Creadas nuevas texturas %ux%u en CDRAM con filtro POINT", width, height);
         }
 
         frame_front_idx                 = 0;

@@ -662,7 +662,7 @@ int gs_app_boxart(PSERVER_DATA server, int app_id, Data* out) {
 }
 
 int gs_start_app(PSERVER_DATA server, STREAM_CONFIGURATION* config, int appId,
-                 bool sops, bool localaudio, int gamepad_mask) {
+                 bool sops, bool localaudio, int gamepad_mask, int displayWidth, int displayHeight) {
     int ret = GS_OK;
     std::string result;
 
@@ -697,15 +697,35 @@ int gs_start_app(PSERVER_DATA server, STREAM_CONFIGURATION* config, int appId,
                        ? CHANNEL_MASK_STEREO
                        : CHANNEL_MASK_51_SURROUND;
         int fps = sops && config->fps > 60 ? 60 : config->fps;
+
+        // Build base /launch URL with standard parameters
         snprintf(url, sizeof(url),
                  "https://%s:%u/"
                  "launch?uniqueid=%s&appid=%d&mode=%dx%dx%d&additionalStates=1&"
                  "sops=%d&rikey=%s&rikeyid=%d&localAudioPlayMode=%d&"
-                 "surroundAudioInfo=%d&remoteControllersBitmap=%d&gcmap=%d%s",
+                 "surroundAudioInfo=%d&remoteControllersBitmap=%d&gcmap=%d",
                  server->serverInfo.address, server->httpsPort, unique_id.c_str(), appId,
                  config->width, config->height, fps, sops, rand.hex().bytes(),
                  rikeyid, localaudio, (mask << 16) + channelCounnt,
-                 gamepad_mask, gamepad_mask, LiGetLaunchUrlQueryParameters());
+                 gamepad_mask, gamepad_mask);
+
+        // Append display resolution hint if specified (Sunshine protocol extension)
+        // Allows host to configure display at different resolution than stream
+        // Use case: Stream 960x544 to client while host display runs at 1920x1080
+        if (displayWidth > 0 && displayHeight > 0) {
+            size_t currentLen = strlen(url);
+            snprintf(url + currentLen, sizeof(url) - currentLen,
+                     "&displayWidth=%d&displayHeight=%d",
+                     displayWidth, displayHeight);
+            brls::Logger::info("[gs_start_app] Display resolution hint: {}x{} (stream: {}x{})",
+                             displayWidth, displayHeight,
+                             config->width, config->height);
+        }
+
+        // Append Limelight query parameters
+        size_t currentLen = strlen(url);
+        snprintf(url + currentLen, sizeof(url) - currentLen, "%s",
+                 LiGetLaunchUrlQueryParameters());
         if (forceFresh && server->currentGame != 0) {
             brls::Logger::warning("[gs_start_app] Ignorando resume para forzar renegociación H.264 (fresh launch)");
         }

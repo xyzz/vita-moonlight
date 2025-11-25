@@ -1,314 +1,319 @@
-
-{
-    "title": "Moonlight Vita",
-    "tabs": {
-        "settings": "Settings",
-        "about": "About Moonlight Vita",
-        "add_host": "Add Host",
-        "hosts": "Hosts"
-    },
-    "capunlocker_notify": "CapUnlocker detected! All 4 cores and extended RAM will be enabled.",
-    "welcome": "Welcome to the Moonlight Vita! Feel free to explore and discover what the library can do.",
-    "components": {
-        "buttons_header": "Buttons",
-        "button_primary": "Primary button",
-        "button_highlight": "\uE13C  Highlight button",
-        "button_wrapping": "Default button with wrapping text",
-        "button_bordered": "Bordered button",
-        "button_borderless": "Borderless button",
-        "slider_header": "Slider",
-        "labels_header": "Labels",
-        "regular_label": "This is a label. By default, they will automatically wrap and expand their height, should the remaining vertical space allow it. Otherwise, they will be truncated, like some of the tabs of the sidebar.\nThis is a label. By default, they will automatically wrap and expand their height, should the remaining vertical space allow it. Otherwise, they will be truncated, like some of the tabs of the sidebar.",
-        "label_left": "This label is left-aligned",
-        "label_center": "This label is center-aligned",
-        "label_right": "This label is right-aligned",
-        "images_header_title": "Images",
-        "images_header_subtitle": "Focus them to see the scaling method",
-        "images_downscaled": "Downscaled",
-        "images_original": "Original",
-        "images_upscaled": "Upscaled",
-        "images_stretched": "Stretched",
-        "images_cropped": "Cropped"
-    },
-    "about": {
+    {
         "title": "Moonlight Vita",
-        "description": "Open source NVIDIA GameStream client for PlayStation Vita. Stream your PC games with Sunshine or GeForce Experience.",
-        "author": "Author: AorsiniYT",
-        "original_creators": "Original Vita port: xyzz, d3m3vilurr, cgutman",
-        "moonlight_repo": "Original Moonlight: github.com/moonlight-stream",
-        "github": "Source code: github.com/xyzz/vita-moonlight",
-        "licence": "License: GPLv3",
-        "logo_credit": "Logo and UI adapted for Vita. Based on Borealis."
-    },
-    "settings": {
-        "add_host": "Add Host",
-        "add_host_desc": "Add a new PC for streaming",
-        "add_host_title": "Add Host",
-        "add_host_manual": "Host name",
-        "add_host_auto": "Search PC automatically",
-        "add_host_manual_msg": "Function to add PC manually (pending)",
-        "add_host_auto_msg": "Function to search PC automatically (pending)",
-        "add_host_ip_placeholder": "e.g. 192.168.1.100",
-        "add_host_name_placeholder": "Host name",
-        "add_host_missing_fields": "You must enter IP and name",
-        "add_host_added": "Host added",
-        "add_host_not_implemented": "(Not implemented yet)",
-        "ip": "IP",
-        "dns": "DNS",
-        "notify": "Post a notification",
-        "language": "Language",
-        "add_host_connection_type": "Connection type",
-        "add_host_lan": "LAN (local)",
-        "add_host_online": "Online (external)",
-        "moonlight/settings/language": "Language",
-        "hosts_list_title": "Saved PCs",
-    "hosts_list_empty": "No saved PCs",
-    "rear_touch_detail": "Configure rear touch zones and actions",
-        "add_host_connect_question_dialog": "Connect to $(name) at $(ip)?",
-        "add_host_connect": "Connect",
-        "add_host_cancel": "Cancel"
-    },
-    "settings_tab": {
+        "tabs": {
+            "settings": "Settings",
+            "about": "About Moonlight Vita",
+            "add_host": "Add Host",
+            "hosts": "Hosts"
+        },
+        "capunlocker_notify": "CapUnlocker detected! All 4 cores and extended RAM will be enabled.",
+        "welcome": "Welcome to the Moonlight Vita! Feel free to explore and discover what the library can do.",
+        "components": {
+            "buttons_header": "Buttons",
+            "button_primary": "Primary button",
+            "button_highlight": "\uE13C  Highlight button",
+            "button_wrapping": "Default button with wrapping text",
+            "button_bordered": "Bordered button",
+            "button_borderless": "Borderless button",
+            "slider_header": "Slider",
+            "labels_header": "Labels",
+            "regular_label": "This is a label. By default, they will automatically wrap and expand their height, should the remaining vertical space allow it. Otherwise, they will be truncated, like some of the tabs of the sidebar.\nThis is a label. By default, they will automatically wrap and expand their height, should the remaining vertical space allow it. Otherwise, they will be truncated, like some of the tabs of the sidebar.",
+            "label_left": "This label is left-aligned",
+            "label_center": "This label is center-aligned",
+            "label_right": "This label is right-aligned",
+            "images_header_title": "Images",
+            "images_header_subtitle": "Focus them to see the scaling method",
+            "images_downscaled": "Downscaled",
+            "images_original": "Original",
+            "images_upscaled": "Upscaled",
+            "images_stretched": "Stretched",
+            "images_cropped": "Cropped"
+        },
+        "about": {
+            "title": "Moonlight Vita",
+            "description": "Open source NVIDIA GameStream client for PlayStation Vita. Stream your PC games with Sunshine or GeForce Experience.",
+            "author": "Author: AorsiniYT",
+            "original_creators": "Original Vita port: xyzz, d3m3vilurr, cgutman",
+            "moonlight_repo": "Original Moonlight: github.com/moonlight-stream",
+            "github": "Source code: github.com/xyzz/vita-moonlight",
+            "licence": "License: GPLv3",
+            "logo_credit": "Logo and UI adapted for Vita. Based on Borealis."
+        },
+        "settings": {
+            "add_host": "Add Host",
+            "add_host_desc": "Add a new PC for streaming",
+            "add_host_title": "Add Host",
+            "add_host_manual": "Host name",
+            "add_host_auto": "Search PC automatically",
+            "add_host_manual_msg": "Function to add PC manually (pending)",
+            "add_host_auto_msg": "Function to search PC automatically (pending)",
+            "add_host_ip_placeholder": "e.g. 192.168.1.100",
+            "add_host_name_placeholder": "Host name",
+            "add_host_missing_fields": "You must enter IP and name",
+            "add_host_added": "Host added",
+            "add_host_not_implemented": "(Not implemented yet)",
+            "ip": "IP",
+            "dns": "DNS",
+            "notify": "Post a notification",
+            "language": "Language",
+            "add_host_connection_type": "Connection type",
+            "add_host_lan": "LAN (local)",
+            "add_host_online": "Online (external)",
+            "moonlight/settings/language": "Language",
+            "hosts_list_title": "Saved PCs",
+            "hosts_list_empty": "No saved PCs",
+            "rear_touch_detail": "Configure rear touch zones and actions",
+            "add_host_connect_question_dialog": "Connect to $(name) at $(ip)?",
+            "add_host_connect": "Connect",
+            "add_host_cancel": "Cancel"
+        },
+        "settings_tab": {
             "header": "Streaming settings",
             "controls_header": "Controls",
             "system_header": "System",
             "render_mode": {
-            "title": "Render mode",
-            "legacy_option": "Legacy (SceVideodec)",
-            "modern_option": "Modern (FFmpeg)",
-            "legacy_name": "Legacy",
-            "modern_name": "Modern",
-            "unknown_name": "Unknown",
-            "notify": "Render mode: {0}"
-        },
-        "pixel_format": {
-            "title": "Pixel format",
-            "rgba": "Direct RGBA",
-            "yuv": "YUV420 (experimental)",
-            "notify": "Pixel format: {0}"
-        },
-        "resolution": {
-            "title": "Resolution",
-            "options": {
-                "0": "960x540 (16:9 QHD)",
-                "1": "960x544 (Vita native)",
-                "2": "1024x576 (16:9)",
-                "3": "1152x648 (16:9)",
-                "4": "1280x540 (21:9)",
-                "5": "1280x720 (720p HD)",
-                "6": "1366x768 (WXGA)",
-                "7": "1600x900 (900p HD+)",
-                "8": "1920x1080 (FHD)"
+                "title": "Render mode",
+                "legacy_option": "Legacy (SceVideodec)",
+                "modern_option": "Modern (FFmpeg)",
+                "legacy_name": "Legacy",
+                "modern_name": "Modern",
+                "unknown_name": "Unknown",
+                "notify": "Render mode: {0}"
             },
-            "saved": "Resolution saved"
-        },
-        "fps": {
-            "title": "FPS",
-            "options": {
-                "0": "24 FPS (Cinema)",
-                "1": "30 FPS (Standard)",
-                "2": "40 FPS",
-                "3": "50 FPS (PAL)",
-                "4": "60 FPS (NTSC)"
+            "pixel_format": {
+                "title": "Pixel format",
+                "rgba": "Direct RGBA",
+                "yuv": "YUV420 (experimental)",
+                "notify": "Pixel format: {0}"
             },
-            "saved": "FPS saved"
-        },
-        "bitrate": {
-            "title": "Bitrate (Kbps)",
-            "options": {
-                "0": "Auto (Recommended)",
-                "1": "2000 Kbps (Low)",
-                "2": "5000 Kbps (Standard)",
-                "3": "8000 Kbps (HD)",
-                "4": "10000 Kbps (HD+)",
-                "5": "15000 Kbps (Full HD)",
-                "6": "20000 Kbps (Full HD+)",
-                "7": "30000 Kbps (Ultra HD)",
-                "8": "50000 Kbps (Maximum)"
+            "resolution": {
+                "title": "Host Monitor Resolution",
+                "description": "Controls the HOST monitor resolution only. Stream is always 960x544 for optimal quality.",
+                "options": {
+                    "0": "Auto (Current Host)",
+                    "1": "960x544",
+                    "2": "1024x576",
+                    "3": "1152x648",
+                    "4": "1280x540",
+                    "5": "1280x720",
+                    "6": "1366x768",
+                    "7": "1600x900",
+                    "8": "1920x1080"
+                },
+                "saved": "Host monitor resolution saved"
             },
-            "saved": "Bitrate saved"
-        },
-        "sops_title": "Stream optimization",
-        "network_opt_title": "Network optimizations",
-        "network_opt_enabled": "Network optimizations enabled",
-        "network_opt_disabled": "Network optimizations disabled",
-        "local_audio_title": "Local audio",
-        "fullscreen_title": "Fullscreen",
-        "frame_pacer_title": "Frame pacer",
-        "center_region_title": "Center region only",
-        "show_fps_title": "Show FPS",
-        "save_debug_log_title": "Save debug log",
-        "ref_frame_title": "Reference frame invalidation",
-        "vblank_wait_title": "Wait for Vita VBlank",
-        "motion_controls_title": "Motion controls",
-        "double_tap_sprint_title": "Double tap to sprint",
-        "touchscreen_mode": {
-            "title": "Touchscreen mode",
-            "options": {
-                "0": "Disabled",
-                "1": "Relative trackpad",
-                "2": "DS4 touchpad (PS4 only)",
-                "3": "Absolute mouse",
-                "4": "Multitouch tablet"
+            "fps": {
+                "title": "FPS",
+                "options": {
+                    "0": "24 FPS (Cinema)",
+                    "1": "30 FPS (Standard)",
+                    "2": "40 FPS",
+                    "3": "50 FPS (PAL)",
+                    "4": "60 FPS (NTSC)"
+                },
+                "saved": "FPS saved"
             },
-            "saved": "Touchscreen mode saved",
-            "changed": "Touchscreen mode changed to:"
-        },
-        "gamepad_type": {
-            "title": "Controller type",
-            "options": {
-                "xbox": "Xbox 360",
-                "ps4": "PlayStation 4"
+            "bitrate": {
+                "title": "Bitrate (Kbps)",
+                "options": {
+                    "0": "Auto (Recommended)",
+                    "1": "2000 Kbps (Low)",
+                    "2": "5000 Kbps (Standard)",
+                    "3": "8000 Kbps (HD)",
+                    "4": "10000 Kbps (HD+)",
+                    "5": "15000 Kbps (Full HD)",
+                    "6": "20000 Kbps (Full HD+)",
+                    "7": "30000 Kbps (Ultra HD)",
+                    "8": "50000 Kbps (Maximum)"
+                },
+                "saved": "Bitrate saved"
             },
-            "notify_prefix": "Controller type changed to: "
-        },
-        "mouse_accel": {
-            "title": "Mouse acceleration"
-        },
-        "keyboard_layout": {
-            "title": "Keyboard layout",
-            "saved": "Keyboard layout saved"
-        },
-        "languages": {
-            "es": "Spanish",
-            "en": "English"
-        },
-        "language_changed": "Language changed successfully"
-    },
-    "rear_touch": {
-        "title": "Rear touch",
-        "toggle": "Rear touch",
-        "calibrate": "Calibrate rear touch",
-        "calibration_zone_title": "Active zone",
-        "calibration_zone_detail": "Adjust the margins with calibration",
-        "actions_header": "Corner actions",
-        "action_nw": "North-west corner action",
-        "action_ne": "North-east corner action",
-        "action_sw": "South-west corner action",
-        "action_se": "South-east corner action",
-        "notify_enabled": "Rear touch enabled",
-        "notify_disabled": "Rear touch disabled",
-        "notify_action_saved": "Rear touch action saved",
-        "notify_calibration_saved": "Rear touch calibration saved",
-        "detail_top": "Top",
-        "detail_bottom": "Bottom",
-        "detail_left": "Left",
-        "detail_right": "Right",
-        "calibration": {
-            "title": "Calibrate Rear Touch",
-            "overlay_title": "Rear Touch Adjustment",
-            "status_enabled": "Status: Enabled",
-            "status_disabled": "Status: Disabled",
-            "selected_edge": "Selected edge: ",
-            "current_action": "Current action: ",
-            "margins": "Margins (px)",
-            "margins_format": "{0} - {1}: {2} | {3}: {4} | {5}: {6} | {7}: {8}",
-            "assignments_prefix": "Assignments",
-            "assignments_top_format": "{0} - {1}: {2} | {3}: {4}",
-            "assignments_bottom_format": "{0}: {1} | {2}: {3}",
-            "instructions": "▲/▼ change edge • ◀/▶ adjust margin • L/R change action • △ toggle touch • □ reset defaults",
-            "zone_labels": {
-                "nw": "NW",
-                "ne": "NE",
-                "sw": "SW",
-                "se": "SE"
+            "sops_title": "Stream optimization",
+            "network_opt_title": "Network optimizations",
+            "network_opt_enabled": "Network optimizations enabled",
+            "network_opt_disabled": "Network optimizations disabled",
+            "local_audio_title": "Local audio",
+            "fullscreen_title": "Fullscreen",
+            "frame_pacer_title": "Frame pacer",
+            "center_region_title": "Center region only",
+            "show_fps_title": "Show FPS",
+            "save_debug_log_title": "Save debug log",
+            "ref_frame_title": "Reference frame invalidation",
+            "vblank_wait_title": "Wait for Vita VBlank",
+            "motion_controls_title": "Motion controls",
+            "double_tap_sprint_title": "Double tap to sprint",
+            "touchscreen_mode": {
+                "title": "Touchscreen mode",
+                "options": {
+                    "0": "Disabled",
+                    "1": "Relative trackpad",
+                    "2": "DS4 touchpad (PS4 only)",
+                    "3": "Absolute mouse",
+                    "4": "Multitouch tablet"
+                },
+                "saved": "Touchscreen mode saved",
+                "changed": "Touchscreen mode changed to:"
             },
-            "edge_labels": ["Top", "Right", "Bottom", "Left"],
-            "actions": {
-                "save": "Save",
-                "cancel": "Cancel",
-                "next_edge": "Next edge",
-                "prev_edge": "Previous edge",
-                "increase_margin": "Increase margin",
-                "decrease_margin": "Decrease margin",
-                "next_action": "Next action",
-                "prev_action": "Previous action",
-                "toggle_enabled": "Toggle Enabled",
-                "reset": "Reset"
+            "gamepad_type": {
+                "title": "Controller type",
+                "options": {
+                    "xbox": "Xbox 360",
+                    "ps4": "PlayStation 4"
+                },
+                "notify_prefix": "Controller type changed to: "
+            },
+            "mouse_accel": {
+                "title": "Mouse acceleration"
+            },
+            "keyboard_layout": {
+                "title": "Keyboard layout",
+                "saved": "Keyboard layout saved"
+            },
+            "languages": {
+                "es": "Spanish",
+                "en": "English"
+            },
+            "language_changed": "Language changed successfully"
+        },
+        "rear_touch": {
+            "title": "Rear touch",
+            "toggle": "Rear touch",
+            "calibrate": "Calibrate rear touch",
+            "calibration_zone_title": "Active zone",
+            "calibration_zone_detail": "Adjust the margins with calibration",
+            "actions_header": "Corner actions",
+            "action_nw": "North-west corner action",
+            "action_ne": "North-east corner action",
+            "action_sw": "South-west corner action",
+            "action_se": "South-east corner action",
+            "notify_enabled": "Rear touch enabled",
+            "notify_disabled": "Rear touch disabled",
+            "notify_action_saved": "Rear touch action saved",
+            "notify_calibration_saved": "Rear touch calibration saved",
+            "detail_top": "Top",
+            "detail_bottom": "Bottom",
+            "detail_left": "Left",
+            "detail_right": "Right",
+            "calibration": {
+                "title": "Calibrate Rear Touch",
+                "overlay_title": "Rear Touch Adjustment",
+                "status_enabled": "Status: Enabled",
+                "status_disabled": "Status: Disabled",
+                "selected_edge": "Selected edge: ",
+                "current_action": "Current action: ",
+                "margins": "Margins (px)",
+                "margins_format": "{0} - {1}: {2} | {3}: {4} | {5}: {6} | {7}: {8}",
+                "assignments_prefix": "Assignments",
+                "assignments_top_format": "{0} - {1}: {2} | {3}: {4}",
+                "assignments_bottom_format": "{0}: {1} | {2}: {3}",
+                "instructions": "▲/▼ change edge • ◀/▶ adjust margin • L/R change action • △ toggle touch • □ reset defaults",
+                "zone_labels": {
+                    "nw": "NW",
+                    "ne": "NE",
+                    "sw": "SW",
+                    "se": "SE"
+                },
+                "edge_labels": [
+                    "Top",
+                    "Right",
+                    "Bottom",
+                    "Left"
+                ],
+                "actions": {
+                    "save": "Save",
+                    "cancel": "Cancel",
+                    "next_edge": "Next edge",
+                    "prev_edge": "Previous edge",
+                    "increase_margin": "Increase margin",
+                    "decrease_margin": "Decrease margin",
+                    "next_action": "Next action",
+                    "prev_action": "Previous action",
+                    "toggle_enabled": "Toggle Enabled",
+                    "reset": "Reset"
+                }
+            }
+        },
+        "hints": {
+            "cancel": "Cancel"
+        },
+        "host_dialog/connecting": "Generating certificates...",
+        "main": {
+            "cancel": "Cancel"
+        },
+        "trackpad": {
+            "header": "Trackpad Configuration",
+            "pointer_speed": {
+                "title": "Pointer speed",
+                "detail": "Adjust the cursor speed multiplier when swiping"
+            },
+            "tap_to_click": {
+                "title": "Tap to click",
+                "detail": "Click by tapping the trackpad without pressing",
+                "enabled": "Tap to click enabled",
+                "disabled": "Tap to click disabled"
+            },
+            "gestures_header": "Gestures & Click Options",
+            "two_finger_right_click": {
+                "title": "Two-finger right click",
+                "detail": "Perform right-click with two fingers",
+                "enabled": "Two-finger right click enabled",
+                "disabled": "Two-finger right click disabled"
+            },
+            "two_finger_scroll": {
+                "title": "Two-finger scrolling",
+                "detail": "Scroll by swiping with two fingers",
+                "enabled": "Two-finger scrolling enabled",
+                "disabled": "Two-finger scrolling disabled"
+            },
+            "invert_scroll": {
+                "title": "Invert scroll direction",
+                "detail": "Use natural scrolling (iOS-style) or traditional",
+                "natural": "Natural scrolling enabled (iOS-style)",
+                "traditional": "Traditional scrolling enabled"
+            },
+            "multi_touch": {
+                "title": "Multi-touch gestures",
+                "detail": "Enable advanced gestures like pinch to zoom",
+                "enabled": "Multi-touch gestures enabled",
+                "disabled": "Multi-touch gestures disabled"
+            },
+            "advanced_header": "Advanced Options",
+            "edge_zone": {
+                "title": "Edge dead zones",
+                "detail": "Define zones at the edges to ignore accidental touches"
+            },
+            "dead_zone": {
+                "title": "Movement dead zone",
+                "detail": "Minimum movement threshold before registering as a swipe"
+            }
+        },
+        "session": {
+            "pause": {
+                "title": "Pause Menu",
+                "keyboard": "Keyboard",
+                "resume": "Resume",
+                "disconnect": "Disconnect",
+                "close_app": "Close app",
+                "notify_disconnected": "Disconnected from host",
+                "notify_app_closed": "App closed on host"
+            },
+            "app_select": {
+                "subtitle": "Select an app to launch",
+                "connecting": "Connecting...",
+                "starting": "Starting...",
+                "error_no_host": "Error: Host information not found.",
+                "no_apps": "No apps found on this host.",
+                "running_session": "Running session",
+                "error_connect": "Error connecting to server",
+                "paired": "Paired",
+                "pairing_failed": "Pairing canceled/failed",
+                "error_start_app": "Error starting the application",
+                "error_start_stream": "Error starting streaming",
+                "active_session_msg": "Active session: $(app). Do you want to resume it or start a new one?",
+                "button_resume": "Resume",
+                "button_start_new": "Start new",
+                "ending_session": "Closing session on host...",
+                "error_end_session": "Failed to close session on host"
             }
         }
-    },
-    "hints": {
-        "cancel": "Cancel"
-    },
-    "host_dialog/connecting": "Generating certificates...",
-    "main": {
-        "cancel": "Cancel"
-    },
-    "trackpad": {
-        "header": "Trackpad Configuration",
-        "pointer_speed": {
-            "title": "Pointer speed",
-            "detail": "Adjust the cursor speed multiplier when swiping"
-        },
-        "tap_to_click": {
-            "title": "Tap to click",
-            "detail": "Click by tapping the trackpad without pressing",
-            "enabled": "Tap to click enabled",
-            "disabled": "Tap to click disabled"
-        },
-        "gestures_header": "Gestures & Click Options",
-        "two_finger_right_click": {
-            "title": "Two-finger right click",
-            "detail": "Perform right-click with two fingers",
-            "enabled": "Two-finger right click enabled",
-            "disabled": "Two-finger right click disabled"
-        },
-        "two_finger_scroll": {
-            "title": "Two-finger scrolling",
-            "detail": "Scroll by swiping with two fingers",
-            "enabled": "Two-finger scrolling enabled",
-            "disabled": "Two-finger scrolling disabled"
-        },
-        "invert_scroll": {
-            "title": "Invert scroll direction",
-            "detail": "Use natural scrolling (iOS-style) or traditional",
-            "natural": "Natural scrolling enabled (iOS-style)",
-            "traditional": "Traditional scrolling enabled"
-        },
-        "multi_touch": {
-            "title": "Multi-touch gestures",
-            "detail": "Enable advanced gestures like pinch to zoom",
-            "enabled": "Multi-touch gestures enabled",
-            "disabled": "Multi-touch gestures disabled"
-        },
-        "advanced_header": "Advanced Options",
-        "edge_zone": {
-            "title": "Edge dead zones",
-            "detail": "Define zones at the edges to ignore accidental touches"
-        },
-        "dead_zone": {
-            "title": "Movement dead zone",
-            "detail": "Minimum movement threshold before registering as a swipe"
-        }
-    },
-    "session": {
-        "pause": {
-            "title": "Pause Menu",
-            "resume": "Resume",
-            "disconnect": "Disconnect",
-            "close_app": "Close app",
-            "notify_disconnected": "Disconnected from host",
-            "notify_app_closed": "App closed on host"
-        }
-    ,
-        "app_select": {
-            "subtitle": "Select an app to launch",
-            "connecting": "Connecting...",
-            "starting": "Starting...",
-            "error_no_host": "Error: Host information not found.",
-            "no_apps": "No apps found on this host.",
-            "running_session": "Running session",
-            "error_connect": "Error connecting to server",
-            "paired": "Paired",
-            "pairing_failed": "Pairing canceled/failed",
-            "error_start_app": "Error starting the application",
-            "error_start_stream": "Error starting streaming",
-            "active_session_msg": "Active session: $(app). Do you want to resume it or start a new one?",
-            "button_resume": "Resume",
-            "button_start_new": "Start new",
-            "ending_session": "Closing session on host...",
-            "error_end_session": "Failed to close session on host"
-        }
     }
-}

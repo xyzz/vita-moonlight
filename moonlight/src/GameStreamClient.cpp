@@ -1,8 +1,3 @@
-/*
-    GameStreamClient.cpp - Implementación del cliente GameStream
-    Patrón basado en Moonlight-Switch para PS Vita
-    Autor: aorsini + comunidad
-*/
 #include "GameStreamClient.hpp"
 
 #include <dirent.h>
@@ -18,6 +13,7 @@
 #include <thread>
 
 #include "ConfigManager.hpp"
+#include "audio/MicrophoneManager.hpp"
 #include "crypto/CryptoManager.hpp"
 #include "model/HostStorage.hpp"
 
@@ -308,6 +304,41 @@ bool GameStreamClient::startApp(const std::string& address, STREAM_CONFIGURATION
     // Guardar copia de la configuración (incluye remoteInputAesKey rellenada por gs_start_app)
     m_last_stream_cfg[address] = config;
     brls::Logger::info("[GameStreamClient] Aplicación iniciada correctamente (remoteInputKey set)");
+
+    ConfigManager micConfig;
+    micConfig.load();
+    VideoSettings micSettings = micConfig.getVideoSettings();
+
+    if (micSettings.enable_microphone)
+    {
+        brls::Logger::info("[GameStreamClient] Microphone enabled in settings - starting transmission");
+
+        std::string micHost = micSettings.microphone_host_ip.empty()
+            ? address
+            : micSettings.microphone_host_ip;
+
+        bool micStarted = MicrophoneManager::getInstance().start(
+            micHost,
+            micSettings.microphone_port,
+            micSettings.microphone_sample_rate,
+            micSettings.microphone_channels,
+            micSettings.microphone_bitrate);
+
+        if (micStarted)
+        {
+            brls::Logger::info("[GameStreamClient] Microphone started successfully to {}:{}",
+                micHost, micSettings.microphone_port);
+        }
+        else
+        {
+            brls::Logger::warning("[GameStreamClient] Microphone failed to start - will retry every 10s");
+        }
+    }
+    else
+    {
+        brls::Logger::debug("[GameStreamClient] Microphone disabled in settings");
+    }
+
     return true;
 }
 
@@ -788,6 +819,10 @@ bool GameStreamClient::quitApp(const std::string& address)
     }
 
     brls::Logger::info("[GameStreamClient] Aplicación terminada correctamente");
+
+    MicrophoneManager::getInstance().stop();
+    brls::Logger::info("[GameStreamClient] Microphone stopped");
+
     // Limpiar estado de stream activo si coincide
     auto it = m_active_streams.find(address);
     if (it != m_active_streams.end())
@@ -815,6 +850,9 @@ void GameStreamClient::setActiveStream(const std::string& address, int appId, co
 void GameStreamClient::clearActiveStream(const std::string& address)
 {
     m_active_streams.erase(address);
+
+    MicrophoneManager::getInstance().stop();
+    brls::Logger::debug("[GameStreamClient] clearActiveStream: microphone stopped");
 }
 
 bool GameStreamClient::hasActiveStream(const std::string& address) const

@@ -173,7 +173,11 @@
                 "es": "Spanish",
                 "en": "English"
             },
-            "language_changed": "Language changed successfully"
+            "language_changed": "Language changed successfully",
+            "microphone_title": "Enable Microphone",
+            "microphone_description": "Transmit microphone audio to host PC (auto-retry every 10s if host not found)",
+            "microphone_enabled": "[OK] Microphone enabled - will start when streaming begins",
+            "microphone_disabled": "[X] Microphone disabled"
         },
         "rear_touch": {
             "title": "Rear touch",

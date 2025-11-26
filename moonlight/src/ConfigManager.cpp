@@ -289,6 +289,7 @@ VideoSettings ConfigManager::getVideoSettings() const
     settings.center_region_only            = get("video", "center_region_only", "false") == "true";
     settings.show_fps                      = get("video", "show_fps", "false") == "true";
     settings.save_debug_log                = get("video", "save_debug_log", "false") == "true";
+    settings.enable_microphone             = get("video", "enable_microphone", "false") == "true";
     settings.enable_ref_frame_invalidation = get("video", "enable_ref_frame_invalidation", "false") == "true";
     settings.enable_vita_vblank_wait       = get("video", "enable_vita_vblank_wait", "false") == "true";
     settings.enable_motion_controls        = get("video", "enable_motion_controls", "false") == "true";
@@ -391,6 +392,7 @@ void ConfigManager::setVideoSettings(const VideoSettings& settings)
     set("video", "center_region_only", settings.center_region_only ? "true" : "false");
     set("video", "show_fps", settings.show_fps ? "true" : "false");
     set("video", "save_debug_log", settings.save_debug_log ? "true" : "false");
+    set("video", "enable_microphone", settings.enable_microphone ? "true" : "false");
     set("video", "enable_ref_frame_invalidation", settings.enable_ref_frame_invalidation ? "true" : "false");
     set("video", "enable_vita_vblank_wait", settings.enable_vita_vblank_wait ? "true" : "false");
     set("video", "enable_motion_controls", settings.enable_motion_controls ? "true" : "false");

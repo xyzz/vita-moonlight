@@ -649,6 +649,29 @@ SettingsTab::SettingsTab()
         config.save();
         brls::Application::notify(brls::getStr("moonlight/settings_tab/keyboard_layout/saved")); });
 
+    // Microphone toggle
+    microphoneToggle->init(
+        brls::getStr("moonlight/settings_tab/microphone_title"),
+        videoSettings.enable_microphone,
+        [this](bool value)
+        {
+            ConfigManager config;
+            config.load();
+            VideoSettings settings     = config.getVideoSettings();
+            settings.enable_microphone = value;
+            config.setVideoSettings(settings);
+            config.save();
+
+            // Note: Microphone will auto-start when streaming session begins
+            // if enable_microphone is true
+
+            brls::Application::notify(
+                value ? brls::getStr("moonlight/settings_tab/microphone_enabled")
+                      : brls::getStr("moonlight/settings_tab/microphone_disabled"));
+
+            return true; // Return true to indicate successful save
+        });
+
     // Configurar opciones del sistema (originales)
     radio->title->setText("Radio cell");
     radio->setSelected(radioSelected);

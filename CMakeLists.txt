@@ -254,6 +254,7 @@ if(PLATFORM_PSV)
         -lSceCommonDialog_stub
         -lSceAppMgr_stub
         -lSceAudio_stub
+        -lSceAudioIn_stub
         -lSceIme_stub
         -lSceMotion_stub
         -lvita2d

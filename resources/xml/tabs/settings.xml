@@ -61,6 +61,11 @@
                 id="localAudioToggle"
                 title="@i18n/moonlight/settings_tab/local_audio_title"/>
 
+            <!-- Microphone Settings -->
+            <brls:BooleanCell
+                id="microphoneToggle"
+                title="@i18n/moonlight/settings_tab/microphone_title"/>
+
             <brls:BooleanCell
                 id="fullscreenToggle"
                 title="@i18n/moonlight/settings_tab/fullscreen_title"/>

@@ -173,7 +173,11 @@
             "es": "Español",
             "en": "English"
         },
-        "language_changed": "Idioma cambiado correctamente"
+        "language_changed": "Idioma cambiado correctamente",
+        "microphone_title": "Activar Micrófono",
+        "microphone_description": "Transmitir audio del micrófono al PC host (reintento automático cada 10s si no se encuentra el host)",
+        "microphone_enabled": "[OK] Micrófono activado - se iniciará al comenzar streaming",
+        "microphone_disabled": "[X] Micrófono desactivado"
     },
     "rear_touch": {
         "title": "Touch trasero",

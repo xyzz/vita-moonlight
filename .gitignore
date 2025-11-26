@@ -18,7 +18,6 @@ openssl-mingw
 openssl-1.1.1w.tar.gz
 reference
 temp_sdl
-scripts/
 compile_commands.json
 dump-analysis/
 temp/

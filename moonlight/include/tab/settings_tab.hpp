@@ -66,6 +66,9 @@ class SettingsTab : public brls::Box
     BRLS_BIND(brls::DetailCell, rearTouchSettingsEntry, "rearTouchSettingsEntry");
     BRLS_BIND(brls::DetailCell, trackpadSettingsEntry, "trackpadSettingsEntry");
 
+    // Microphone settings
+    BRLS_BIND(brls::BooleanCell, microphoneToggle, "microphoneToggle");
+
     static inline brls::SelectorCell* languageSelectorPtr = nullptr;
 
     static brls::View* create();

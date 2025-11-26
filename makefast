@@ -395,6 +395,21 @@ deploy_to_vita() {
 if build_project && check_eboot; then
     echo -e "\n[+] Compilación completada. Enviando a PS Vita..."
     deploy_to_vita
+
+    # Build moonmic-host applications (Windows/Linux)
+    echo -e "\n[+] Compilando moonmic-host para Windows y Linux..."
+    if [ -f "scripts/build_moonmic_hosts.sh" ]; then
+        if ./scripts/build_moonmic_hosts.sh; then
+            echo -e "\n[✓] moonmic-host compilado exitosamente"
+            echo "[+] Binarios disponibles en: cmake-build-psv/host/"
+        else
+            echo -e "\n[!] Advertencia: Falló la compilación de moonmic-host"
+            echo "[+] El build de PS Vita se completó correctamente, pero moonmic-host tiene errores"
+        fi
+    else
+        echo -e "\n[!] No se encontró el script de build de moonmic-host"
+    fi
+
     echo -e "\n[+] Proceso makefast completado."
 else
     echo -e "\n[!] Error en la compilación."

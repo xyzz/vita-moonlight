@@ -1,0 +1,51 @@
+#!/bin/bash
+
+set -e
+
+# Instala unzip si no está presente
+sudo apt update
+sudo apt install -y unzip wget
+
+pvr_psp2_version=3.9
+
+# Crea directorios temporales
+mkdir -p /tmp/vita/include
+mkdir -p /tmp/vita/lib
+mkdir -p /tmp/vita/share/sdl2/suprx
+
+# Descarga e instala los headers de PVR_PSP2
+wget -O /tmp/PVR_PSP2.zip "https://github.com/GrapheneCt/PVR_PSP2/archive/refs/tags/v${pvr_psp2_version}.zip"
+unzip /tmp/PVR_PSP2.zip -d /tmp
+cp -r /tmp/PVR_PSP2-${pvr_psp2_version}/include/* /tmp/vita/include
+rm /tmp/PVR_PSP2.zip
+rm -rf /tmp/PVR_PSP2-${pvr_psp2_version}
+
+# Corrige el include guard de khrplatform.h
+sed -i -e 's/__drvkhrplatform_h_/__khrplatform_h_/' /tmp/vita/include/KHR/khrplatform.h
+
+# Descarga e instala las librerías stub
+wget -O /tmp/vitasdk_stubs.zip "https://github.com/GrapheneCt/PVR_PSP2/releases/download/v${pvr_psp2_version}/vitasdk_stubs.zip"
+unzip /tmp/vitasdk_stubs.zip -d /tmp/pvr_psp2_stubs
+find /tmp/pvr_psp2_stubs -type f -name "*.a" -exec cp {} /tmp/vita/lib \;
+rm /tmp/vitasdk_stubs.zip
+rm -rf /tmp/pvr_psp2_stubs
+
+# Descarga e instala los archivos .suprx
+wget -O /tmp/PSVita_Release.zip "https://github.com/GrapheneCt/PVR_PSP2/releases/download/v${pvr_psp2_version}/PSVita_Release.zip"
+unzip /tmp/PSVita_Release.zip -d /tmp/PSVita_Release
+rm -f /tmp/PSVita_Release/libGLESv1_CM.suprx
+rm -f /tmp/PSVita_Release/libpvr2d.suprx
+mv /tmp/PSVita_Release/*.suprx /tmp/vita/share/sdl2/suprx/
+rm -rf /tmp/PSVita_Release.zip
+rm -rf /tmp/PSVita_Release
+
+# Copia los archivos al VITASDK
+if [ -z "$VITASDK" ]; then
+    export VITASDK="/usr/local/vitasdk"
+    echo "La variable de entorno VITASDK no estaba definida. Usando /usr/local/vitasdk"
+fi
+
+cp -rv /tmp/vita/* "$VITASDK/arm-vita-eabi"
+rm -rf /tmp/vita
+
+echo "Instalación de PVR_PSP2 para PSVita completada."

@@ -952,8 +952,8 @@ inline void vitainput_process(int cPort) {
                                (pad[cPort].buttons & SCE_CTRL_LEFT);
   
   // Map physical port to controller index:
-  // Normal Vita: port 0 -> controller 0
-  // Vita TV: port 1 -> controller 0, port 2 -> controller 1, port 3 -> controller 2
+  // Port 0 -> controller 0 (all platforms, main controller with touch/overlays)
+  // Ports 1-3 -> controllers 0-2 (secondary controllers, gamepad input only)
   int controllerIndex = (cPort > 0) ? (cPort - 1) : 0;
   
   if (cPort == vita_controller_port) {
@@ -989,14 +989,11 @@ static uint8_t active_input_thread = 0;
 int vitainput_thread(SceSize args, void *argp) {
   while (1) {
     if (active_input_thread) {
-      if (config.model == SCE_KERNEL_MODEL_VITATV) {
-        // PS Vita TV: process up to 4 controllers on ports 0-3
-        for (int port = 0; port < MAX_PORT; ++port) {
-          vitainput_process(port);
-        }
-      } else {
-        // PS Vita: only one controller on port 0
-        vitainput_process(0);
+      // Process up to 4 controllers on both PS Vita and PS Vita TV
+      // On normal Vita with ds34vita plugin, this enables external DS3/DS4 controllers
+      // Ports 1-3 will be empty if no controllers connected (minimal overhead)
+      for (int port = 0; port < MAX_PORT; ++port) {
+        vitainput_process(port);
       }
     }
 
@@ -1063,8 +1060,8 @@ void vitainput_config(CONFIGURATION config) {
     mapping_load(mapping_file_path, &map);
   }
 
-  // vita_controller_port is always 0 (main port for touch/overlays)
-  // On Vita TV, ports 1-3 are processed in the thread but 0 handles touch
+  // vita_controller_port is always 0 (main port for touch/overlays on both platforms)
+  // Ports 1-3 are processed for gamepad input only (no touch/overlay support)
   vita_controller_port = 0;
 
   VERTICAL =

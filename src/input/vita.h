@@ -78,7 +78,6 @@ typedef struct double_click_tracker {
 
 #define INPUT_TYPE_MASK         0xfff00000
 #define INPUT_VALUE_MASK        0x000fffff
-
 #define INPUT_TYPE_KEYBOARD     0x00000000
 #define INPUT_TYPE_SPECIAL      0x00100000
 #define INPUT_TYPE_MOUSE        0x00200000
@@ -116,11 +115,11 @@ void vitainput_stop(void);
 
 uint8_t read_backscreen();
 uint8_t read_frontscreen();
-uint32_t is_pressed(uint32_t defined);
-uint32_t is_old_pressed(uint32_t defined);
-short read_analog(uint32_t defined);
-void special(uint32_t defined, uint32_t pressed, uint32_t old_pressed);
-void vitainput_process(void);
+uint32_t is_pressed(int port, uint32_t defined);
+uint32_t is_old_pressed(int port, uint32_t defined);
+short read_analog(int port, uint32_t defined);
+void special(int port, uint32_t defined, uint32_t pressed, uint32_t old_pressed);
+void vitainput_process(int cPort);
 void move_mouse(TouchData old, TouchData cur);
 bool mouse_click(short finger_count, bool press);
 void move_motion(SceMotionState motionState);

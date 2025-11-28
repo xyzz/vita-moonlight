@@ -78,6 +78,12 @@ class MicrophoneManager
      */
     int getPort() const;
 
+    /**
+     * @brief Update gain multiplier dynamically (applies immediately if running)
+     * @param gain New gain multiplier (1.0 = no change, higher = louder)
+     */
+    void setGain(float gain);
+
   private:
     MicrophoneManager();
     ~MicrophoneManager();

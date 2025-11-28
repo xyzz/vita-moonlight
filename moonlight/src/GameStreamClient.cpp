@@ -277,7 +277,13 @@ bool GameStreamClient::startApp(const std::string& address, STREAM_CONFIGURATION
     if (mode == StartMode::NEW_ONLY)
         g_force_fresh_launch_h264 = true;
 
-    int status = gs_start_app(&m_server_data[address], &config, appId, true, true, 0x1, displayWidth, displayHeight);
+    ConfigManager sopsConfig;
+    sopsConfig.load();
+    VideoSettings videoSettings = sopsConfig.getVideoSettings();
+    bool sops                   = videoSettings.sops; // Default is true
+    brls::Logger::info("[GameStreamClient] SOPS (Optimize game settings) = {}", sops);
+
+    int status = gs_start_app(&m_server_data[address], &config, appId, sops, true, 0x1, displayWidth, displayHeight);
 
     // Restaurar flag global
     if (mode == StartMode::NEW_ONLY)

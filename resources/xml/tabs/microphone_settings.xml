@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="utf-8"?>
+<brls:Box
+    width="auto"
+    height="auto">
+
+    <brls:ScrollingFrame
+        width="auto"
+        height="auto"
+        axis="column"
+        alignItems="stretch"
+        scrollingBehavior="centered"
+        grow="1.0">
+
+        <brls:Box
+            width="10000"
+            height="auto"
+            axis="column"
+            alignItems="stretch"
+            paddingTop="@style/brls/sidebar/padding_top"
+            paddingRight="@style/brls/sidebar/padding_right"
+            paddingBottom="@style/brls/sidebar/padding_bottom"
+            paddingLeft="@style/brls/sidebar/padding_left">
+
+            <!-- Subtitle with MoonMic link -->
+            <brls:Label
+                width="auto"
+                height="auto"
+                text="@i18n/moonlight/microphone/subtitle"
+                fontSize="16"
+                marginBottom="20"/>
+
+            <!-- Gain Settings -->
+            <brls:Header
+                width="auto"
+                height="auto"
+                title="@i18n/moonlight/microphone/gain_header"
+                marginBottom="0px"/>
+
+            <brls:Label
+                width="auto"
+                height="auto"
+                text="@i18n/moonlight/microphone/gain_description"
+                fontSize="18"
+                marginBottom="8"/>
+
+            <brls:Slider
+                id="gainSlider"
+                width="auto"
+                height="40"
+                marginBottom="8"/>
+
+            <brls:Label
+                id="gainLabel"
+                width="auto"
+                height="auto"
+                text="Gain: 10x"
+                fontSize="20"
+                marginBottom="12"/>
+
+            <!-- Audio Format -->
+            <brls:Header
+                width="auto"
+                height="auto"
+                title="@i18n/moonlight/microphone/format_header"
+                marginBottom="0px"/>
+
+            <brls:BooleanCell
+                id="opusToggle"
+                title="@i18n/moonlight/microphone/opus_toggle"/>
+
+            <!-- Testing -->
+            <brls:Header
+                width="auto"
+                height="auto"
+                title="@i18n/moonlight/microphone/test_header"
+                marginBottom="0px"/>
+
+            <brls:Label
+                width="auto"
+                height="auto"
+                text="@i18n/moonlight/microphone/test_description"
+                fontSize="18"
+                marginBottom="8"/>
+
+            <brls:BooleanCell
+                id="testMicrophoneToggle"
+                title="@i18n/moonlight/microphone/test_toggle"/>
+
+            <!-- Host Selector for Remote Test -->
+            <brls:SelectorCell
+                id="hostSelector"
+                title="@i18n/moonlight/microphone/host_selector_title"/>
+
+            <brls:BooleanCell
+                id="testMicrophoneRemoteToggle"
+                title="@i18n/moonlight/microphone/test_remote_toggle"/>
+
+            <!-- Port Configuration -->
+            <brls:Header
+                width="auto"
+                height="auto"
+                title="@i18n/moonlight/microphone/port_header"
+                marginBottom="0px"/>
+
+            <brls:DetailCell
+                id="portInputCell"
+                title="@i18n/moonlight/microphone/port_title"/>
+
+        </brls:Box>
+
+    </brls:ScrollingFrame>
+
+</brls:Box>

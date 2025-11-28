@@ -68,6 +68,7 @@ class SettingsTab : public brls::Box
 
     // Microphone settings
     BRLS_BIND(brls::BooleanCell, microphoneToggle, "microphoneToggle");
+    BRLS_BIND(brls::DetailCell, microphoneConfigureCell, "microphoneConfigureCell");
 
     static inline brls::SelectorCell* languageSelectorPtr = nullptr;
 

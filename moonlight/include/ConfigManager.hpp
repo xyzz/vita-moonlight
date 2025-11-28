@@ -100,12 +100,14 @@ struct VideoSettings
     // Nueva opción: tipo de gamepad
     GamepadType gamepad_type = GAMEPAD_TYPE_XBOX; // 0=Xbox, 1=PS4 (para emular controlador)
 
-    bool enable_microphone         = false; // Enable/disable microphone transmission
-    std::string microphone_host_ip = ""; // Host IP (empty = use stream host)
-    int microphone_port            = MOONMIC_DEFAULT_PORT; // UDP port for mic transmission
-    int microphone_sample_rate     = MOONMIC_DEFAULT_SAMPLE_RATE; // Sample rate (Hz) - Vita hardware native
-    int microphone_channels        = MOONMIC_DEFAULT_CHANNELS; // 1=mono, 2=stereo
-    int microphone_bitrate         = MOONMIC_DEFAULT_BITRATE; // Opus bitrate (bps) - optimal for 16kHz mono VOIP
+    bool enable_microphone             = false; // Enable/disable microphone transmission
+    bool enable_microphone_compression = false; // true=Opus, false=RAW PCM (controlled by UI toggle)
+    std::string microphone_host_ip     = ""; // Host IP (empty = use stream host)
+    int microphone_port                = MOONMIC_DEFAULT_PORT; // UDP port for mic transmission
+    int microphone_sample_rate         = MOONMIC_DEFAULT_SAMPLE_RATE; // Sample rate (Hz) - Vita hardware native
+    int microphone_channels            = MOONMIC_DEFAULT_CHANNELS; // 1=mono, 2=stereo
+    int microphone_bitrate             = MOONMIC_DEFAULT_BITRATE; // Opus bitrate (bps) - optimal for 16kHz mono VOIP
+    float microphone_gain              = 10.0f; // Gain multiplier (1.0 - 100.0, default 10.0)
 
     RearTouchSettings rear_touch;
 };

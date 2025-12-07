@@ -1,5 +1,6 @@
 #include "GameStreamClient.hpp"
 
+#include <curl/curl.h>
 #include <dirent.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -996,4 +997,128 @@ bool GameStreamClient::probeActiveSession(const HostInfo& host, RemoteAppInfo& o
     m_active_streams[address] = s;
     brls::Logger::info("[GameStreamClient] probeActiveSession: registro m_active_streams[{}] = {{ appId={}, appName='{}' }}", address, sd.currentGame, outRunning.name);
     return true;
+}
+
+// libcurl requires a C-compatible callback on Vita.
+static size_t sunshine_curl_write_callback(void* contents, size_t size, size_t nmemb, void* userp)
+{
+    size_t total_size     = size * nmemb;
+    std::string* response = static_cast<std::string*>(userp);
+    response->append(static_cast<char*>(contents), total_size);
+    return total_size;
+}
+
+int GameStreamClient::getSunshinePairStatus(const std::string& address)
+{
+    brls::Logger::info("[GameStreamClient] getSunshinePairStatus called for {}", address);
+
+    // 1. Obtener keyDir
+    std::string keyDir = getKeyDirFor(address);
+    if (keyDir.empty())
+    {
+        brls::Logger::error("[GameStreamClient] getSunshinePairStatus: No keyDir for {}", address);
+        return 0;
+    }
+    brls::Logger::info("[GameStreamClient] Found keyDir: {}", keyDir);
+
+    // 2. Rutas de certificados y uniqueid
+    std::string certPath     = keyDir + "/client.pem";
+    std::string keyPath      = keyDir + "/key.pem";
+    std::string uniqueidPath = keyDir + "/uniqueid.dat";
+
+    // 3. Leer uniqueid
+    std::string uniqueid;
+    FILE* f = fopen(uniqueidPath.c_str(), "r");
+    if (f)
+    {
+        char buf[32] = { 0 };
+        if (fgets(buf, sizeof(buf), f))
+        {
+            uniqueid = buf;
+            // Trim newline
+            while (!uniqueid.empty() && (uniqueid.back() == '\n' || uniqueid.back() == '\r'))
+            {
+                uniqueid.pop_back();
+            }
+        }
+        fclose(f);
+    }
+
+    if (uniqueid.empty())
+    {
+        brls::Logger::error("[GameStreamClient] getSunshinePairStatus: Failed to read uniqueid");
+        return 0;
+    }
+    brls::Logger::info("[GameStreamClient] Read uniqueid: {}", uniqueid);
+
+    // 4. Configurar CURL
+    CURL* curl = curl_easy_init();
+    if (!curl)
+    {
+        brls::Logger::error("[GameStreamClient] Failed to init curl");
+        return 0;
+    }
+
+    // Obtener puerto HTTPS de los datos del servidor si están disponibles
+    int port = 47984; // Default Sunshine
+    if (m_server_data.count(address) > 0)
+    {
+        port = m_server_data[address].httpsPort;
+        if (port == 0)
+            port = 47984;
+    }
+    brls::Logger::info("[GameStreamClient] Using HTTPS port: {}", port);
+
+    // Sunshine serverinfo endpoint
+    // Format: https://<ip>:<port>/serverinfo?uniqueid=<uniqueid>
+    char urlBuf[512];
+    snprintf(urlBuf, sizeof(urlBuf), "https://%s:%d/serverinfo?uniqueid=%s",
+        address.c_str(), port, uniqueid.c_str());
+    brls::Logger::info("[GameStreamClient] URL: {}", urlBuf);
+
+    std::string response_string;
+
+    curl_easy_setopt(curl, CURLOPT_URL, urlBuf);
+    curl_easy_setopt(curl, CURLOPT_SSLCERT, certPath.c_str());
+    curl_easy_setopt(curl, CURLOPT_SSLKEY, keyPath.c_str());
+    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L); // Self-signed certs
+    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 5L); // 5 second timeout
+
+    // Use static function instead of lambda (Vita-safe)
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, sunshine_curl_write_callback);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response_string);
+
+    brls::Logger::info("[GameStreamClient] Performing HTTPS request...");
+    CURLcode res   = curl_easy_perform(curl);
+    long http_code = 0;
+    curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
+
+    curl_easy_cleanup(curl);
+
+    brls::Logger::info("[GameStreamClient] Request complete: res={}, http_code={}", (int)res, http_code);
+
+    if (res != CURLE_OK)
+    {
+        brls::Logger::warning("[GameStreamClient] Sunshine validation failed (curl error): {}", curl_easy_strerror(res));
+        return 0;
+    }
+
+    if (http_code != 200)
+    {
+        brls::Logger::warning("[GameStreamClient] Sunshine validation HTTP error: {}", http_code);
+        return 0;
+    }
+
+    brls::Logger::info("[GameStreamClient] Response length: {}", response_string.length());
+
+    // 5. Parsear respuesta (buscar <PairStatus>1</PairStatus>)
+    if (response_string.find("<PairStatus>1</PairStatus>") != std::string::npos)
+    {
+        brls::Logger::info("[GameStreamClient] Sunshine validation success (PairStatus=1)");
+        return 1;
+    }
+
+    brls::Logger::warning("[GameStreamClient] Sunshine validation returned unpaired/unknown");
+    return 0;
 }

@@ -9,6 +9,8 @@
 #include <borealis.hpp>
 
 #include "ConfigManager.hpp"
+#include "GameStreamClient.hpp"
+#include "model/HostStorage.hpp"
 
 MicrophoneManager& MicrophoneManager::getInstance()
 {
@@ -134,6 +136,69 @@ bool MicrophoneManager::startInternal()
         settings.enable_microphone_compression ? "Opus" : "RAW PCM",
         raw_mode);
 
+    // Perform Sunshine validation
+    // IMPORTANT: We need to find the host in HostStorage to get the proper keyDir
+    std::vector<HostInfo> hosts = HostStorage::loadHosts();
+    std::string keyDir;
+
+    for (const auto& host : hosts)
+    {
+        if (host.ip == host_ip_)
+        {
+            // Found matching host - try to connect to populate GameStreamClient map
+            if (!GameStreamClient::instance().isConnected(host.ip))
+            {
+                brls::Logger::info("[MicrophoneManager] Connecting to {} to load keyDir", host.name);
+                GameStreamClient::instance().connect(host);
+            }
+
+            keyDir = GameStreamClient::instance().getKeyDirFor(host.ip);
+            break;
+        }
+    }
+
+    if (keyDir.empty())
+    {
+        brls::Logger::warning("[MicrophoneManager] No keyDir found for {}, validation will use PairStatus=0", host_ip_);
+    }
+
+    int pair_status = 0;
+    if (!keyDir.empty())
+    {
+        pair_status = GameStreamClient::instance().getSunshinePairStatus(host_ip_);
+    }
+    else
+    {
+        brls::Logger::warning("[MicrophoneManager] Skipping Sunshine validation (no keyDir)");
+    }
+
+    // Get uniqueid and devicename
+    std::string uniqueid;
+    if (!keyDir.empty())
+    {
+        std::string uniqueidPath = keyDir + "/uniqueid.dat";
+        FILE* f                  = fopen(uniqueidPath.c_str(), "r");
+        if (f)
+        {
+            char buf[32] = { 0 };
+            if (fgets(buf, sizeof(buf), f))
+            {
+                uniqueid = buf;
+                while (!uniqueid.empty() && (uniqueid.back() == '\n' || uniqueid.back() == '\r'))
+                    uniqueid.pop_back();
+            }
+            fclose(f);
+        }
+    }
+
+    // Device name (default to "Vita" if not set)
+    std::string devicename = "Vita";
+    // Ideally we should get this from settings, but for now hardcode or use hostname
+
+    brls::Logger::info("[MicrophoneManager] Sunshine validation result: PairStatus={}", pair_status);
+    brls::Logger::info("[MicrophoneManager] uniqueid='{}' len={}", uniqueid, uniqueid.length());
+    brls::Logger::info("[MicrophoneManager] devicename='{}' len={}", devicename, devicename.length());
+
     // Configure libmoonmic
     moonmic_config_t config = {
         .host_ip     = host_ip_.c_str(),
@@ -143,7 +208,12 @@ bool MicrophoneManager::startInternal()
         .bitrate     = static_cast<uint32_t>(bitrate_),
         .raw_mode    = raw_mode, // Set based on UI toggle
         .auto_start  = true, // Start capturing immediately
-        .gain        = settings.microphone_gain // Gain multiplier from config
+        .gain        = settings.microphone_gain, // Gain multiplier from config
+
+        .uniqueid            = uniqueid.c_str(),
+        .devicename          = devicename.c_str(),
+        .sunshine_https_port = 47984, // Default Sunshine port
+        .pair_status         = pair_status
     };
 
     client_ = moonmic_create(&config);
@@ -225,4 +295,13 @@ void MicrophoneManager::setGain(float gain)
         moonmic_set_gain(client_, gain);
         brls::Logger::info("[MicrophoneManager] Updated gain to {:.1f}x during transmission", gain);
     }
+}
+
+bool MicrophoneManager::isConnected() const
+{
+    if (!running_ || !client_)
+    {
+        return false;
+    }
+    return moonmic_is_connected(client_);
 }

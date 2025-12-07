@@ -95,6 +95,31 @@
                 id="testMicrophoneRemoteToggle"
                 title="@i18n/moonlight/microphone/test_remote_toggle"/>
 
+            <!-- Connection Status Indicator -->
+            <brls:Box
+                width="auto"
+                height="auto"
+                axis="row"
+                alignItems="center"
+                marginTop="8"
+                marginBottom="16">
+
+                <brls:Label
+                    id="hostStatusLabel"
+                    width="auto"
+                    height="auto"
+                    text="Not connected"
+                    fontSize="16"
+                    marginRight="10"/>
+
+                <brls:Rectangle
+                    id="connectionLED"
+                    width="12"
+                    height="12"
+                    cornerRadius="6"
+                    color="#FF0000"/>
+            </brls:Box>
+
             <!-- Port Configuration -->
             <brls:Header
                 width="auto"

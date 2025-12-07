@@ -1,8 +1,3 @@
-/*
-    GameStreamClient.hpp - Cliente para manejar conexiones GameStream
-    Patrón basado en Moonlight-Switch para PS Vita
-    Autor: aorsini + comunidad
-*/
 #ifndef GAMESTREAM_CLIENT_HPP
 #define GAMESTREAM_CLIENT_HPP
 
@@ -92,6 +87,10 @@ class GameStreamClient
 
     // Devuelve el keyDir calculado/guardado para una dirección si existe
     std::string getKeyDirFor(const std::string& address) const;
+
+    // Obtiene el PairStatus de Sunshine mediante petición HTTPS a /serverinfo
+    // Retorna 1 si está emparejado, 0 si no o error
+    int getSunshinePairStatus(const std::string& address);
 
   private:
     GameStreamClient();

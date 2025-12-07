@@ -290,8 +290,8 @@ build_project() {
         -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY \\
         -DCMAKE_FIND_ROOT_PATH_MODE_PACKAGE=ONLY"
 
-    # Control explícito de BUILD_FFMPEG: por defecto OFF, activar sólo si se pidió 'ffmpeg'
-    if [ "$MODE" = "ffmpeg" ]; then
+    # Control explícito de BUILD_FFMPEG: activar si MODE=ffmpeg o FEATURE=ffmpeg
+    if [ "$MODE" = "ffmpeg" ] || [ "$FEATURE" = "ffmpeg" ]; then
         cmake_cmd="$cmake_cmd -DBUILD_FFMPEG=ON"
         echo "[+] Habilitando BUILD_FFMPEG=ON"
     else

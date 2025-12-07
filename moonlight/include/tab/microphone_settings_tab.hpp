@@ -1,19 +1,22 @@
 #pragma once
 
 #include <borealis.hpp>
+#include <chrono>
 #include <string>
 
 class MicrophoneSettingsTab : public brls::Box
 {
   public:
     MicrophoneSettingsTab();
-    ~MicrophoneSettingsTab(); // Destructor to stop test on exit
+    ~MicrophoneSettingsTab();
 
     static brls::View* create();
 
   private:
     std::string getGainText(float gain);
-    std::string currentHostAddress; // Selected host for remote testing
+    void updateConnectionStatus();
+
+    std::string currentHostAddress;
     int currentHostPort = 48100;
 
     BRLS_BIND(brls::Slider, gainSlider, "gainSlider");
@@ -23,4 +26,27 @@ class MicrophoneSettingsTab : public brls::Box
     BRLS_BIND(brls::SelectorCell, hostSelector, "hostSelector");
     BRLS_BIND(brls::BooleanCell, testMicrophoneRemoteToggle, "testMicrophoneRemoteToggle");
     BRLS_BIND(brls::DetailCell, portInputCell, "portInputCell");
+    BRLS_BIND(brls::Rectangle, connectionLED, "connectionLED");
+    BRLS_BIND(brls::Label, hostStatusLabel, "hostStatusLabel");
+
+    bool monitoringConnection = false;
+
+    std::chrono::steady_clock::time_point lastConnectionCheck;
+    static constexpr int CONNECTION_CHECK_INTERVAL_MS = 500; // Check every 500ms
+
+    void frame(brls::FrameContext* ctx) override
+    {
+        brls::Box::frame(ctx);
+
+        if (monitoringConnection)
+        {
+            auto now     = std::chrono::steady_clock::now();
+            auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - lastConnectionCheck).count();
+            if (elapsed >= CONNECTION_CHECK_INTERVAL_MS)
+            {
+                updateConnectionStatus();
+                lastConnectionCheck = now;
+            }
+        }
+    }
 };

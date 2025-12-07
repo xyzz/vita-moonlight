@@ -61,6 +61,12 @@ class MicrophoneManager
     bool isRetrying() const;
 
     /**
+     * @brief Check heartbeat connection status
+     * @return true if connected and receiving heartbeats
+     */
+    bool isConnected() const;
+
+    /**
      * @brief Get last error message
      * @return Error message or empty string
      */

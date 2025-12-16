@@ -347,7 +347,12 @@
                 "button_resume": "Resume",
                 "button_start_new": "Start new",
                 "ending_session": "Closing session on host...",
-                "error_end_session": "Failed to close session on host"
+                "error_end_session": "Failed to close session on host",
+                "moonmic_not_connected": "Moonmic is not connected",
+                "moonmic_host_active": "Moonmic host is active",
+                "resolution_prompt_body": "Host display will switch to $(res) before streaming (may restart Sunshine). Continue?",
+                "resolution_prompt_continue": "Continue",
+                "resolution_prompt_cancel": "Cancel"
             }
         }
     }

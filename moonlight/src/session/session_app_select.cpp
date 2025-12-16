@@ -9,16 +9,22 @@
 #include <borealis/core/application.hpp>
 #include <borealis/core/logger.hpp>
 #include <borealis/core/thread.hpp>
+#include <chrono>
+#include <cstdio> // Para snprintf
 #include <cstdlib> // Para malloc/free
 #include <cstring> // Para strcpy
 #include <set>
 #include <string> // Para std::string
+#include <thread>
 
 #include "ConfigManager.hpp"
 #include "GameStreamClient.hpp"
 #include "Limelight.h"
+#include "audio/MicrophoneManager.hpp"
 #include "client.h"
 #include "model/HostStorage.hpp"
+#include "moonmic/MoonmicBridge.hpp"
+#include "moonmic/MoonmicPrep.hpp"
 #include "session/session_main.hpp"
 #include "session/vita_session.hpp"
 #include "utils/dialog_utils.h"
@@ -131,6 +137,8 @@ SessionAppSelect::SessionAppSelect(const std::string& hostName)
         brls::Logger::error("[SessionAppSelect] No se encontró el host '%s' en HostStorage", hostName.c_str());
         // Dejar host vacío, mostrará error en populateAppList
     }
+
+    // Ya no notificamos estado de Moonmic en ctor para evitar falsos negativos.
 
     this->inflateFromXMLRes("xml/views/session_app_select.xml");
 
@@ -314,6 +322,80 @@ void SessionAppSelect::populateAppList()
 {
     brls::Logger::info("[SessionAppSelect] populateAppList llamado para host: {} (ip: {})", host.name, host.ip);
 
+    // Esperar a que Moonmic confirme/prepare Sunshine antes de pedir la lista de apps
+    if (!sunshineReady)
+    {
+        if (sunshineCheckInFlight)
+        {
+            brls::Logger::info("[SessionAppSelect] Esperando señal de Moonmic/Sunshine (spinner activo)");
+            return;
+        }
+
+        HostInfo hostCopy = this->host;
+
+        ConfigManager cfg;
+        cfg.load();
+        VideoSettings vs       = cfg.getVideoSettings();
+        StreamConfiguration sc = cfg.getStreamConfig();
+
+        moonmic::PrepCallbacks callbacks;
+        callbacks.onStart = [this]()
+        {
+            sunshineCheckInFlight = true;
+            if (spinner)
+                spinner->setVisibility(brls::Visibility::VISIBLE);
+            if (gridView)
+                gridView->setVisibility(brls::Visibility::INVISIBLE);
+            if (app_select_empty)
+                app_select_empty->setVisibility(brls::Visibility::GONE);
+        };
+
+        callbacks.onDone = [this](bool ok)
+        {
+            sunshineCheckInFlight = false;
+            if (!ok)
+            {
+                sunshineReady = true; // Mark check as fully handled (don't retry endlessly)
+                if (!moonmicNotified)
+                {
+                    brls::Application::notify(brls::getStr("moonlight/session/app_select/moonmic_not_connected"));
+                    moonmicLastStatus = false;
+                    moonmicNotified   = true;
+                }
+                if (spinner)
+                    spinner->setVisibility(brls::Visibility::GONE);
+
+                // Fallback: Proceed even if Moonmic is not active
+                brls::Logger::warning("[SessionAppSelect] Moonmic handshake failed, proceeding with normal connection...");
+                this->populateAppList();
+                return;
+            }
+
+            sunshineReady = true;
+            if (!moonmicNotified)
+            {
+                brls::Application::notify(brls::getStr("moonlight/session/app_select/moonmic_host_active"));
+                moonmicLastStatus = true;
+                moonmicNotified   = true;
+            }
+
+            auto [currentTargetW, currentTargetH] = moonmic::MoonmicBridge::getInstance().getTargetResolution();
+            brls::Logger::info("[SessionAppSelect] Moonmic handshake OK (target {}x{})", currentTargetW, currentTargetH);
+
+            this->populateAppList();
+        };
+
+        callbacks.onCancel = [this]()
+        {
+            sunshineCheckInFlight = false;
+            brls::Application::notify(brls::getStr("moonlight/session/app_select/error_start_app"));
+            brls::Application::popActivity();
+        };
+
+        moonmic::ensureSunshineReadyWithPrompt(hostCopy, sc, vs, resolutionPromptShown, callbacks);
+        return;
+    }
+
     // Mostrar spinner y ocultar contenido
     if (spinner)
         spinner->setVisibility(brls::Visibility::VISIBLE);
@@ -388,105 +470,118 @@ void SessionAppSelect::AppSelected(const RemoteAppInfo& app, bool forceStart)
 {
     brls::Logger::info("App seleccionada: {} (ID: {})", app.name, app.id);
 
-    // Preparar configuración de streaming para PS Vita
-    STREAM_CONFIGURATION streamConfig;
-    memset(&streamConfig, 0, sizeof(streamConfig));
-
-    // Cargar configuración del usuario
-    ConfigManager configManager;
-    if (!configManager.load())
+    // Flujo de inicio encapsulado para poder confirmarlo antes
+    auto startFlow = [this, app, forceStart]()
     {
-        brls::Logger::warning("[SessionAppSelect] No se pudo cargar configuración, usando valores por defecto");
-    }
+        // Preparar configuración de streaming para PS Vita
+        STREAM_CONFIGURATION streamConfig;
+        memset(&streamConfig, 0, sizeof(streamConfig));
 
-    StreamConfiguration streamSettings = configManager.getStreamConfig();
-    VideoSettings videoSettings        = configManager.getVideoSettings();
-
-    // Debug: mostrar valores leídos de configuración
-    brls::Logger::info("[SessionAppSelect] Configuración leída:");
-    brls::Logger::info("[SessionAppSelect] - Stream: {}x{} @ {}fps, bitrate={}",
-        streamSettings.width, streamSettings.height, streamSettings.fps, streamSettings.bitrate);
-    brls::Logger::info("[SessionAppSelect] - Video: render_mode={}", videoSettings.render_mode);
-
-    // FORCE 960x544 stream for PS Vita (optimal quality)
-    // Settings resolution values are saved for HOST monitor control only
-    // Sunshine will downscale from displayWidth x displayHeight to 960x544 with high quality
-    streamConfig.width  = VITA_STREAM_WIDTH;
-    streamConfig.height = VITA_STREAM_HEIGHT;
-    streamConfig.fps    = streamSettings.fps > 0 ? streamSettings.fps : VITA_STREAM_DEFAULT_FPS;
-
-    // Save display resolution hint for passing to gs_start_app
-    // If width/height from settings is 0 (Auto), Sunshine uses current host display
-    // Otherwise, Sunshine will change host display to these dimensions before streaming
-    int displayWidth  = streamSettings.width; // Host monitor width
-    int displayHeight = streamSettings.height; // Host monitor height
-
-    // Calcular bitrate: si es automático (-1), usar fórmula basada en resolución y fps
-    if (streamSettings.bitrate == -1)
-    {
-        // Fórmula aproximada: (ancho * alto * fps * bits_per_pixel) / 1000000 para Mbps
-        // Usando VITA_STREAM_BITS_PER_PIXEL bits por pixel como aproximación conservadora para H.264
-        // Calcular paso a paso para evitar pérdida de precisión
-        long long total_pixels          = (long long)streamConfig.width * streamConfig.height * streamConfig.fps;
-        long long total_bits_per_second = (total_pixels * (long long)(VITA_STREAM_BITS_PER_PIXEL * 10)) / 10;
-        int calculatedBitrate           = (int)(total_bits_per_second / 1000); // Convertir a Kbps directamente
-        // Limitar a un rango razonable usando constantes globales
-        streamConfig.bitrate = std::max(VITA_STREAM_MIN_BITRATE, std::min(VITA_STREAM_MAX_BITRATE, calculatedBitrate));
-    }
-    else
-    {
-        streamConfig.bitrate = streamSettings.bitrate > 0 ? streamSettings.bitrate : VITA_STREAM_DEFAULT_BITRATE;
-    }
-
-    streamConfig.audioConfiguration = AUDIO_CONFIGURATION_STEREO;
-    streamConfig.encryptionFlags    = ENCFLG_NONE; // Sin encriptación por ahora
-
-    brls::Logger::info("[SessionAppSelect] Configuración de streaming:");
-    brls::Logger::info("[SessionAppSelect] - Resolución: {}x{}", streamConfig.width, streamConfig.height);
-    brls::Logger::info("[SessionAppSelect] - FPS: {}", streamConfig.fps);
-    brls::Logger::info("[SessionAppSelect] - Bitrate: {} Kbps", streamConfig.bitrate);
-
-    // Asegurar packetSize y flags correctos si no han sido establecidos
-    if (streamConfig.packetSize <= 0)
-    {
-        streamConfig.packetSize = 1024; // valor seguro por defecto
-        brls::Logger::info("[SessionAppSelect] packetSize no definido -> usando 1024");
-    }
-    if (streamConfig.streamingRemotely == 0 && streamConfig.streamingRemotely != STREAM_CFG_LOCAL && streamConfig.streamingRemotely != STREAM_CFG_REMOTE && streamConfig.streamingRemotely != STREAM_CFG_AUTO)
-    {
-        streamConfig.streamingRemotely = STREAM_CFG_AUTO; // dejar al core decidir
-        brls::Logger::info("[SessionAppSelect] streamingRemotely no definido -> AUTO");
-    }
-    if (streamConfig.supportedVideoFormats == 0)
-    {
-#ifdef VIDEO_FORMAT_H264
-        streamConfig.supportedVideoFormats = VIDEO_FORMAT_H264;
-        brls::Logger::info("[SessionAppSelect] supportedVideoFormats vacío -> set H264");
-#endif
-    }
-    brls::Logger::info("[SessionAppSelect] - packetSize: {} streamingRemotely={} formats=0x{:X}",
-        streamConfig.packetSize, streamConfig.streamingRemotely, streamConfig.supportedVideoFormats);
-
-    // Inicializar servidor usando GameStreamClient (patrón Moonlight-Switch)
-
-    // Mostrar diálogo modal con spinner indicando el progreso de conexión
-    brls::Visibility prevGridVis = brls::Visibility::GONE;
-    std::string connectingMsg    = brls::getStr("moonlight/session/app_select/connecting");
-    auto* loadingDialog          = this->showConnectingDialog(connectingMsg, prevGridVis);
-
-    // Ejecutar la secuencia de conexión e inicio en un hilo de fondo
-    // Capturamos por valor los datos necesarios para evitar uso de `this` en background
-    HostInfo hostCopy            = this->host;
-    RemoteAppInfo appCopy        = app;
-    STREAM_CONFIGURATION cfgCopy = streamConfig;
-    int displayW                 = displayWidth;
-    int displayH                 = displayHeight;
-    std::thread([hostCopy, appCopy, cfgCopy, displayW, displayH, loadingDialog, this, prevGridVis, forceStart]() mutable
+        // Cargar configuración del usuario
+        ConfigManager configManager;
+        if (!configManager.load())
         {
+            brls::Logger::warning("[SessionAppSelect] No se pudo cargar configuración, usando valores por defecto");
+        }
+
+        StreamConfiguration streamSettings = configManager.getStreamConfig();
+        VideoSettings videoSettings        = configManager.getVideoSettings();
+
+        // Enviar handshake Moonmic para configurar remapping Sunshine solo después de confirmación
+        {
+            std::string micHost = videoSettings.microphone_host_ip.empty() ? this->host.ip : videoSettings.microphone_host_ip;
+            int micPort         = videoSettings.microphone_port > 0 ? videoSettings.microphone_port : MOONMIC_DEFAULT_PORT;
+            auto& bridge        = moonmic::MoonmicBridge::getInstance();
+            bridge.loadConfig();
+            if (streamSettings.width > 0 && streamSettings.height > 0)
+            {
+                bridge.setTargetResolution(static_cast<uint16_t>(streamSettings.width), static_cast<uint16_t>(streamSettings.height));
+            }
+            auto hsResult = bridge.sendResolutionHandshake(micHost, micPort);
+            brls::Logger::info("[SessionAppSelect] Moonmic handshake {} ({}:{})", hsResult.success ? "OK" : "FAIL", micHost, micPort);
+        }
+
+        // Debug: mostrar valores leídos de configuración
+        brls::Logger::info("[SessionAppSelect] Configuración leída:");
+        brls::Logger::info("[SessionAppSelect] - Stream: {}x{} @ {}fps, bitrate={}",
+            streamSettings.width, streamSettings.height, streamSettings.fps, streamSettings.bitrate);
+        brls::Logger::info("[SessionAppSelect] - Video: render_mode={}", videoSettings.render_mode);
+
+        // FORCE 960x544 stream for PS Vita (optimal quality)
+        // Settings resolution values are saved for HOST monitor control only
+        // Sunshine will downscale from displayWidth x displayHeight to 960x544 with high quality
+        streamConfig.width  = VITA_STREAM_WIDTH;
+        streamConfig.height = VITA_STREAM_HEIGHT;
+        streamConfig.fps    = streamSettings.fps > 0 ? streamSettings.fps : VITA_STREAM_DEFAULT_FPS;
+
+        // Build RTSP launch URL without displayWidth/displayHeight
+        // Display resolution is now controlled via moonmic protocol handshake
+        // which configures Sunshine's mode_remapping before streaming starts:
+
+        // Calcular bitrate: si es automático (-1), usar fórmula basada en resolución y fps
+        if (streamSettings.bitrate == -1)
+        {
+            // Fórmula aproximada: (ancho * alto * fps * bits_per_pixel) / 1000000 para Mbps
+            // Usando VITA_STREAM_BITS_PER_PIXEL bits por pixel como aproximación conservadora para H.264
+            // Calcular paso a paso para evitar pérdida de precisión
+            long long total_pixels          = (long long)streamConfig.width * streamConfig.height * streamConfig.fps;
+            long long total_bits_per_second = (total_pixels * (long long)(VITA_STREAM_BITS_PER_PIXEL * 10)) / 10;
+            int calculatedBitrate           = (int)(total_bits_per_second / 1000); // Convertir a Kbps directamente
+            // Limitar a un rango razonable usando constantes globales
+            streamConfig.bitrate = std::max(VITA_STREAM_MIN_BITRATE, std::min(VITA_STREAM_MAX_BITRATE, calculatedBitrate));
+        }
+        else
+        {
+            streamConfig.bitrate = streamSettings.bitrate > 0 ? streamSettings.bitrate : VITA_STREAM_DEFAULT_BITRATE;
+        }
+
+        streamConfig.audioConfiguration = AUDIO_CONFIGURATION_STEREO;
+        streamConfig.encryptionFlags    = ENCFLG_NONE; // Sin encriptación por ahora
+
+        brls::Logger::info("[SessionAppSelect] Configuración de streaming:");
+        brls::Logger::info("[SessionAppSelect] - Resolución: {}x{}", streamConfig.width, streamConfig.height);
+        brls::Logger::info("[SessionAppSelect] - FPS: {}", streamConfig.fps);
+        brls::Logger::info("[SessionAppSelect] - Bitrate: {} Kbps", streamConfig.bitrate);
+
+        // Asegurar packetSize y flags correctos si no han sido establecidos
+        if (streamConfig.packetSize <= 0)
+        {
+            streamConfig.packetSize = 1024; // valor seguro por defecto
+            brls::Logger::info("[SessionAppSelect] packetSize no definido -> usando 1024");
+        }
+        if (streamConfig.streamingRemotely == 0 && streamConfig.streamingRemotely != STREAM_CFG_LOCAL && streamConfig.streamingRemotely != STREAM_CFG_REMOTE && streamConfig.streamingRemotely != STREAM_CFG_AUTO)
+        {
+            streamConfig.streamingRemotely = STREAM_CFG_AUTO; // dejar al core decidir
+            brls::Logger::info("[SessionAppSelect] streamingRemotely no definido -> AUTO");
+        }
+        if (streamConfig.supportedVideoFormats == 0)
+        {
+#ifdef VIDEO_FORMAT_H264
+            streamConfig.supportedVideoFormats = VIDEO_FORMAT_H264;
+            brls::Logger::info("[SessionAppSelect] supportedVideoFormats vacío -> set H264");
+#endif
+        }
+        brls::Logger::info("[SessionAppSelect] - packetSize: {} streamingRemotely={} formats=0x{:X}",
+            streamConfig.packetSize, streamConfig.streamingRemotely, streamConfig.supportedVideoFormats);
+
+        // Inicializar servidor usando GameStreamClient (patrón Moonlight-Switch)
+
+        // Mostrar diálogo modal con spinner indicando el progreso de conexión
+        brls::Visibility prevGridVis = brls::Visibility::GONE;
+        std::string connectingMsg    = brls::getStr("moonlight/session/app_select/connecting");
+        auto* loadingDialog          = this->showConnectingDialog(connectingMsg, prevGridVis);
+
+        // Ejecutar la secuencia de conexión e inicio en un hilo de fondo
+        // Capturamos por valor los datos necesarios para evitar uso de `this` en background
+        HostInfo hostCopy            = this->host;
+        RemoteAppInfo appCopy        = app;
+        STREAM_CONFIGURATION cfgCopy = streamConfig;
+        std::thread([hostCopy, appCopy, cfgCopy, loadingDialog, this, prevGridVis, forceStart]() mutable
+            {
         brls::Logger::info("[SessionAppSelect][async] Iniciando conexión en hilo de fondo para {}", hostCopy.ip);
         bool connected = GameStreamClient::instance().connect(hostCopy);
         // Actualizar UI en hilo principal
-    brls::sync([connected, hostCopy, appCopy, cfgCopy, displayW, displayH, loadingDialog, prevGridVis, forceStart, this]() mutable {
+        brls::sync([connected, hostCopy, appCopy, cfgCopy, loadingDialog, prevGridVis, forceStart, this]() mutable {
             // Nota: no cerramos inmediatamente el diálogo de 'connecting' si
             // estamos conectados — lo reutilizaremos cambiando su texto a
             // 'starting'. Solo cerramos si la conexión falló.
@@ -517,14 +612,14 @@ void SessionAppSelect::AppSelected(const RemoteAppInfo& app, bool forceStart)
             // continuamos con startApp.
 
             // Ejecutar startApp y VitaSession en un hilo para no bloquear UI
-            std::thread([hostCopy, appCopy, cfgCopy, displayW, displayH, loadingDialog, this, prevGridVis, forceStart]() mutable {
+            std::thread([hostCopy, appCopy, cfgCopy, loadingDialog, this, prevGridVis, forceStart]() mutable {
                 bool started = false;
                 if (forceStart) {
                     // Si se forzó (Resume), intentar resume explícito
-                    started = GameStreamClient::instance().startApp(hostCopy.ip, cfgCopy, std::stoi(appCopy.id), GameStreamClient::StartMode::RESUME_ONLY, displayW, displayH);
+                    started = GameStreamClient::instance().startApp(hostCopy.ip, cfgCopy, std::stoi(appCopy.id), GameStreamClient::StartMode::RESUME_ONLY);
                 } else {
                     // Normal: permitir auto behavior (resume o launch según servidor)
-                    started = GameStreamClient::instance().startApp(hostCopy.ip, cfgCopy, std::stoi(appCopy.id), GameStreamClient::StartMode::AUTO, displayW, displayH);
+                    started = GameStreamClient::instance().startApp(hostCopy.ip, cfgCopy, std::stoi(appCopy.id), GameStreamClient::StartMode::AUTO);
                 }
                 brls::sync([started, hostCopy, appCopy, loadingDialog, this, prevGridVis]() {
                     if (loadingDialog) loadingDialog->close();
@@ -559,6 +654,8 @@ void SessionAppSelect::AppSelected(const RemoteAppInfo& app, bool forceStart)
                 });
             }).detach();
         }); })
-        .detach();
-    return;
+            .detach();
+    };
+
+    startFlow();
 }

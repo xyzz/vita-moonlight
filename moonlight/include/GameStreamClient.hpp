@@ -96,6 +96,9 @@ class GameStreamClient
     GameStreamClient();
     ~GameStreamClient();
 
+    bool fetchSunshineServerinfo(const std::string& address, std::string& response);
+    bool parseSunshineCurrentGame(const std::string& response, int& outCurrentGame);
+
     std::map<std::string, SERVER_DATA> m_server_data;
     std::map<std::string, STREAM_CONFIGURATION> m_last_stream_cfg; // address -> última config lanzada
     std::map<std::string, std::vector<RemoteAppInfo>> m_app_lists;

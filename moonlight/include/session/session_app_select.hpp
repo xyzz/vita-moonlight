@@ -38,4 +38,11 @@ class SessionAppSelect : public brls::Box
     bool suppressActiveDialog = false;
     // Evita mostrar más de una vez el diálogo de sesión activa dentro de la misma instancia
     bool activeDialogShown = false;
+    // Controla espera previa a cargar apps hasta que Moonmic/Sunshine respondan
+    bool sunshineReady         = false;
+    bool sunshineCheckInFlight = false;
+    bool moonmicNotified       = false;
+    bool moonmicLastStatus     = false;
+    // Prompt de resolución (se muestra al entrar al host, no al lanzar app)
+    bool resolutionPromptShown = false;
 };

@@ -437,15 +437,28 @@ SettingsTab::SettingsTab()
         config.save();
         brls::Application::notify(brls::getStr("moonlight/settings_tab/bitrate/saved")); });
 
-    // Configurar toggles booleanos
-    sopsToggle->init(brls::getStr("moonlight/settings_tab/sops_title"), videoSettings.sops, [this](bool value)
-        {
+    // SOPS (Sound Over PS Network) - Force Enabled for MoonMic compatibility
+    // Hidden from UI to prevent accidental disable
+    sopsToggle->setVisibility(brls::Visibility::GONE);
+    if (!videoSettings.sops)
+    {
+        ConfigManager config;
+        config.load();
+        VideoSettings settings = config.getVideoSettings();
+        settings.sops          = true;
+        config.setVideoSettings(settings);
+        config.save();
+    }
+    /*
+    sopsToggle->init(brls::getStr("moonlight/settings_tab/sops_title"), videoSettings.sops, [this](bool value) {
         ConfigManager config;
         config.load();
         VideoSettings settings = config.getVideoSettings();
         settings.sops = value;
         config.setVideoSettings(settings);
-        config.save(); });
+        config.save();
+    });
+    */
 
     // Toggle para optimizaciones de red (IDR smart, pacing, etc.)
     networkOptimizationsToggle->init(brls::getStr("moonlight/settings_tab/network_opt_title"), videoSettings.enable_network_optimizations, [this](bool value)

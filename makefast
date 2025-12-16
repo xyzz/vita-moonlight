@@ -181,35 +181,49 @@ setup_swap() {
 }
 
 # Modo: 'release' (por defecto), 'debug', o 'ffmpeg'
-MODE="${1:-${MODE:-release}}"
-MODE=$(echo "$MODE" | tr '[:upper:]' '[:lower:]')
+# Soportar combinaciones: ffmpeg debug, debug ffmpeg, etc.
+BUILD_FFMPEG="OFF"
+BUILD_TYPE="Release"
 
-if [ "$MODE" != "debug" ] && [ "$MODE" != "release" ] && [ "$MODE" != "ffmpeg" ]; then
-    echo "[makefast] Modo inválido: $MODE. Use 'debug', 'release' o 'ffmpeg'."
-    exit 1
-fi
+# Procesar todos los argumentos
+for arg in "$@"; do
+    arg_lower=$(echo "$arg" | tr '[:upper:]' '[:lower:]')
+    case "$arg_lower" in
+        debug)
+            BUILD_TYPE="Debug"
+            echo "[makefast] Modo Debug activado"
+            ;;
+        ffmpeg)
+            BUILD_FFMPEG="ON"
+            echo "[makefast] FFmpeg habilitado"
+            ;;
+        gl)
+            FEATURE="gl"
+            echo "[makefast] Feature GL activada"
+            ;;
+        release)
+            BUILD_TYPE="Release"
+            ;;
+        *)
+            echo "[makefast] Argumento no reconocido: $arg (ignorado)"
+            ;;
+    esac
+done
 
-echo "[makefast] Modo de compilación: $MODE"
-FEATURE="${2:-}"
-FEATURE=$(echo "$FEATURE" | tr '[:upper:]' '[:lower:]')
-if [ -n "$FEATURE" ]; then
-    echo "[makefast] Feature adicional solicitada: $FEATURE"
-fi
+echo "[makefast] Configuración final: BUILD_TYPE=$BUILD_TYPE, BUILD_FFMPEG=$BUILD_FFMPEG"
 
 # Si la feature solicita GL (GLES2), cambiar el BUILD_DIR y desactivar GXM
-if [ "$MODE" = "ffmpeg" ] && [ "$FEATURE" = "gl" ]; then
+if [ "$FEATURE" = "gl" ]; then
     BUILD_DIR="cmake-build-psv-gl"
     EBOOT_PATH="${BUILD_DIR}/moonlight.self"
     echo "[makefast] Usando BUILD_DIR=${BUILD_DIR} para compilación GLES (USE_GXM=OFF)"
-    # Añadir flag para desactivar GXM en CMake
-    CMAKE_EXTRA_FLAGS="${CMAKE_EXTRA_FLAGS} -DUSE_GXM=OFF"
 fi
 
 # Configuración inicial de compilación
 check_system_resources
 
 # Optimizaciones para compilación
-if [ "$MODE" = "debug" ]; then
+if [ "$BUILD_TYPE" = "Debug" ]; then
     # Debug: añadir símbolos y no hacer strip
     export CFLAGS="-O0 -g -fno-omit-frame-pointer -ffunction-sections -fdata-sections"
     export CXXFLAGS="-O0 -g -fno-omit-frame-pointer -ffunction-sections -fdata-sections"
@@ -270,7 +284,8 @@ build_project() {
         -DSIMPLE_HIGHLIGHT=ON \\
         -DUSE_GXM=${use_gxm} \\
         -DUSE_VITA_SHARK=OFF \\
-        -DCMAKE_BUILD_TYPE=$( [ \"$MODE\" = \"debug\" ] && echo Debug || echo Release ) \\
+        -DCMAKE_BUILD_TYPE=${BUILD_TYPE} \\
+        -DBUILD_FFMPEG=${BUILD_FFMPEG} \\
         -DCMAKE_TOOLCHAIN_FILE=\"${VITASDK}/share/vita.toolchain.cmake\" \\
         -DCMAKE_MAKE_PROGRAM=\"make\" \\
         -DCMAKE_C_COMPILER=\"${CC}\" \\
@@ -290,14 +305,7 @@ build_project() {
         -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY \\
         -DCMAKE_FIND_ROOT_PATH_MODE_PACKAGE=ONLY"
 
-    # Control explícito de BUILD_FFMPEG: activar si MODE=ffmpeg o FEATURE=ffmpeg
-    if [ "$MODE" = "ffmpeg" ] || [ "$FEATURE" = "ffmpeg" ]; then
-        cmake_cmd="$cmake_cmd -DBUILD_FFMPEG=ON"
-        echo "[+] Habilitando BUILD_FFMPEG=ON"
-    else
-        cmake_cmd="$cmake_cmd -DBUILD_FFMPEG=OFF"
-        echo "[+] BUILD_FFMPEG desactivado (pasado explícitamente -DBUILD_FFMPEG=OFF)"
-    fi
+    echo "[+] BUILD_TYPE=${BUILD_TYPE}, BUILD_FFMPEG=${BUILD_FFMPEG}"
 
     eval "$cmake_cmd" || {
         echo "[!] Error al configurar el proyecto con CMake"
@@ -397,9 +405,17 @@ if build_project && check_eboot; then
     deploy_to_vita
 
     # Build moonmic-host applications (Windows/Linux)
-    echo -e "\n[+] Compilando moonmic-host para Windows y Linux..."
+    # IMPORTANT: Always build host in Release mode, regardless of Vita build type
+    echo -e "\n[+] Compilando moonmic-host para Windows y Linux (siempre en Release)..."
     if [ -f "scripts/build_moonmic_hosts.sh" ]; then
-        if ./scripts/build_moonmic_hosts.sh; then
+        # Clear Vita-specific debug flags and force Release mode for host
+        (
+            unset CFLAGS CXXFLAGS LDFLAGS
+            export CMAKE_BUILD_TYPE=Release
+            ./scripts/build_moonmic_hosts.sh
+        )
+
+        if [ $? -eq 0 ]; then
             echo -e "\n[✓] moonmic-host compilado exitosamente"
             echo "[+] Binarios disponibles en: cmake-build-psv/host/"
         else

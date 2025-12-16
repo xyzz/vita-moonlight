@@ -348,7 +348,12 @@
             "button_resume": "Reanudar",
             "button_start_new": "Iniciar nueva",
             "ending_session": "Cerrando sesión en el host...",
-            "error_end_session": "Error al cerrar la sesión en el host"
+            "error_end_session": "Error al cerrar la sesión en el host",
+            "moonmic_not_connected": "Moonmic no está conectado",
+            "moonmic_host_active": "Moonmic host está activo",
+            "resolution_prompt_body": "La pantalla del host cambiará a $(res) antes de iniciar (puede reiniciar Sunshine). ¿Continuar?",
+            "resolution_prompt_continue": "Continuar",
+            "resolution_prompt_cancel": "Cancelar"
         }
     }
 }

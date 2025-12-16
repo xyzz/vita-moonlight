@@ -12,7 +12,7 @@
 #include <string>
 #include <thread>
 
-#include "moonmic.h"
+#include "../moonmic/MoonmicBridge.hpp"
 
 /**
  * @brief Singleton manager for microphone audio transmission using libmoonmic

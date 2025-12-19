@@ -49,6 +49,17 @@ class MicrophoneManager
     void stop();
 
     /**
+     * @brief Get microphone network round-trip time
+     * @return RTT in ms, or -1 if unavailable
+     */
+    int getRTT();
+
+    /**
+     * @brief Check if actually transmitting (connected to host)
+     */
+    bool isTransmitting();
+
+    /**
      * @brief Check if microphone is currently running
      * @return true if transmitting audio
      */
@@ -128,6 +139,7 @@ class MicrophoneManager
 
     std::string last_error_;
     mutable std::mutex error_mutex_;
+    mutable std::mutex client_mutex_;
 
     static constexpr int RETRY_INTERVAL_SECONDS = 10;
 };

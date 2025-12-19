@@ -98,6 +98,20 @@ bool MicrophoneManager::isRetrying() const
     return retry_enabled_;
 }
 
+bool MicrophoneManager::isTransmitting()
+{
+    std::lock_guard<std::mutex> lock(client_mutex_);
+    return client_ != nullptr && moonmic_is_connected(client_);
+}
+
+int MicrophoneManager::getRTT()
+{
+    std::lock_guard<std::mutex> lock(client_mutex_);
+    if (!client_)
+        return -1;
+    return moonmic_client_get_rtt(client_);
+}
+
 std::string MicrophoneManager::getLastError() const
 {
     std::lock_guard<std::mutex> lock(error_mutex_);

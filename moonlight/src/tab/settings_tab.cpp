@@ -115,7 +115,7 @@ SettingsTab::SettingsTab()
         initialRenderMode = 0; // clamp si config tiene valor desconocido
     // Shared container to keep the mapping from visible selector indices to original vitaResolutions
     auto filteredIndicesPtr = std::make_shared<std::vector<int>>();
-    renderModeSelector->init(brls::getStr("moonlight/settings_tab/render_mode/title"), renderModes, initialRenderMode, [this, updatePixelSelectorVisibility, filteredIndicesPtr](int selected)
+    renderModeSelector->init(brls::getStr("moonlight/settings_tab/render_mode/title"), renderModes, initialRenderMode, [this, updatePixelSelectorVisibility, filteredIndicesPtr, streamConfig](int selected)
         {
         ConfigManager config;
         config.load();
@@ -136,8 +136,8 @@ SettingsTab::SettingsTab()
         set_render_mode_cached(chosen);
         updatePixelSelectorVisibility(chosen, true);
         // Also update available resolution options depending on render mode
-        // Legacy mode (0) only exposes resolutions <= 1280x720. FFmpeg (modern) exposes all.
-    auto updateResOptions = [this, filteredIndicesPtr](int mode) {
+    // Legacy mode (0) only exposes resolutions <= 1280x720. FFmpeg (modern) exposes all.
+    auto updateResOptions = [this, filteredIndicesPtr](int mode, const StreamConfiguration& sc) {
             // Recreate the vitaResolutions and labels exactly as initial construction in this TU
             std::vector<std::string> resolutions = {
                 brls::getStr("moonlight/settings_tab/resolution/options/0"),  // Auto
@@ -182,10 +182,7 @@ SettingsTab::SettingsTab()
                 // update shared mapping
                 filteredIndicesPtr->assign(filteredIndices.begin(), filteredIndices.end());
                 resolutionSelector->setData(filteredLabels);
-                // Determine selection based on current saved stream config if possible
-                ConfigManager cfg;
-                cfg.load();
-                StreamConfiguration sc = cfg.getStreamConfig();
+                // Determine selection based on current saved stream config
                 int mapped = 0;
                 // try to find saved resolution in the filtered list
                 for (size_t i = 0; i < filteredIndices.size(); ++i) {
@@ -204,7 +201,7 @@ SettingsTab::SettingsTab()
                 resolutionSelector->setSelection(mapped, true);
             }
         };
-        updateResOptions(chosen);
+        updateResOptions(chosen, streamConfig);
         const char* modeNameKey = nullptr;
         if (chosen == 0) {
             modeNameKey = "moonlight/settings_tab/render_mode/legacy_name";
@@ -755,8 +752,9 @@ SettingsTab::SettingsTab()
         },
         "Hint");
 
-    ipAddress->setDetailText(brls::Application::getPlatform()->getIpAddress());
-    dnsServer->setDetailText(brls::Application::getPlatform()->getDnsServer());
+    // Async Init for system stats (IP, DNS, Brightness) to avoid lag
+    ipAddress->setDetailText("...");
+    dnsServer->setDetailText("...");
 
     input->registerAction("hints/open"_i18n, brls::BUTTON_X, [](brls::View* view)
         {
@@ -764,12 +762,15 @@ SettingsTab::SettingsTab()
         brls::Application::getPlatform()->openBrowser(cell->detail->getFullText());
         return true; }, false, false, brls::SOUND_CLICK);
 
-    float brightness = brls::Application::getPlatform()->getBacklightBrightness();
-    slider->init("Brightness", brightness, [this](float value)
+    // Initial dummy value, updated async
+    slider->init("Brightness", 0.0f, [this](float value)
         {
         brls::Application::getPlatform()->setBacklightBrightness(value);
         slider->setDetailText(fmt::format("{:.2f}", value)); });
-    slider->setDetailText(fmt::format("{:.2f}", brightness));
+    slider->setDetailText("...");
+
+    // Start background loading
+    this->initAsync();
 
     notify->registerClickAction([](...)
         {
@@ -824,4 +825,32 @@ SettingsTab::SettingsTab()
 brls::View* SettingsTab::create()
 {
     return new SettingsTab();
+}
+
+void SettingsTab::initAsync()
+{
+    std::shared_ptr<bool> token = this->aliveToken;
+
+    std::thread([this, token]()
+        {
+        // Fetch system info in background (may block on network)
+        std::string ip = brls::Application::getPlatform()->getIpAddress();
+        std::string dns = brls::Application::getPlatform()->getDnsServer();
+        float brightness = brls::Application::getPlatform()->getBacklightBrightness();
+
+        brls::sync([this, token, ip, dns, brightness]() {
+            if (!(*token)) return;
+
+            // Update UI
+            ipAddress->setDetailText(ip);
+            dnsServer->setDetailText(dns);
+
+            // Update slider (re-init to set value correctly)
+            slider->init("Brightness", brightness, [this](float value){
+                brls::Application::getPlatform()->setBacklightBrightness(value);
+                slider->setDetailText(fmt::format("{:.2f}", value));
+            });
+            slider->setDetailText(fmt::format("{:.2f}", brightness));
+        }); })
+        .detach();
 }

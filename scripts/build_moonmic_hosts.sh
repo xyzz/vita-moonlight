@@ -19,6 +19,7 @@ install_deps() {
     if ! dpkg -s libpulse-dev >/dev/null 2>&1; then MISSING_PACKAGES="$MISSING_PACKAGES libpulse-dev"; fi
     if ! dpkg -s nlohmann-json3-dev >/dev/null 2>&1; then MISSING_PACKAGES="$MISSING_PACKAGES nlohmann-json3-dev"; fi
     if ! dpkg -s libpng-dev >/dev/null 2>&1; then MISSING_PACKAGES="$MISSING_PACKAGES libpng-dev"; fi
+    if ! dpkg -s libspeexdsp-dev >/dev/null 2>&1; then MISSING_PACKAGES="$MISSING_PACKAGES libspeexdsp-dev"; fi
 
     # Windows cross-compiler
     if ! command -v x86_64-w64-mingw32-g++ &> /dev/null; then

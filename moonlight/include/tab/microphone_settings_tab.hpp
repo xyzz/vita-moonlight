@@ -34,6 +34,9 @@ class MicrophoneSettingsTab : public brls::Box
     std::chrono::steady_clock::time_point lastConnectionCheck;
     static constexpr int CONNECTION_CHECK_INTERVAL_MS = 500; // Check every 500ms
 
+    std::shared_ptr<bool> aliveToken = std::make_shared<bool>(true);
+    void loadHostsAsync();
+
     void frame(brls::FrameContext* ctx) override
     {
         brls::Box::frame(ctx);

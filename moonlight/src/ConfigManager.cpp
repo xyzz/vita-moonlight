@@ -175,22 +175,13 @@ bool ConfigManager::load()
         std::cout << "[ConfigManager] Error al cargar el archivo o no existe." << std::endl;
         return false;
     }
-    std::cout << "[ConfigManager] Configuración cargada:" << std::endl;
-    for (const auto& sec : data)
-    {
-        std::cout << "[" << sec.first << "]" << std::endl;
-        for (const auto& kv : sec.second)
-        {
-            std::cout << kv.first << "=" << kv.second << std::endl;
-        }
-    }
+    // Verbose logging removed for performance
     return true;
 }
 
 bool ConfigManager::save() const
 {
     std::string path = getConfigPath();
-    std::cout << "[ConfigManager] Guardando configuración en: " << path << std::endl;
     std::ofstream file(path);
     if (!file.is_open())
     {
@@ -206,15 +197,7 @@ bool ConfigManager::save() const
         }
         file << "\n";
     }
-    std::cout << "[ConfigManager] Configuración guardada:" << std::endl;
-    for (const auto& sec : data)
-    {
-        std::cout << "[" << sec.first << "]" << std::endl;
-        for (const auto& kv : sec.second)
-        {
-            std::cout << kv.first << "=" << kv.second << std::endl;
-        }
-    }
+    // Verbose logging removed for performance
     return true;
 }
 
@@ -290,6 +273,7 @@ VideoSettings ConfigManager::getVideoSettings() const
     settings.show_fps                      = get("video", "show_fps", "false") == "true";
     settings.save_debug_log                = get("video", "save_debug_log", "false") == "true";
     settings.enable_microphone             = get("video", "enable_microphone", "false") == "true";
+    settings.microphone_gain               = std::stof(get("video", "microphone_gain", "10.0"));
     settings.enable_microphone_compression = get("video", "enable_microphone_compression", "false") == "true";
     settings.enable_ref_frame_invalidation = get("video", "enable_ref_frame_invalidation", "false") == "true";
     settings.enable_vita_vblank_wait       = get("video", "enable_vita_vblank_wait", "false") == "true";
@@ -394,6 +378,7 @@ void ConfigManager::setVideoSettings(const VideoSettings& settings)
     set("video", "show_fps", settings.show_fps ? "true" : "false");
     set("video", "save_debug_log", settings.save_debug_log ? "true" : "false");
     set("video", "enable_microphone", settings.enable_microphone ? "true" : "false");
+    set("video", "microphone_gain", std::to_string(settings.microphone_gain));
     set("video", "enable_microphone_compression", settings.enable_microphone_compression ? "true" : "false");
     set("video", "enable_ref_frame_invalidation", settings.enable_ref_frame_invalidation ? "true" : "false");
     set("video", "enable_vita_vblank_wait", settings.enable_vita_vblank_wait ? "true" : "false");

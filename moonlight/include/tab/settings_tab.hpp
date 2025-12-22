@@ -73,4 +73,8 @@ class SettingsTab : public brls::Box
     static inline brls::SelectorCell* languageSelectorPtr = nullptr;
 
     static brls::View* create();
+
+  private:
+    std::shared_ptr<bool> aliveToken = std::make_shared<bool>(true);
+    void initAsync();
 };

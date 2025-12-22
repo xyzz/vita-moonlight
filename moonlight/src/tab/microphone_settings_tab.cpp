@@ -212,3 +212,49 @@ brls::View* MicrophoneSettingsTab::create()
 {
     return new MicrophoneSettingsTab();
 }
+
+void MicrophoneSettingsTab::loadHostsAsync()
+{
+    std::shared_ptr<bool> token = this->aliveToken;
+
+    std::thread([this, token]()
+        {
+        std::vector<HostInfo> hosts = HostStorage::loadHosts();
+
+        std::sort(hosts.begin(), hosts.end(), [](const HostInfo& a, const HostInfo& b) {
+            return a.name < b.name;
+        });
+
+        brls::sync([this, token, hosts]() {
+            if (!(*token)) return;
+
+            std::vector<std::string> hostNames;
+
+            if (hosts.empty()) {
+                hostNames.push_back(brls::getStr("moonlight/microphone/no_hosts"));
+                currentHostAddress = "";
+                currentHostPort = 48100;
+            } else {
+                for (const auto& host : hosts) {
+                    hostNames.push_back(host.name + " (" + host.ip + ")");
+                }
+                 if (!hosts.empty()) {
+                    currentHostAddress = hosts[0].ip;
+                    currentHostPort = hosts[0].microphone_port;
+                }
+            }
+
+            hostSelector->init(
+                brls::getStr("moonlight/microphone/host_selector_title"),
+                hostNames,
+                0,
+                [this, hosts](int selected) {
+                    if (!hosts.empty() && selected >= 0 && selected < (int)hosts.size()) {
+                        currentHostAddress = hosts[selected].ip;
+                        currentHostPort = hosts[selected].microphone_port;
+                    }
+                }
+            );
+        }); })
+        .detach();
+}

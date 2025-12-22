@@ -191,6 +191,12 @@ void HostsTab::refreshHostsList()
                     // Cerrar automáticamente
                 });
                 infoDialog->open();
+
+                // FORCE FOCUS FIX: The selector disappears because labels aren't focusable.
+                // We need to kick the focus manager to find the OK button.
+                brls::sync([infoDialog]() {
+                    brls::Application::giveFocus(infoDialog);
+                });
             });
             dialog->addButton(brls::getStr("host_dialog/dialog/settings"), [this, host](/*dialog*/) {
                 sceClibPrintf("[PCCard] Settings para %s (%s)\n", host.name.c_str(), host.ip.c_str());

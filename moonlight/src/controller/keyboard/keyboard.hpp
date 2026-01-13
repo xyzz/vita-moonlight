@@ -9,6 +9,19 @@
 // Forward declare NVGcontext for draw override
 struct NVGcontext;
 
+#include <cstring>
+
+// Keyboard state structure for polling
+struct KeyboardState
+{
+    bool keys[256];
+
+    KeyboardState()
+    {
+        memset(keys, 0, sizeof(keys));
+    }
+};
+
 class KeyboardOverlay : public BaseOverlay
 {
   public:
@@ -30,6 +43,9 @@ class KeyboardOverlay : public BaseOverlay
     // Dibujar custom para teclado en grid
     void draw(NVGcontext* vg, float x, float y, float width, float height, brls::Style style, brls::FrameContext* ctx) override;
 
+    // Get current keyboard state for polling
+    KeyboardState getKeyboardState() const;
+
   private:
     // Layout de teclas (filas de labels)
     std::vector<std::vector<std::string>> keyRows;
@@ -43,4 +59,7 @@ class KeyboardOverlay : public BaseOverlay
     float localPanelAlpha = 1.0f;
     // Estado de Shift (mayúsculas) — toggle cuando se pulsa la tecla Shift
     bool shiftActive = false;
+
+    // Persistent key states
+    bool keyStates[256];
 };

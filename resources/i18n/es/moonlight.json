@@ -207,6 +207,16 @@
             "port_header": "Configuración de Puerto",
             "port_title": "Puerto del Micrófono",
             "port_hint": "Puerto UDP (predeterminado: 48100)"
+        },
+        "keyboard": {
+            "title": "Configurar Teclado",
+            "configure_title": "Configurar Teclado",
+            "configure_detail": "Distribución, temas y personalización",
+            "header_layout": "Distribución del Teclado",
+            "header_theme": "Apariencia (Próximamente)",
+            "theme_preview_title": "Tema Actual",
+            "theme_editor_title": "Editor de Temas",
+            "theme_info": "Los temas personalizados de teclado estarán disponibles en una actualización futura. ¡Podrás crear y compartir tus propios diseños de teclado!"
         }
     },
     "rear_touch": {

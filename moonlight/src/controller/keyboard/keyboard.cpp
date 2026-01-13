@@ -13,6 +13,7 @@
 #include <cctype>
 #include <cwchar>
 
+#include "controller/ControllerInput.hpp"
 #include "keyboardkeys.hpp"
 
 static bool file_exists(const std::string& path)
@@ -24,6 +25,8 @@ static bool file_exists(const std::string& path)
 KeyboardOverlay::KeyboardOverlay(const std::string& cssPath)
     : cssPath(cssPath)
 {
+    memset(keyStates, 0, sizeof(keyStates));
+
     // Valores por defecto neutrales; `willAppear()` ajusta el panel
     // al ancho/pantalla y posición en tiempo de aparición.
     panelW = 0.0f;
@@ -34,11 +37,15 @@ KeyboardOverlay::KeyboardOverlay(const std::string& cssPath)
     initDefaultLayout();
 
     // Registrar recognizer para taps que mapee a la rejilla de teclas
-    brls::TapGestureRecognizer* tapRecognizer = new brls::TapGestureRecognizer([this](brls::TapGestureStatus status, brls::Sound* sound)
+    // Tap gesture para detectar teclas en grid
+    this->addGestureRecognizer(new brls::TapGestureRecognizer([this](brls::TapGestureStatus status, brls::Sound* sound)
         {
         if (status.state == brls::GestureState::END) {
             float tapX = status.position.x;
             float tapY = status.position.y;
+
+            brls::Logger::info("[KeyboardOverlay] Tap detected at X={}, Y={}", tapX, tapY);
+            brls::Logger::info("[KeyboardOverlay] Panel rect: X={}, Y={}, W={}, H={}", panelX, panelY, panelW, panelH);
 
             // Calcular base Y
             float startY = this->panelY + this->btnYStart;
@@ -48,24 +55,40 @@ KeyboardOverlay::KeyboardOverlay(const std::string& cssPath)
                     // Columna
                     const auto &cols = keyRows[row];
                     size_t colsCount = cols.size();
-                    if (colsCount == 0) return;
+                    if (colsCount == 0) continue; // Skip empty rows
+
                     float totalW = colsCount * this->btnW + (colsCount - 1) * this->btnMargin;
                     float startX = this->panelX + (this->panelW - totalW) * 0.5f;
+
                     for (size_t c = 0; c < colsCount; ++c) {
                         float keyX = startX + c * (this->btnW + this->btnMargin);
                         if (tapX >= keyX && tapX <= keyX + this->btnW) {
                             // Activar tecla
+                            brls::Logger::info("[KeyboardOverlay] Hit key: {}", cols[c]);
                             this->sendKeyByLabel(cols[c]);
                             return;
                         }
                     }
                 }
             }
-        } });
-    this->addGestureRecognizer(tapRecognizer);
+            brls::Logger::info("[KeyboardOverlay] Tap missed all keys");
+        } }));
+
+    // Register with input manager
+    if (g_controllerInput)
+    {
+        g_controllerInput->setActiveKeyboard(this);
+    }
 }
 
-KeyboardOverlay::~KeyboardOverlay() { }
+KeyboardOverlay::~KeyboardOverlay()
+{
+    // Unregister
+    if (g_controllerInput && g_controllerInput->getActiveKeyboard() == this)
+    {
+        g_controllerInput->setActiveKeyboard(nullptr);
+    }
+}
 
 bool KeyboardOverlay::loadCss(const std::string& path)
 {
@@ -251,7 +274,8 @@ void KeyboardOverlay::sendKeyByLabel(const std::string& label)
 {
     if (label == "Close")
     {
-        this->hide();
+        // Pop activity to close the keyboard overlay properly
+        brls::Application::popActivity();
         return;
     }
 
@@ -259,25 +283,34 @@ void KeyboardOverlay::sendKeyByLabel(const std::string& label)
     {
         // Toggle persistent shift (mayúsculas)
         this->shiftActive = !this->shiftActive;
+        // Update Shift VK state for polling
+        keyStates[0x10] = this->shiftActive;
+        // Shift acts as a toggle, so we don't auto-release it
         return;
     }
 
     if (label == "Space")
     {
-        LiSendKeyboardEvent(0x20, KEY_ACTION_DOWN, 0);
-        LiSendKeyboardEvent(0x20, KEY_ACTION_UP, 0);
+        // Space = VK 0x20
+        keyStates[0x20] = true;
+        brls::delay(50, [this]()
+            { keyStates[0x20] = false; });
         return;
     }
     if (label == "Enter")
     {
-        LiSendKeyboardEvent(0x0D, KEY_ACTION_DOWN, 0);
-        LiSendKeyboardEvent(0x0D, KEY_ACTION_UP, 0);
+        // Enter = VK 0x0D
+        keyStates[0x0D] = true;
+        brls::delay(50, [this]()
+            { keyStates[0x0D] = false; });
         return;
     }
     if (label == "Backspace")
     {
-        LiSendKeyboardEvent(0x08, KEY_ACTION_DOWN, 0);
-        LiSendKeyboardEvent(0x08, KEY_ACTION_UP, 0);
+        // Backspace = VK 0x08
+        keyStates[0x08] = true;
+        brls::delay(50, [this]()
+            { keyStates[0x08] = false; });
         return;
     }
 
@@ -343,13 +376,26 @@ void KeyboardOverlay::sendKeyByLabel(const std::string& label)
 
         if (found)
         {
-            // Enviar SHIFT solo si el mapping lo requiere
-            if (found->needs_shift)
-                LiSendKeyboardEvent(0x10, KEY_ACTION_DOWN, 0);
-            LiSendKeyboardEvent((short)found->vk, KEY_ACTION_DOWN, 0);
-            LiSendKeyboardEvent((short)found->vk, KEY_ACTION_UP, 0);
-            if (found->needs_shift)
-                LiSendKeyboardEvent(0x10, KEY_ACTION_UP, 0);
+            // Update state for polling
+
+            // Handle shift requirement for this char
+            if (found->needs_shift && !this->shiftActive)
+            {
+                keyStates[0x10] = true; // Momentary shift
+            }
+
+            short vk      = (short)found->vk;
+            keyStates[vk] = true;
+
+            // Auto-release after short delay to simulate tap
+            brls::delay(50, [this, vk, found]()
+                {
+                keyStates[vk] = false;
+                if (found->needs_shift && !this->shiftActive) {
+                    keyStates[0x10] = false; // Release momentary shift
+                } });
+
+            brls::Logger::info("[KeyboardOverlay] Set VK 0x{:02X} = true (auto-release scheduled)", vk);
         }
         else
         {
@@ -422,4 +468,12 @@ void KeyboardOverlay::draw(NVGcontext* vg, float x, float y, float width, float 
             nvgText(vg, tx, ty, display.c_str(), nullptr);
         }
     }
+}
+
+// Get current keyboard state for polling
+KeyboardState KeyboardOverlay::getKeyboardState() const
+{
+    KeyboardState state;
+    memcpy(state.keys, keyStates, sizeof(keyStates));
+    return state;
 }

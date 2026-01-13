@@ -10,6 +10,8 @@
 #include "controller/GamepadState.hpp"
 #include "controller/RearTouchInput.hpp"
 #include "controller/TouchInput.hpp"
+#include "controller/keyboard/keyboard.hpp"
+#include "debug.hpp"
 
 struct VitaMouseState
 {
@@ -59,6 +61,13 @@ class ControllerInputManager
     // Cambiar tipo de gamepad sin reiniciar sesión
     void setGamepadType(GamepadType type);
 
+    void setActiveKeyboard(KeyboardOverlay* kb)
+    {
+        vita_debug_log("[ControllerInput] setActiveKeyboard: %p", kb);
+        activeKeyboard = kb;
+    }
+    KeyboardOverlay* getActiveKeyboard() const { return activeKeyboard; }
+
   private:
     bool inputEnabled;
     bool inputDropped;
@@ -74,6 +83,8 @@ class ControllerInputManager
     RearTouchInputManager* rearTouchManager;
 
     std::function<void()> pauseCallback;
+
+    KeyboardOverlay* activeKeyboard = nullptr;
 
     // Tipo de gamepad actual
     GamepadType currentGamepadType = GAMEPAD_TYPE_XBOX;

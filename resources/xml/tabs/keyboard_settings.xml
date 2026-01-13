@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<brls:Box
+    width="auto"
+    height="auto"
+    axis="column"
+    paddingTop="20"
+    paddingRight="40"
+    paddingBottom="20"
+    paddingLeft="40">
+
+    <!-- Keyboard Layout -->
+    <!-- Keyboard Layout -->
+    <brls:Header
+        title="@i18n/moonlight/keyboard/header_layout"
+        marginBottom="10"/>
+
+    <brls:SelectorCell
+        id="keyboard_layout_selector"
+        marginBottom="20"/>
+
+    <!-- Theme Settings (Future) -->
+    <brls:Header
+        title="@i18n/moonlight/keyboard/header_theme"
+        marginBottom="10"/>
+
+    <brls:DetailCell
+        id="theme_preview"
+        title="@i18n/moonlight/keyboard/theme_preview_title"
+        marginBottom="10"/>
+
+    <brls:DetailCell
+        id="theme_editor"
+        title="@i18n/moonlight/keyboard/theme_editor_title"
+        marginBottom="20"/>
+
+    <brls:Label
+        text="@i18n/moonlight/keyboard/theme_info"
+        fontSize="16"
+        textColor="#888888"
+        marginTop="10"/>
+
+</brls:Box>

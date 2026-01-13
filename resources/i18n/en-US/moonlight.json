@@ -209,6 +209,16 @@
             "port_title": "Microphone Port",
             "port_hint": "UDP port (default: 48100)"
         },
+        "keyboard": {
+            "title": "Configure Keyboard",
+            "configure_title": "Configure Keyboard",
+            "configure_detail": "Layout, themes, and customization",
+            "header_layout": "Keyboard Layout",
+            "header_theme": "Appearance (Coming Soon)",
+            "theme_preview_title": "Current Theme",
+            "theme_editor_title": "Theme Editor",
+            "theme_info": "Custom keyboard themes will be available in a future update. You will be able to create and share your own keyboard designs!"
+        },
         "rear_touch": {
             "title": "Rear touch",
             "toggle": "Rear touch",

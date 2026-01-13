@@ -128,10 +128,10 @@
                 id="gamepadTypeSelector"
                 title="@i18n/moonlight/settings_tab/gamepad_type/title"/>
 
-            <!-- Layout del Teclado -->
-            <brls:SelectorCell
-                id="keyboardLayoutSelector"
-                title="@i18n/moonlight/settings_tab/keyboard_layout/title"/>
+            <!-- Configurar Teclado -->
+            <brls:DetailCell
+                id="keyboardConfigureCell"
+                title="@i18n/moonlight/keyboard/configure_title"/>
 
             <!-- Opciones del Sistema (originales) -->
             <brls:Header title="@i18n/moonlight/settings_tab/system_header"/>

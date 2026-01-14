@@ -233,20 +233,22 @@ int main(int argc, char* argv[])
     brls::Application::registerXMLView("HostsTab", HostsTab::create);
 
 #if defined(__PSV__)
+    // CapUnlocker deshabilitado: evitamos el cambio de afinidad/prioridad y cualquier comportamiento
+    // que dependa de módulos externos para ampliar límites (reduce consumo/fragmentación de RAM).
+    /*
     int search_unk[2];
-    if (_vshKernelSearchModuleByName("CapUnlocker", search_unk) >= 0)
-    {
+    if(_vshKernelSearchModuleByName("CapUnlocker", search_unk) >= 0) {
         brls::Logger::info("[CapUnlocker] ¡CapUnlocker detectado por _vshKernelSearchModuleByName!");
-        brls::sync([]()
-            { brls::Application::notify("moonlight/capunlocker_notify"_i18n); });
+        brls::sync([]() {
+            brls::Application::notify("moonlight/capunlocker_notify"_i18n);
+        });
         int res1 = sceKernelChangeThreadPriority(SCE_KERNEL_THREAD_ID_SELF, 64);
         int res2 = sceKernelChangeThreadCpuAffinityMask(SCE_KERNEL_THREAD_ID_SELF, 0xF);
         brls::Logger::info("[CapUnlocker] Cambio de prioridad res={} | Cambio de afinidad res={}", res1, res2);
-    }
-    else
-    {
+    } else {
         brls::Logger::info("[CapUnlocker] CapUnlocker NO detectado. Solo 1-2 núcleos y RAM limitada disponibles.");
     }
+    */
 #endif
 
     // El estilo visual de los labels de "about" (fuente y color) se aplica en el controlador de la vista correspondiente

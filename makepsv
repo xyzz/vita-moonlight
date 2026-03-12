@@ -520,20 +520,6 @@ main() {
                 ;;
         esac
 
-        # Build moonmic-host applications (Windows/Linux)
-        echo -e "\n[+] Compilando moonmic-host para Windows y Linux..."
-        if [ -f "scripts/build_moonmic_hosts.sh" ]; then
-            if ./scripts/build_moonmic_hosts.sh; then
-                echo -e "\n[✓] moonmic-host compilado exitosamente"
-                echo "[+] Binarios disponibles en: cmake-build-psv/host/"
-            else
-                echo -e "\n[!] Advertencia: Falló la compilación de moonmic-host"
-                echo "[+] El build de PS Vita se completó correctamente, pero moonmic-host tiene errores"
-            fi
-        else
-            echo -e "\n[!] No se encontró el script de build de moonmic-host"
-        fi
-
         return 0
     else
         local end_time=$(date +%s)
@@ -562,4 +548,3 @@ else
     echo -e "\n[!] El proceso ha fallado"
     exit 1
 fi
-```

@@ -107,7 +107,7 @@ void HostsTab::refreshHostsList()
     this->hostsList->clearViews(true);
     constexpr int CARDS_PER_ROW = 3;
 
-    // --- Comprobación de hosts guardados ---
+    // --- Checking saved hosts ---
     auto hosts = HostStorage::loadHosts();
     if (hosts.empty())
     {
@@ -137,11 +137,11 @@ void HostsTab::refreshHostsList()
         auto* card = new PCCard(host.name, "img/moonlight/pc.png");
         card->setClickAction([this, host, card]()
             {
-            // Logging multiplataforma para click
+            // Cross-platform logging for click
             VITALOG("[PCCard] Click en card de host: %s (%s)\n", host.name.c_str(), host.ip.c_str());
             auto* dialog = new brls::Dialog(brls::getStr("host_dialog/dialog/title"));
 
-            // Evita que el diálogo se cierre automáticamente al pulsar un botón
+            // Prevents the dialog from closing automatically when a button is pressed
             dialog->setCancelable(false);
 
             dialog->addButton(brls::getStr("host_dialog/dialog/connect"), [this, host](/*dialog*/) {
@@ -153,10 +153,10 @@ void HostsTab::refreshHostsList()
             dialog->addButton(brls::getStr("host_dialog/dialog/info"), [dialog, host]() {
                 sceClibPrintf("[PCCard] Info para %s (%s)\n", host.name.c_str(), host.ip.c_str());
 
-                // Crear diálogo de información del host usando dialog_utils
+                // Create host information dialog using dialog_utils
                 brls::Style style = brls::Application::getStyle();
 
-                // Crear el contenido con las filas de información
+                // Create the content with the rows of information
                 std::vector<std::pair<std::string, std::string>> infoRows = {
                     {brls::getStr("host_dialog/info/name"), host.name},
                     {brls::getStr("host_dialog/info/ip"), host.ip},
@@ -168,19 +168,19 @@ void HostsTab::refreshHostsList()
                 infoContent->setJustifyContent(brls::JustifyContent::FLEX_START);
                 infoContent->setWidth(620.0f);
 
-                // Título del diálogo
+                // Dialogue title
                 auto* titleLabel = createLabel(brls::getStr("host_dialog/info/title"),
                                                style["brls/applet_frame/header_title_font_size"],
                                                brls::HorizontalAlign::CENTER, 18.0f);
                 infoContent->addView(titleLabel);
 
-                // Filas de información
+                // Information rows
                 brls::Box* infoBox = createInfoBox(infoRows,
                                                     style["brls/label/default_font_size"],
                                                     10.0f);
                 infoContent->addView(infoBox);
 
-                // Crear diálogo personalizado
+                // Create custom dialog
                 DialogOptions options;
                 options.contentPadding = style["brls/dialog/paddingTopBottom"] * 0.6f;
                 options.contentWidth = 620.0f;
@@ -189,7 +189,7 @@ void HostsTab::refreshHostsList()
 
                 auto* infoDialog = createCustomDialog(infoContent, options);
                 infoDialog->addButton(brls::getStr("host_dialog/dialog/ok"), []() {
-                    // Cerrar automáticamente
+                    // Close automatically
                 });
                 infoDialog->open();
 
@@ -201,7 +201,7 @@ void HostsTab::refreshHostsList()
             });
             dialog->addButton(brls::getStr("host_dialog/dialog/settings"), [this, host](/*dialog*/) {
                 sceClibPrintf("[PCCard] Settings para %s (%s)\n", host.name.c_str(), host.ip.c_str());
-                // El diálogo se cerrará automáticamente, solo abrir el dropdown en el siguiente frame
+                // The dialog will close automatically, just open the dropdown in the next frame
                 brls::sync([this, host]() {
                     VITALOG("[hosts_tab.cpp] Entrando en brls::sync para crear Dropdown de settings para host: %s\n", host.name.c_str());
                     std::vector<std::string> options = {
@@ -211,9 +211,9 @@ void HostsTab::refreshHostsList()
                     };
                     std::string dropdownTitle = brls::getStr("host_dialog/dropdown/title") + ": " + host.name;
                     VITALOG("[hosts_tab.cpp] Creando Dropdown con título: %s\n", dropdownTitle.c_str());
-                    // Crear el dropdown con un callback que cierre la activity actual (dropdown)
-                    // de forma diferida y luego abra la activity de edición. Usamos brls::sync
-                    // para evitar reentrancias al hacer pop/push de activities.
+                    // Create the dropdown with a callback that closes the current activity (dropdown)
+                    // deferred and then open the editing activity. We use brls::sync
+                    // to avoid reentries when popping/pushing activities.
                     auto* dropdown = new brls::Dropdown(dropdownTitle, options, [this, host](int selected) {
                         VITALOG("[Dropdown] Opción seleccionada: %d para host: %s\n", selected, host.name.c_str());
                         if (selected == 0) {
@@ -257,51 +257,51 @@ void HostsTab::refreshHostsList()
                                     std::thread([hostToRemove]() {
                                         bool ok = false;
                                         try {
-                                            // Intentar obtener la información completa del host (incluye IP)
+                                            // Try to get full host information (includes IP)
                                             auto hopt = HostStorage::findHost(hostToRemove);
                                             if (hopt.has_value()) {
                                                 HostInfo h = *hopt;
-                                                // Intentar conectar y, si procede, terminar app remota y unpair
+                                                // Try to connect and, if applicable, terminate remote app and unpair
                                                 auto &gsc = GameStreamClient::instance();
                                                 if (!h.ip.empty()) {
-                                                    // intentar connect si no está conectado
+                                                    // try connect if not connected
                                                     if (!gsc.isConnected(h.ip)) {
                                                         gsc.connect(h);
                                                     }
                                                     if (gsc.isConnected(h.ip)) {
-                                                        // Si hay una sesión activa, intentar cerrarla
+                                                        // If there is an active session, try to close it
                                                         try {
                                                             if (gsc.serverData(h.ip).currentGame != 0) {
                                                                 gsc.quitApp(h.ip);
                                                             }
                                                         } catch (...) {
-                                                            // Ignorar fallos en quitApp
+                                                            // Ignore crashes in quitApp
                                                         }
-                                                        // Intentar desemparejar en el host
+                                                        // Try to unpair on the host
                                                         try {
                                                             gsc.unpair(h.ip);
                                                         } catch (...) {
-                                                            // Ignorar fallos en unpair
+                                                            // Ignore failures in unpair
                                                         }
                                                     }
                                                 }
                                             }
                                         } catch (...) {
-                                            // Ignorar cualquier excepción y proceder a la eliminación local
+                                            // Ignore any exceptions and proceed to local deletion
                                         }
 
-                                            // Intentar renombrar el keyDir a un backup temporal y luego eliminarlo.
+                                            // Try renaming the keyDir to a temporary backup and then deleting it.
                                             try {
                                                 ConfigManager cfg; cfg.load();
                                                 std::string baseDir = cfg.getKeysDir();
-                                                // Intentar resolver host para obtener safeId
+                                                // Try to resolve host to get safeId
                                                 auto hopt = HostStorage::findHost(hostToRemove);
                                                 std::string keyDir;
                                                 if (hopt.has_value()) {
                                                     std::string safe = hopt->safeId.empty() ? hostToRemove : hopt->safeId;
                                                     keyDir = baseDir + "/" + safe;
                                                 } else {
-                                                    // Si no se encuentra, intentar con safe derivado
+                                                    // If not found, try safe derivative
                                                     std::string safeGuess = hostToRemove;
                                                     for (char &c : safeGuess) { if (c == '/'||c=='\\'||c==':'||c=='*'||c=='?'||c=='"'||c=='<'||c=='>'||c=='|') c = '_'; }
                                                     keyDir = baseDir + "/" + safeGuess;
@@ -314,7 +314,7 @@ void HostsTab::refreshHostsList()
                                                         fs::remove_all(backup);
                                                         ok = true;
                                                     } catch (...) {
-                                                        // Si el rename o remove_all falla intentar el método tradicional
+                                                        // If rename or remove_all fails try the traditional method
                                                         ok = HostStorage::removeHost(hostToRemove);
                                                     }
                                                 } else {
@@ -322,7 +322,7 @@ void HostsTab::refreshHostsList()
                                                     ok = HostStorage::removeHost(hostToRemove);
                                                 }
                                             } catch (...) {
-                                                // Si algo falla, intentar eliminación directa
+                                                // If something fails, try direct removal
                                                 ok = HostStorage::removeHost(hostToRemove);
                                             }
                                         brls::sync([hostToRemove, ok]() {
@@ -332,7 +332,7 @@ void HostsTab::refreshHostsList()
                                             } else {
                                                 brls::Application::notify(brls::getStr("host_dialog/change_ip_failure"));
                                             }
-                                            // Solicitar recarga global segura del home
+                                            // Request secure global recharge from home
                                             HostsTab::requestGlobalRefresh();
                                         });
                                     }).detach();
@@ -343,7 +343,7 @@ void HostsTab::refreshHostsList()
 
                         } else if (selected == 2) {
                             sceClibPrintf("[PCCard] Emparejar online fuera de casa: %s\n", host.name.c_str());
-                            // Lógica real para emparejar online aquí
+                            // Actual logic for online matching here
                         }
                     }, -1);
                     brls::Application::pushActivity(new brls::Activity(dropdown));

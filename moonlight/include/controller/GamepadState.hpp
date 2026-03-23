@@ -2,7 +2,7 @@
 
 #include <stdint.h>
 
-// Representa el estado del gamepad a enviar hacia Limelight.
+// Represents the state of the gamepad to be sent to Limelight.
 struct GamepadState
 {
     uint16_t buttonFlags;

@@ -4,13 +4,13 @@
 #include <borealis/views/image.hpp>
 #include <borealis/views/label.hpp>
 
-#include "view/pccard.hpp" // Añadir include para PCCard
+#include "view/pccard.hpp"
 
 GridView::GridView()
 {
     brls::Logger::info("[GridView] Constructor llamado");
-    this->setAxis(brls::Axis::COLUMN); // Cambiar a columna para filas
-    this->columns = 4; // 4 columnas por defecto para PS Vita
+    this->setAxis(brls::Axis::COLUMN);
+    this->columns = 4; // 4 columns by default for PS Vita
     this->itemNames.clear();
     this->itemIcons.clear();
     this->onItemSelect = nullptr;
@@ -66,7 +66,7 @@ void GridView::reload()
 
         if (i % columns != 0)
         {
-            card->setMarginLeft(12); // Separación horizontal entre elementos
+            card->setMarginLeft(12);
         }
 
         currentRowBox->addView(card);
@@ -122,7 +122,7 @@ brls::View* GridView::getNextFocus(brls::FocusDirection direction, brls::View* c
                 }
                 else
                 {
-                    // Si no hay elemento en esta columna, ir al último de la fila
+                    // If there is no element in this column, go to the last in the row
                     int lastInRow = std::min((int)totalItems - 1, (currentRow + 1) * columns + columns - 1);
                     nextView      = itemViews[lastInRow];
                 }

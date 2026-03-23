@@ -19,19 +19,19 @@ class BorealisVideoView : public brls::View
     BorealisVideoView();
     ~BorealisVideoView() override;
 
-    // (Deprecated) submitFrame: mantenido temporalmente para compatibilidad pero ya no usado
+    // (Deprecated) submitFrame – Temporarily maintained for compatibility but no longer used
     void submitFrame(const uint8_t* src, uint32_t w, uint32_t h, uint32_t pitchBytes) { }
 
     void draw(NVGcontext* vg, float x, float y, float width, float height, brls::Style style, brls::FrameContext* ctx) override;
     brls::View* getDefaultFocus() override { return nullptr; }
-    // No override de getPreferredSize: dejamos que el layout de Borealis nos dimensione.
+    // No override of getPreferredSize: we let the Borealis layout size us.
 
   private:
     uint32_t storedW = 0, storedH = 0;
     int nvgImageId                       = -1;
     bool recreateImage                   = false;
     const vita2d_texture* currentTexture = nullptr;
-    // Métricas simples
+    // Simple metrics
     uint64_t lastStatsMs  = 0;
     uint32_t framesDrawn  = 0;
     uint32_t framesSeen   = 0;

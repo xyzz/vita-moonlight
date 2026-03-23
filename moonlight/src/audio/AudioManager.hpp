@@ -4,18 +4,18 @@
 #include <string>
 #include <vector>
 
-// AudioManager: interfaz para manejar paquetes de audio entrantes (stream Moonlight)
-// Objetivos próximos:
-//  - Buffer JIT de audio para sincronización con video
-//  - Estadísticas de jitter, pérdidas y underruns
-//  - Posible resample si host cambia frecuencia
-//  - Mixer simple para futuros sonidos UI
+// AudioManager: interface to handle incoming audio packets (Moonlight stream)
+// Nearby goals:
+//  - Audio JIT buffer for synchronization with video
+//  - Jitter, losses and underruns statistics
+//  - Possible resampling if host changes frequency
+//  - Simple mixer for future UI sounds
 
 struct AudioPacket
 {
-    uint32_t frameIndex; // índice o número de bloque
-    uint64_t ptsMs; // timestamp estimado (ms)
-    std::vector<uint8_t> data; // datos codificados recibidos (por ahora passthrough)
+    uint32_t frameIndex; // index or block number
+    uint64_t ptsMs; // estimated timestamp (ms)
+    std::vector<uint8_t> data; // encrypted data received (for now passthrough)
 };
 
 struct AudioStats
@@ -34,19 +34,19 @@ class AudioManager
   public:
     static AudioManager& instance();
 
-    // Alimentar un paquete de audio recibido (desempaquetado desde red)
+    // Feed a received audio packet (unpacked from network)
     void pushPacket(const AudioPacket& pkt);
 
-    // Llamado periódicamente (ej. desde loop principal) para drenar y reproducir
+    // Called periodically (e.g. from main loop) to drain and play
     void update(uint64_t nowMs);
 
     // Obtener stats (snapshot)
     AudioStats getStats() const;
 
-    // Reset (nueva sesión)
+    // Reset (new session)
     void reset();
 
-    // Configuración inicial (formato, sample rate, etc.)
+    // Initial settings (format, sample rate, etc.)
     void configure(int sampleRate, int channels, const std::string& codecName);
 
   private:
@@ -58,6 +58,6 @@ class AudioManager
     int sampleRate = 0;
     int channels   = 0;
     std::string codec;
-    // TODO: implementar cola circular eficiente (por ahora vector simple)
+    // TODO: implement efficient circular queue (simple vector for now)
     std::vector<AudioPacket> queue;
 };

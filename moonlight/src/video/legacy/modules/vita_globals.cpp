@@ -1,14 +1,11 @@
 #include "vita_globals.hpp"
-// Zero-copy eliminado: métricas mínimas
 
 #include "libgamestream/sps.h"
 
-// Variables globales del sistema de video
 VideoStatus video_status          = VITA_VIDEO_NOT_INIT;
 uint32_t video_status_canary_pre  = 0xDEADBEEF;
 uint32_t video_status_canary_post = 0xBAADF00D;
 
-// Buffers y recursos decoder
 char* decoder_buffer                    = NULL;
 size_t decoder_buffer_size              = 0;
 SceAvcdecCtrl* decoder                  = NULL;
@@ -17,30 +14,28 @@ size_t decoder_block_size               = 0;
 SceAvcdecQueryDecoderInfo* decoder_info = NULL;
 SceVideodecQueryInitInfoHwAvcdec* init  = NULL;
 
-// Doble buffer de texturas RGBA para salida directa
+// Double RGBA texture buffer for direct output
 vita2d_texture* frame_textures[2] = { nullptr, nullptr };
 int frame_front_idx               = 0;
 int frame_back_idx                = 1;
-bool single_frame_buffer          = false; // por defecto doble buffer; se puede activar para pruebas legacy
-// Estado de inicialización de vita2d
+bool single_frame_buffer          = false; // default double buffer; can be activated for legacy testing
+// vita2d initialization state
 bool vita2d_inited = false;
 
 int SCREEN_WIDTH  = 960;
 int SCREEN_HEIGHT = 544;
 
-// Escalado
 image_scaling_settings image_scaling = { 0 };
 
-// Estado de hilos y flags runtime
 bool active_video_thread = false;
 bool frame_ready_flag    = false;
 uint32_t frame_count     = 0;
 int need_drop            = 0;
 
-// Modo legacy y heurísticas
-// Modos legacy eliminados
+// Legacy mode and heuristics
+// Legacy modes removed
 
-// Heurística HEVC abort
+// Heuristics HEVC abort
 bool hevc_abort_flag = false;
 
 // Buffers YUV para ruta no-direct-output
@@ -48,16 +43,16 @@ uint8_t* decoder_yuv_raw       = NULL;
 uint8_t* decoder_yuv_buffer    = NULL;
 size_t decoder_yuv_buffer_size = 0;
 size_t decoder_yuv_total_alloc = 0;
-// Staging RGBA eliminado
+// RGBA Staging removed
 void* decoder_output_phys_ptr   = nullptr;
 size_t decoder_output_phys_size = 0;
 int decoder_output_phys_block   = -1;
 bool decoder_output_phys_mapped = false;
-// Integración NVG eliminada (render directo)
-bool legacy_single_immediate_present = false; // presentación diferida mediante Borealis
-bool video_fullscreen_stretch        = true; // activado por defecto para ocupar pantalla completa
-// low-latency eliminado: presentación inmediata ahora es el camino único
-int decoder_output_mode                    = 0; // 0=RGBA directo, 1=YUV420 experimental
+// NVG integration removed (direct render)
+bool legacy_single_immediate_present = false; // delayed presentation using Borealis
+bool video_fullscreen_stretch        = true; // activated by default to occupy full screen
+// low-latency removed: immediate presentation is now the only way
+int decoder_output_mode                    = 0; // 0=RGBA direct, 1=YUV420 experimental
 bool decoder_tried_direct_texture          = true;
 int decoder_src_width                      = 0;
 int decoder_src_height                     = 0;
@@ -74,7 +69,6 @@ uint32_t decoder_linear_rgba_height        = 0;
 int decoder_linear_rgba_memblock           = -1;
 bool decoder_linear_rgba_physically_backed = false;
 
-// Estadísticas
 VitaVideoStats g_stats      = { 0 };
 uint64_t stats_start_ms     = 0;
 uint64_t last_fps_window_ms = 0;
@@ -85,7 +79,7 @@ bool active_pacer_thread    = false;
 // Indicadores
 indicator_status poor_net_indicator = { 0 };
 
-gs::SpsContext* g_sps_ctx = nullptr; // contexto SPS activo (fix de SPS)
+gs::SpsContext* g_sps_ctx = nullptr; // SPS context active (SPS fix)
 
 // Video status info
 VideoStatusInfo g_video_status_info = { VITA_VIDEO_NOT_INIT };
@@ -113,11 +107,11 @@ const int VITA_STREAM_MAX_BITRATE      = 50000; // 50 Mbps maximum
 
 // ========================================
 
-// Funciones
+// Features
 void vitavideo_update_scaling_settings(int width, int height)
 {
-    // Port del comportamiento legacy: calcular tamaño de textura / región recortada
-    // y dimensiones de presentación. Soporta la opción "center_region_only".
+    // Legacy behavior port: calculate texture size/clipped region
+    // and presentation dimensions. Supports the "center_region_only" option.
     image_scaling.texture_width  = SCREEN_WIDTH;
     image_scaling.texture_height = SCREEN_HEIGHT;
     image_scaling.origin_x       = 0;
@@ -130,13 +124,12 @@ void vitavideo_update_scaling_settings(int width, int height)
     double scaled_width  = (double)SCREEN_HEIGHT * width / height;
     double scaled_height = (double)SCREEN_WIDTH * height / width;
 
-    // Igual ratio: no cambios
     if (SCREEN_WIDTH * height == SCREEN_HEIGHT * width)
     {
     }
     else if (SCREEN_WIDTH * height > SCREEN_HEIGHT * width)
     {
-        // Host más "alto" (ej. 4:3) -> scaled_height > SCREEN_HEIGHT
+        // Taller host (e.g. 4:3) -> scaled_height > SCREEN_HEIGHT
         if (g_video_settings_snapshot.center_region_only)
         {
             image_scaling.texture_height = VITA_DECODER_RESOLUTION((int)vita_round(scaled_height));
@@ -152,7 +145,7 @@ void vitavideo_update_scaling_settings(int width, int height)
     }
     else
     {
-        // Host más "ancho" (ej. 16:9)
+        // "Wider" host (e.g. 16:9)
         if (g_video_settings_snapshot.center_region_only)
         {
             image_scaling.texture_width = VITA_DECODER_RESOLUTION((int)vita_round(scaled_width));

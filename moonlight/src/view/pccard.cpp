@@ -8,15 +8,15 @@
 
 #include <borealis/core/application.hpp>
 
-// Función helper para medir ancho de texto
+// Helper function to measure text width
 float measureTextWidth(int font, float fontSize, const std::string& text)
 {
     NVGcontext* vg = brls::Application::getNVGContext();
     if (!vg)
     {
-        // Fallback seguro: si no hay contexto NVG disponible (puede ocurrir en etapas
-        // tempranas de inicialización en Vita), approximamos el ancho con una regla simple.
-        // Esto evita crashes y devuelve un valor razonable para la lógica de truncado.
+        // Safe Fallback: If no NVG context is available (can occur in stages
+        // early initialization on Vita), we approximate the width with a simple rule.
+        // This avoids crashes and returns a reasonable value for the truncation logic.
         float approxCharWidth = fontSize * 0.6f;
         return approxCharWidth * static_cast<float>(text.size());
     }
@@ -27,7 +27,7 @@ float measureTextWidth(int font, float fontSize, const std::string& text)
     return bounds[2] - bounds[0];
 }
 
-// Card visual como botón grande reutilizable
+// Visual card as large reusable button
 PCCard::PCCard(const std::string& name, const std::string& imagePath)
     : brls::Button()
 {
@@ -40,7 +40,7 @@ PCCard::PCCard(const std::string& name, const std::string& imagePath)
     this->setBorderColor(nvgRGB(100, 100, 120));
     this->setBorderThickness(2);
 
-    // Layout vertical: imagen y label
+    // Vertical layout: image and label
 
     box = new brls::Box(brls::Axis::COLUMN);
     box->setWidth(180);
@@ -53,28 +53,28 @@ PCCard::PCCard(const std::string& name, const std::string& imagePath)
 
     image                 = new brls::Image();
     std::string fixedPath = (imagePath == "resources/img/moonlight/pc.png") ? "img/moonlight/pc.png" : imagePath;
-    // Cargar la imagen inmediatamente (ruta fija ya calculada arriba)
+    // Load image immediately (fixed path already calculated above)
     image->setImageFromRes(fixedPath);
     image->setWidth(48);
     image->setHeight(48);
     image->setMarginTop(20);
-    image->setMarginBottom(18); // Separación extra entre imagen y texto
+    image->setMarginBottom(18); // Extra separation between image and text
     box->addView(image);
 
     label = new brls::Label();
     label->setText(name);
     label->setFontSize(16);
-    label->setMargins(0, 0, 0, 0); // El margen superior ya lo da la imagen
-    label->setWidth(160); // Un poco menos que la card para padding
+    label->setMargins(0, 0, 0, 0); // The upper margin is already given by the image
+    label->setWidth(160); // A little less than the card for padding
     label->setTextColor(nvgRGB(255, 255, 255));
-    label->setSingleLine(true); // Necesario para animación
-    label->setAutoAnimate(false); // Desactivamos auto-animación por foco
-    // Cálculo manual del ancho del texto para decidir animación y alineación usando la nueva API pública
+    label->setSingleLine(true); // Required for animation
+    label->setAutoAnimate(false); // We disable auto-animation by focus
+    // Manual calculation of text width to decide animation and alignment using new public API
     float textWidth = measureTextWidth(label->getFont(), label->getFontSize(), name);
     if (textWidth > 160)
     {
         label->setHorizontalAlign(brls::HorizontalAlign::LEFT);
-        label->setAnimated(true); // Animar si se trunca
+        label->setAnimated(true); // Animate if truncated
     }
     else
     {
@@ -100,17 +100,17 @@ void PCCard::setPCName(const std::string& name)
         label->setText(name);
         if (name.empty())
         {
-            // Si no hay nombre, ocultamos imagen para evitar que quede una tarjeta con solo foto
+            // If there is no name, we hide the image to avoid leaving a card with only a photo
             if (image)
             {
                 image->setVisibility(brls::Visibility::GONE);
             }
-            // Desactivar animación si no hay texto
+            // Disable animation if there is no text
             label->setAnimated(false);
             label->setHorizontalAlign(brls::HorizontalAlign::CENTER);
             return;
         }
-        // Recalcular animación y alineación si cambia el nombre usando la nueva API pública
+        // Recalculate animation and alignment if you change name using new public API
         if (image)
             image->setVisibility(brls::Visibility::VISIBLE);
         float textWidth = measureTextWidth(label->getFont(), label->getFontSize(), name);

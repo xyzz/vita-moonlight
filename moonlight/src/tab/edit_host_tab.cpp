@@ -73,7 +73,7 @@ void EditHostTab::saveChanges()
             if (HostStorage::addHost(newHost))
             {
                 brls::Application::notify(brls::getStr("host_dialog/edit_host_success"));
-                // Solicitar recarga global para que el cambio sea visible inmediatamente
+                // Request global reload so that the change is visible immediately
                 HostsTab::requestGlobalRefresh();
             }
             else

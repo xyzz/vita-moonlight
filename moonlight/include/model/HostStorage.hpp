@@ -12,38 +12,38 @@ struct HostInfo
 {
     std::string name;
     std::string ip;
-    int port    = 47989; // Puerto por defecto Sunshine
+    int port    = 47989; // Sunshine Default Port
     bool paired = false;
-    // Dirección MAC del host (opcional, puede estar vacía)
+    // Host MAC address (optional, can be empty)
     std::string mac;
-    // Identificador seguro (carpeta) derivado del nombre o IP; se usa como keyDir
+    // Secure identifier (folder) derived from name or IP; used as keyDir
     std::string safeId;
-    // Puerto del micrófono (por dispositivo, guardado en device.ini)
-    int microphone_port = 48100; // Puerto por defecto MoonMic
+    // Microphone port (per device, saved in device.ini)
+    int microphone_port = 48100; // MoonMic default port
 };
 
-// Genera un identificador "seguro" para usar como nombre de carpeta
+// Generate a "safe" identifier to use as a folder name
 std::string makeSafeHostId(const std::string& raw);
 
 class HostStorage
 {
   public:
-    // Carga todos los hosts leyendo device.ini de cada carpeta
+    // Load all hosts by reading device.ini from each folder
     static std::vector<HostInfo> loadHosts();
-    // No implementado (no se usa con device.ini)
+    // Not implemented (not used with device.ini)
     static bool saveHosts(const std::vector<HostInfo>& hosts);
-    // Añade un host (crea device.ini si no existe)
+    // Add a host (create device.ini if ​​it doesn't exist)
     static bool addHost(const HostInfo& host);
-    // Busca un host por nombre
+    // Search for a host by name
     static std::optional<HostInfo> findHost(const std::string& name);
-    // Elimina un host por nombre (borra la carpeta)
+    // Delete a host by name (delete folder)
     static bool removeHost(const std::string& name);
-    // Actualiza la dirección IP de un host existente
+    // Update the IP address of an existing host
     static bool updateHostIp(const std::string& name, const std::string& newIp);
-    // Guarda un host tras pairing exitoso (crea device.ini)
-    // mac: valor opcional con la dirección MAC del host (ej: "AA:BB:CC:DD:EE:FF").
+    // Save a host after successful pairing (create device.ini)
+    // mac: optional value with the MAC address of the host (ex: "AA:BB:CC:DD:EE:FF").
     static bool savePairedHost(const std::string& name, const std::string& ip, int port, bool paired, const std::string& mac = "");
-    // Genera el archivo device.ini en la carpeta del host (llamar tras pairing exitoso)
-    // mac: puntero opcional; si es nullptr o cadena vacía, no se escribe la línea mac=
+    // Generate device.ini file in host folder (call after successful pairing)
+    // mac: optional pointer; if nullptr or empty string, the mac= line is not written
     static bool writeDeviceIni(const std::string& hostDir, const std::string& safeHostName, const char* address, int port, bool paired, const char* mac = nullptr);
 };

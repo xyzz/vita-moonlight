@@ -6,13 +6,13 @@
 #include <psp2/kernel/clib.h>
 #endif
 
-// Incluir para acceder a g_debug_log_enabled
+// Include to access g_debug_log_enabled
 #include "video/legacy/modules/vita_globals.hpp"
 
-// Implementación para redirigir logs de libgamestream en Vita
+// Implementation to redirect libgamestream logs on Vita
 extern "C" void vita_debug_log(const char* fmt, ...)
 {
-    // Solo imprimir si el debug log está habilitado
+    // Only print if debug log is enabled
     if (!g_debug_log_enabled)
     {
         return;
@@ -28,7 +28,7 @@ extern "C" void vita_debug_log(const char* fmt, ...)
         return;
     }
     buffer[sizeof(buffer) - 1] = '\0';
-    // Asegurar newline para separar entradas (el código de llamadas a veces concatena)
+    // Ensure newline to separate entries (calling code sometimes concatenates)
     bool need_newline = (n == 0) || (buffer[n - 1] != '\n');
 #if defined(__PSV__)
     sceClibPrintf("%s%s", buffer, need_newline ? "\n" : "");

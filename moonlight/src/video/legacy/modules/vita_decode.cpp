@@ -41,13 +41,10 @@ typedef struct ScePafInit
     int heap_opt_param2;
 } ScePafInit;
 
-// Función para inicializar soporte 1080p con API Internal
-// Carga módulos PAF/AVCDEC y configura el decoder para resoluciones > 720p
 int vitavideo_init_1080p_internal_api(int width, int height, SceVideodecQueryInitInfoHwAvcdec* init)
 {
     static bool modules_loaded = false;
 
-    // Solo cargar módulos una vez
     if (!modules_loaded)
     {
         SceSysmoduleOpt sysmodule_opt;
@@ -72,7 +69,6 @@ int vitavideo_init_1080p_internal_api(int width, int height, SceVideodecQueryIni
         int ret_avc = sceSysmoduleLoadModule(SCE_SYSMODULE_AVCDEC);
         VITA_DEBUG_LOG("[Video][1080p] sceSysmoduleLoadModule(SCE_SYSMODULE_AVCDEC): 0x%x", ret_avc);
 
-        // Configuración Internal
         int ret_config = sceVideodecSetConfigInternal(SCE_VIDEODEC_TYPE_HW_AVCDEC, 2);
         VITA_DEBUG_LOG("[Video][1080p] sceVideodecSetConfigInternal: 0x%x", ret_config);
 
@@ -82,7 +78,6 @@ int vitavideo_init_1080p_internal_api(int width, int height, SceVideodecQueryIni
         modules_loaded = true;
     }
 
-    // Inicializar con API Internal
     int ret = sceVideodecInitLibraryInternal(SCE_VIDEODEC_TYPE_HW_AVCDEC, init);
     if (ret == 0x80620808)
     {
@@ -99,8 +94,6 @@ int vitavideo_init_1080p_internal_api(int width, int height, SceVideodecQueryIni
     return 0;
 }
 
-// Externs ya están en vita_globals.hpp
-
 #ifndef SCE_AVCDEC_PIXELFORMAT_YUV420_PLANAR
 #define SCE_AVCDEC_PIXELFORMAT_YUV420_PLANAR 0x4
 #endif
@@ -112,8 +105,8 @@ static inline uint64_t monotonicMs_local()
     return 0;
 }
 
-// Control interno para evitar spam de logs en fallback físico
-static bool decoder_phys_fallback_permanent_disable = false; // si true no volver a intentar alloc físico
+// Internal control to avoid log spam in physical fallback
+static bool decoder_phys_fallback_permanent_disable = false; // if true do not retry physical alloc
 static int decoder_phys_fallback_fail_count         = 0;
 
 extern "C" int vitavideo_submit_decode_unit(PDECODE_UNIT decodeUnit)
@@ -128,7 +121,7 @@ extern "C" int vitavideo_submit_decode_unit(PDECODE_UNIT decodeUnit)
     unsigned int strideBytes = vita2d_texture_get_stride(FRAME_BACK());
     if (!strideBytes)
         strideBytes = image_scaling.texture_width * 4;
-    // Forzar ausencia de fallback físico en modo RGBA (depuración estable)
+    // Force no physical fallback in RGBA mode (stable debugging)
     if (vd_submit_counter < 4 || (vd_submit_counter % 300) == 0)
     {
         VITA_DEBUG_LOG("[Video] submit_decode_unit #%u", vd_submit_counter);
@@ -153,7 +146,7 @@ extern "C" int vitavideo_submit_decode_unit(PDECODE_UNIT decodeUnit)
         decodeYuv           = false;
     }
 
-    // La lógica de staging la maneja el pixel processor modular
+    // Staging logic is handled by the modular pixel processor
 
     bool useFallbackBuffer       = false;
     uint8_t* fallbackPtr         = nullptr;
@@ -228,15 +221,15 @@ extern "C" int vitavideo_submit_decode_unit(PDECODE_UNIT decodeUnit)
         }
     }
 
-    // === Usar procesador de píxeles modular para configurar decoder ===
+    // === Use modular pixel processor to configure decoder ===
     bool decodeUsesFallback = false;
     uint8_t* decodeTarget   = nullptr;
     if (g_pixelProcessor)
     {
-        // El procesador determina el formato de píxel
+        // The processor determines the pixel format
         picture.frame.pixelType = g_pixelProcessor->getDecoderPixelFormat();
 
-        // El procesador determina el buffer de destino
+        // The processor determines the destination buffer
         void* frontTex = frame_textures[frame_front_idx];
         void* backTex  = frame_textures[frame_back_idx];
         decodeTarget   = g_pixelProcessor->getDecodeTarget(frontTex, backTex);
@@ -249,7 +242,7 @@ extern "C" int vitavideo_submit_decode_unit(PDECODE_UNIT decodeUnit)
     }
     else
     {
-        // Fallback si no hay procesador: RGBA directo a textura
+        // Fallback if there is no processor: RGBA direct to texture
         picture.frame.pixelType = SCE_AVCDEC_PIXELFORMAT_RGBA8888;
         decodeTarget            = texBack;
 
@@ -299,9 +292,9 @@ extern "C" int vitavideo_submit_decode_unit(PDECODE_UNIT decodeUnit)
     const uint8_t* cpuPushPtr  = nullptr;
     uint32_t cpuPushPitchBytes = 0;
 
-    picture.frame.pPicture[0] = decodeTarget; // decodificar directo al buffer elegido
-    // (Fase1) Push diferido al FINAL tras swap (similar a Switch: se expone frame estable)
-    picture.frame.pPicture[1] = NULL; // siempre NULL
+    picture.frame.pPicture[0] = decodeTarget; // decode directly to the chosen buffer
+    // (Phase1) Delayed push to FINAL after swap (similar to Switch: stable frame is exposed)
+    picture.frame.pPicture[1] = NULL; // always NULL
 
     if (decoder_buffer_size < (decodeUnit->fullLength + AV_INPUT_BUFFER_PADDING_SIZE))
     {
@@ -348,8 +341,8 @@ extern "C" int vitavideo_submit_decode_unit(PDECODE_UNIT decodeUnit)
 
     int ret = -1;
 
-    // Si ya estamos en modo fallback y aún no tenemos bloque, intentar asignar con varios tipos
-    // (Las rutas antiguas de fallback directo se integran arriba en useFallbackBuffer)
+    // If we are already in fallback mode and we still do not have a block, try to assign with several types
+    // (Old direct fallback routes are built into useFallbackBuffer above)
 
     // VITA_DEBUG_LOG("[Video][DECODE] call fmt=%s w=%u h=%u strideBytes=%u pitchPx=%u phys=%s tex=%p staging=%s",
     //     decodeYuv ? "YUV420" : "RGBA",
@@ -362,7 +355,7 @@ extern "C" int vitavideo_submit_decode_unit(PDECODE_UNIT decodeUnit)
     //     useLinearStaging ? "yes" : "no");
     ret = sceAvcdecDecode(decoder, &au, &array_picture);
 
-    // Mapear errores comunes para diagnóstico rápido
+    // Map common errors for quick diagnosis
     const char* errName = "OK";
     switch ((uint32_t)ret)
     {
@@ -401,24 +394,24 @@ extern "C" int vitavideo_submit_decode_unit(PDECODE_UNIT decodeUnit)
 
     if (array_picture.numOfOutput != 1)
     {
-        // Si no hay output pero estamos en fallback físico y tenemos bloque, hacer copia tentativa (best-effort)
-        // Sin output todavía
+        // If there is no output but we are in physical fallback and we have a block, make a tentative copy (best-effort)
+        // No output yet
         syntheticFrameIndex++;
         vd_submit_counter++;
         return DR_OK;
     }
 
-    // === Post-procesamiento modular ===
+    // ===Modular post-processing===
     if (g_pixelProcessor)
     {
-        // El procesador maneja cualquier conversión o copia necesaria
+        // The processor handles any necessary conversion or copy
         void* outputTex = frame_textures[frame_back_idx];
 
-        // Si el decoder escribió en un buffer intermedio (ej. YUV), el procesador lo procesa aquí
-        // Si escribió directo (RGBA hardware), esto puede ser no-op o sincronización
+        // If the decoder wrote to an intermediate buffer (e.g. YUV), the processor processes it here
+        // If you wrote direct (hardware RGBA), this may be no-op or sync
         g_pixelProcessor->postProcess(decodeTarget, outputTex);
 
-        // Configurar punteros para debug/dump si es necesario
+        // Set pointers to debug/dump if necessary
         if (g_pixelProcessor->getDecoderPixelFormat() == SCE_AVCDEC_PIXELFORMAT_RGBA8888)
         {
             cpuPushPtr        = decodeTarget;
@@ -432,11 +425,11 @@ extern "C" int vitavideo_submit_decode_unit(PDECODE_UNIT decodeUnit)
         VITA_DEBUG_LOG("[Video] Primer frame output confirmado por decoder");
         loggedFirstOut = true;
     }
-    // Copiar del staging a la textura si usamos staging
-    // Sin staging: ya está en textura
+    // Copy from staging to texture if we use staging
+    // Without staging: it is already in texture
     last_call_had_output = true;
 
-    // (Ya decodificado directamente en textura BACK)
+    // (Already decoded directly into BACK texture)
 
     if (!single_frame_buffer)
     {
@@ -446,11 +439,10 @@ extern "C" int vitavideo_submit_decode_unit(PDECODE_UNIT decodeUnit)
         // VITA_DEBUG_LOG("[Video][DECODE] swap buffers front=%d back=%d", frame_front_idx, frame_back_idx);
     }
 
-    // Marcar primer frame (log previo a incrementar frames_decoded)
     if (g_stats.frames_decoded == 0)
         VITA_DEBUG_LOG("[Video][DBG] primer frame decodificado");
 
-    // Publicar textura directamente (sin copias CPU)
+    // Publish texture directly (no CPU copies)
     {
         const vita2d_texture* texFront = FRAME_FRONT();
         const uint32_t w               = image_scaling.texture_width;
@@ -480,8 +472,6 @@ extern "C" int vitavideo_submit_decode_unit(PDECODE_UNIT decodeUnit)
     }
     VitaSession::onFrameDecoded();
 
-    // Modo Direct GXM eliminado: no se sube frame a renderer directo
-
     uint64_t tPresentMs = monotonicMs_local();
     if (active_video_thread)
     {
@@ -498,12 +488,9 @@ extern "C" int vitavideo_submit_decode_unit(PDECODE_UNIT decodeUnit)
             vita_netopt_on_frame_completed(syntheticFrameIndex);
         }
     }
-    // (primer frame ya marcado arriba)
     syntheticFrameIndex++;
     vd_submit_counter++;
-    // Caso: outputs=1 consecutivos en frames donde host manda slices acumuladas.
-    // La API puede devolver outputs=1 repetido si hay frames listos en cola interna; aceptamos.
+    // Case: consecutive outputs=1 in frames where host sends accumulated slices.
+    // The API can return repeated outputs=1 if there are ready frames in the internal queue; we accept.
     return DR_OK;
 }
-
-// g_sps_ctx se define como puntero crudo en vita_globals.cpp

@@ -9,13 +9,13 @@
 #include "legacy/modules/vita_globals.hpp"
 #include "video/render_mode_cache.hpp"
 
-// Snapshot global consumido por vita.cpp
+// Global snapshot consumed by vita.cpp
 VideoSettings g_video_settings_snapshot = {};
 
-// Flag para habilitar/deshabilitar debug logs
+// Flag to enable/disable debug logs
 bool g_debug_log_enabled = false;
 
-// Declaraciones extern para las funciones de vita.cpp
+// extern declarations for vita.cpp functions
 extern "C"
 {
     int vitavideo_setup(int videoFormat, int width, int height, int redrawRate, void* context, int drFlags);
@@ -25,7 +25,7 @@ extern "C"
     int vitavideo_submit_decode_unit(PDECODE_UNIT decodeUnit);
 }
 
-// Inicializar instancia singleton
+// Initialize singleton instance
 // VideoManager* VideoManager::_instance = nullptr;
 
 VideoManager::VideoManager()
@@ -45,13 +45,13 @@ VideoManager::~VideoManager()
         stopVideo();
     }
 
-    // No necesitamos cleanup manual ya que el sistema legacy maneja su propio estado
-    // a través de los callbacks de Limelight
+    // We do not need manual cleanup since the legacy system manages its own state
+    // via Limelight callbacks
 
     // _instance = nullptr;
 }
 
-// Instancia singleton
+// singleton instance
 VideoManager* VideoManager::instance()
 {
     static VideoManager* instance = new VideoManager();
@@ -67,7 +67,7 @@ bool VideoManager::initialize()
 
     brls::Logger::info("[VideoManager] Inicializando sistema de video...");
 
-    // Cargar configuración
+    // Load configuration
     _config.load();
     VideoSettings settings = _config.getVideoSettings();
     bool updated           = false;
@@ -83,15 +83,15 @@ bool VideoManager::initialize()
         _config.save();
     }
     g_video_settings_snapshot = settings; // sincronizar snapshot global
-    // Sincronizar flags globales legacy que afectan render inmediato
+    // Synchronize legacy global flags that affect immediate render
     video_fullscreen_stretch = settings.fullscreen;
-    // low latency removido: ya no se asigna
+    // low latency removed: no longer assigned
     _currentModeInt = settings.render_mode;
     _currentMode    = (_currentModeInt == 0) ? "legacy" : "ffmpeg";
 
     brls::Logger::info("[VideoManager] Modo de renderizado configurado: {}", _currentMode);
 
-    // Si el modo por defecto es ffmpeg, preparar el contexto
+    // If the default mode is ffmpeg, prepare the context
 #ifdef BUILD_FFMPEG
     if (_currentMode == "ffmpeg")
     {
@@ -103,9 +103,9 @@ bool VideoManager::initialize()
         }
     }
 #endif
-    // Inicializar contexto según el modo
-    // No necesitamos contextos manuales ya que el sistema legacy maneja su propio estado
-    // a través de los callbacks de Limelight
+    // Initialize context based on mode
+    // We do not need manual contexts since the legacy system manages its own state
+    // via Limelight callbacks
 
     _initialized = true;
     brls::Logger::info("[VideoManager] Sistema de video inicializado correctamente");
@@ -121,28 +121,28 @@ void VideoManager::setRenderMode(const std::string& mode)
 
     brls::Logger::info("[VideoManager] Cambiando modo de renderizado de {} a {}", _currentMode, mode);
 
-    // Detener video actual si está corriendo
+    // Stop current video if it is running
     if (_videoRunning)
     {
         stopVideo();
     }
 
-    // Limpiar contexto anterior
+    // Clear previous context
 #ifdef BUILD_FFMPEG
     if (_currentMode == "ffmpeg" && _ffmpegContext)
     {
-        // Cleanup del contexto FFmpeg si existe
+        // Cleanup of FFmpeg context if it exists
         ffmpeg_video_cleanup(_ffmpegContext);
         delete _ffmpegContext;
         _ffmpegContext = nullptr;
     }
 #endif
 
-    // Establecer nuevo modo
+    // Set new mode
     _currentMode    = mode;
     _currentModeInt = (mode == "legacy") ? 0 : 1;
 
-    // Si el nuevo modo es ffmpeg, reservar contexto
+    // If new mode is ffmpeg, reserve context
 #ifdef BUILD_FFMPEG
     if (_currentMode == "ffmpeg")
     {
@@ -155,7 +155,7 @@ void VideoManager::setRenderMode(const std::string& mode)
     }
 #endif
 
-    // Guardar en configuración
+    // Save to settings
     _config.load();
     VideoSettings settings = _config.getVideoSettings();
     settings.render_mode   = _currentModeInt;
@@ -164,19 +164,19 @@ void VideoManager::setRenderMode(const std::string& mode)
         brls::Logger::info("[VideoManager] Desactivando formato YUV experimental: sólo disponible en modo legacy");
         settings.pixel_format_mode = 0;
     }
-    g_video_settings_snapshot = settings; // actualizar snapshot global
+    g_video_settings_snapshot = settings; // update global snapshot
     _config.setVideoSettings(settings);
     _config.save();
     set_render_mode_cached(_currentModeInt);
 
-    // Inicializar nuevo contexto
-    // No necesitamos contextos manuales ya que el sistema legacy maneja su propio estado
-    // a través de los callbacks de Limelight
+    // Initialize new context
+    // We do not need manual contexts since the legacy system manages its own state
+    // via Limelight callbacks
 
     brls::Logger::info("[VideoManager] Modo de renderizado cambiado exitosamente");
 }
 
-// Callbacks estáticos que delegan según el modo actual
+// Static callbacks that delegate based on current mode
 // Provide access to the internal render context for LiStartConnection
 void* VideoManager::getRenderContext()
 {
@@ -198,7 +198,7 @@ DECODER_RENDERER_CALLBACKS VideoManager::getDecoderCallbacks()
 
     if (_currentMode == "legacy")
     {
-        // Asignar callbacks directamente a las funciones extern "C" de vita.cpp
+        // Assign callbacks directly to the extern "C" functions of vita.cpp
         callbacks.setup            = vitavideo_setup;
         callbacks.start            = vitavideo_start;
         callbacks.stop             = vitavideo_stop;
@@ -209,10 +209,10 @@ DECODER_RENDERER_CALLBACKS VideoManager::getDecoderCallbacks()
     else
     {
 #ifdef BUILD_FFMPEG
-        // Obtener callbacks desde el wrapper FFmpeg
+        // Get callbacks from the FFmpeg wrapper
         callbacks = get_ffmpeg_video_callbacks();
 #else
-        // FFmpeg no está compilado: fallback a legacy callbacks to avoid undefined refs
+        // FFmpeg is not compiled: fallback to legacy callbacks to avoid undefined refs
         callbacks.setup            = vitavideo_setup;
         callbacks.start            = vitavideo_start;
         callbacks.stop             = vitavideo_stop;
@@ -275,12 +275,12 @@ void VideoManager::startVideo()
 
     if (_currentMode == "legacy")
     {
-        // El sistema legacy maneja su propio estado interno a través de callbacks
+        // The legacy system manages its own internal state through callbacks
         brls::Logger::info("[VideoManager] Video legacy iniciado");
     }
     else if (_currentMode == "ffmpeg")
     {
-        // TODO: Implementar cuando tengamos FFmpeg
+        // TODO: Deploy when we have FFmpeg
         brls::Logger::info("[VideoManager] Video FFmpeg iniciado (placeholder)");
     }
 
@@ -298,16 +298,16 @@ void VideoManager::stopVideo()
 
     if (_currentMode == "legacy")
     {
-        // El sistema legacy maneja su propio cleanup a través de callbacks
+        // The legacy system handles its own cleanup through callbacks
         brls::Logger::info("[VideoManager] Video legacy detenido");
     }
     else if (_currentMode == "ffmpeg")
     {
-        // TODO: Implementar cuando tengamos FFmpeg
+        // TODO: Deploy when we have FFmpeg
         brls::Logger::info("[VideoManager] Video FFmpeg detenido (placeholder)");
     }
 
     _videoRunning = false;
 }
 
-// Callbacks estáticos para Limelight - REMOVIDOS: ahora usamos directamente las funciones extern "C"
+// Static callbacks for Limelight - REMOVED: we now directly use extern "C" functions

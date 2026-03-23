@@ -16,11 +16,11 @@
 
 #include "utils/host_search.hpp"
 
-// Contexto seguro para pairing asíncrono
+// Secure context for asynchronous pairing
 struct PairingContext
 {
     std::atomic<bool> cancelled { false };
-    // Puedes agregar más datos aquí si es necesario
+    // You can add more details here if necessary
 };
 
 class AddHostTab : public brls::Box, public std::enable_shared_from_this<AddHostTab>
@@ -48,10 +48,10 @@ class AddHostTab : public brls::Box, public std::enable_shared_from_this<AddHost
     std::thread discoveryThread;
     BRLS_BIND(brls::Box, loader, "loader");
     std::atomic<bool> pairingInProgress { false };
-    // Marca si los inputs ya fueron desbloqueados cuando apareció el PIN
+    // Check if the inputs were already unlocked when the PIN appeared
     std::atomic<bool> inputsUnblockedByPin { false };
 
-    // --- Pairing seguro y asincrónico ---
+    // --- Secure and asynchronous pairing ---
     std::shared_ptr<PairingContext> pairingContext;
     std::thread pairingThread;
 #if defined(__PSV__)

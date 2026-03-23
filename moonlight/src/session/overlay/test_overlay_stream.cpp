@@ -7,10 +7,10 @@
 TestOverlayStream::TestOverlayStream()
 {
     this->setFocusable(true);
-    // Etiquetas de los botones (en el mismo orden visual que el pause overlay)
+    // Button labels (in the same visual order as the pause overlay)
     buttonLabels = { "Resume", "Settings", "Disconnect", "Close App" };
 
-    // Registrar navegación por direccionales y acciones (A=confirm, B=cancel)
+    // Record navigation by turn signals and actions (A=confirm, B=cancel)
     this->registerAction("nav_up", brls::BUTTON_NAV_UP, [this](brls::View*)
         { this->moveFocus(-1); return true; });
     this->registerAction("nav_down", brls::BUTTON_NAV_DOWN, [this](brls::View*)
@@ -20,14 +20,14 @@ TestOverlayStream::TestOverlayStream()
     this->registerAction("cancel", brls::BUTTON_B, [this](brls::View*)
         { vita_debug_log("[TestOverlayStream] cancel pressed"); return true; });
 
-    // También permitir START para simular resume/close (útil en pruebas)
+    // Also allow START to simulate resume/close (useful in testing)
     this->registerAction("start", brls::BUTTON_START, [this](brls::View*)
         { vita_debug_log("[TestOverlayStream] START pressed"); return true; });
 }
 
 void TestOverlayStream::onLayout()
 {
-    // Nada específico por ahora
+    // Nothing specific for now
 }
 
 void TestOverlayStream::moveFocus(int delta)
@@ -45,12 +45,12 @@ void TestOverlayStream::moveFocus(int delta)
 void TestOverlayStream::activateFocused()
 {
     vita_debug_log("[TestOverlayStream] activateFocused index=%d label=%s", focusedIndex, buttonLabels[focusedIndex].c_str());
-    // Aquí podríamos llamar a callbacks reales; por ahora solo log
+    // Here we could call real callbacks; for now just log
 }
 
 void TestOverlayStream::draw(NVGcontext* vg, float x, float y, float width, float height, brls::Style style, brls::FrameContext* ctx)
 {
-    // Dibujar panel en esquina superior izquierda (480x544)
+    // Draw panel in upper left corner (480x544)
     float panelW = 480.0f;
     float panelH = 544.0f;
     float panelX = 0.0f;

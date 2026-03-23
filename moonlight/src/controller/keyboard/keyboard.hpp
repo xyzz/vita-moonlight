@@ -28,10 +28,10 @@ class KeyboardOverlay : public BaseOverlay
     KeyboardOverlay(const std::string& cssPath);
     ~KeyboardOverlay() override;
 
-    // Cargar CSS (parser simple) y aplicar propiedades
+    // Load CSS (simple parser) and apply properties
     bool loadCss(const std::string& path);
 
-    // Mostrar/ocultar teclado (la integración con Borealis la hace quien empuje la vista)
+    // Show/hide keyboard (integration with Borealis is done by whoever pushes the view)
     void show();
     void hide();
 
@@ -40,14 +40,14 @@ class KeyboardOverlay : public BaseOverlay
 
     void willAppear(bool resetState = false) override;
 
-    // Dibujar custom para teclado en grid
+    // Draw custom keyboard grid
     void draw(NVGcontext* vg, float x, float y, float width, float height, brls::Style style, brls::FrameContext* ctx) override;
 
     // Get current keyboard state for polling
     KeyboardState getKeyboardState() const;
 
   private:
-    // Layout de teclas (filas de labels)
+    // Key layout (rows of labels)
     std::vector<std::vector<std::string>> keyRows;
     void initDefaultLayout();
     void sendKeyByLabel(const std::string& label);
@@ -55,9 +55,9 @@ class KeyboardOverlay : public BaseOverlay
     std::string cssPath;
     std::unordered_map<std::string, std::string> properties;
     bool loaded = false;
-    // Copia local del alpha del panel (BaseOverlay::panelAlpha es privado)
+    // Local copy of panel alpha (BaseOverlay::panelAlpha is private)
     float localPanelAlpha = 1.0f;
-    // Estado de Shift (mayúsculas) — toggle cuando se pulsa la tecla Shift
+    // Shift State (Shift) — toggle when the Shift key is pressed
     bool shiftActive = false;
 
     // Persistent key states

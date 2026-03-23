@@ -11,7 +11,7 @@
 #include "session/overlay/vita_pause_overlay.hpp"
 #include "session/overlay/vita_stream_overlay_view.hpp"
 
-// Vista principal de la sesión de streaming (usando XML)
+// Streaming session main view (using XML)
 class SessionMainView : public brls::Box
 {
   public:
@@ -33,5 +33,5 @@ class SessionMainView : public brls::Box
     static inline std::atomic<bool> pauseOverlayOpen { false };
 };
 
-// Función para lanzar la pantalla principal de sesión
+// Function to launch the main session screen
 void showSessionMain(const HostInfo& host, const RemoteAppInfo& app);

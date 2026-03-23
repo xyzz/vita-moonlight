@@ -1,4 +1,4 @@
-// Limpio: solo declaraciones. Implementación en VideoFrameHolder.cpp
+// Clean: statements only. Implementation in VideoFrameHolder.cpp
 #pragma once
 #ifndef __cplusplus
 #error "VideoFrameHolder.hpp requiere C++"
@@ -25,10 +25,10 @@ class VideoFrameHolder
   public:
     static VideoFrameHolder& instance();
 
-    // Publica una textura ya residente en VRAM/GXM
+    // Publish a texture already resident in VRAM/GXM
     void pushTexture(const vita2d_texture* texture, uint32_t w, uint32_t h, uint64_t ptsMs);
 
-    // Devuelve true si había frame nuevo; 'out' recibe referencia a la textura
+    // Returns true if there was a new frame; 'out' receives reference to the texture
     bool popLatest(GxmFrame& out);
     // Clear any pending frame and mark none available.
     void clear();

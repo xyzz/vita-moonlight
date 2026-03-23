@@ -12,27 +12,27 @@
 #include "controller/input_types.hpp"
 #include "controller/special_inputs.hpp"
 
-// Estructura de configuración de streaming (similar al legacy)
+// Streaming configuration structure (similar to legacy)
 struct StreamConfiguration
 {
     int width                 = 1280;
     int height                = 720;
     int fps                   = 60;
-    int bitrate               = -1; // Auto-calculado
+    int bitrate               = -1; // Automatic bitrate
     int packetSize            = 1024;
     int streamingRemotely     = 0;
     int audioConfiguration    = 2; // AUDIO_CONFIGURATION_STEREO
     int supportedVideoFormats = 1; // VIDEO_FORMAT_H264
 
-    // Método para validar y ajustar resolución para PS Vita
+    // Method to validate and adjust resolution for PS Vita
     void validateAndAdjustResolution()
     {
 #if defined(__PSV__) || defined(__psp2__) || defined(__PSP2__)
-        // Aplicar restricciones de PS Vita: múltiplos de 16, mínimo 64
+        // Apply PS Vita restrictions: multiples of 16, minimum 64
         width  = (width < 64) ? 64 : ((width + 15) / 16) * 16;
         height = (height < 64) ? 64 : ((height + 15) / 16) * 16;
 
-        // Limitar a resoluciones razonables para PS Vita
+        // Limit to reasonable resolutions for PS Vita
         if (width > 1920)
             width = 1920;
         if (height > 1080)
@@ -54,7 +54,6 @@ struct RearTouchSettings
     std::uint32_t actionSouthEast = controller::INPUT_TYPE_GAMEPAD | controller::GAMEPAD_FLAG_RS;
 };
 
-// Enum para tipos de gamepad soportados
 enum GamepadType : int
 {
     GAMEPAD_TYPE_XBOX = 0, // Emular Xbox 360 (A/B/X/Y, LB/RB)
@@ -75,7 +74,7 @@ struct VideoSettings
     bool enable_motion_controls        = false;
     bool enable_double_tap_sprint      = false;
     bool absolute_mouse                = false;
-    bool enable_network_optimizations  = true; // Optimizaciones de red (IDR smart, pacing, etc.)
+    bool enable_network_optimizations  = true; // Network optimizations (IDR smart, pacing, etc.)
     int touchscreen_mode               = 0; // 0=Off, 1=DS4 Touchpad, 2=Mouse Absoluto, 3=Tableta Multitouch
     int double_tap_sprint_step_time    = 200;
     float motion_controls_scalar_x     = 1.2f;
@@ -83,7 +82,6 @@ struct VideoSettings
     int mouse_acceleration             = 150;
     int keyboard_layout                = 0; // 0=EN_US, 1=ES_ES, 2=ES_LATAM
 
-    // Configuración del Trackpad (específica)
     int trackpad_pointer_speed           = 100; // 0-200
     int trackpad_dead_zone               = 50; // 0-200px
     bool trackpad_tap_to_click           = true;
@@ -93,12 +91,10 @@ struct VideoSettings
     bool trackpad_multi_touch            = true;
     int trackpad_edge_zone               = 15; // 0-50%
 
-    // Nueva opción: modo de renderizado
     int render_mode       = 0; // 0=Legacy, 1=Modern (FFmpeg)
-    int pixel_format_mode = 0; // 0=RGBA directo, 1=YUV420 (pruebas)
+    int pixel_format_mode = 0; // 0=RGBA direct, 1=YUV420 (testing)
 
-    // Nueva opción: tipo de gamepad
-    GamepadType gamepad_type = GAMEPAD_TYPE_XBOX; // 0=Xbox, 1=PS4 (para emular controlador)
+    GamepadType gamepad_type = GAMEPAD_TYPE_XBOX; // 0=Xbox, 1=PS4 (to emulate controller)
 
     bool enable_microphone             = false; // Enable/disable microphone transmission
     bool enable_microphone_compression = false; // true=Opus, false=RAW PCM (controlled by UI toggle)
@@ -122,18 +118,16 @@ class ConfigManager
     void set(const std::string& section, const std::string& key, const std::string& value);
     static std::string getConfigPath();
 
-    // --- Gestión de directorio de llaves/dispositivos ---
+    // --- Key/device directory management ---
     std::string getKeysDir() const;
     void setKeysDir(const std::string& dir);
 
-    // Helpers seguros para crear/asegurar directorios relacionados con keys
-    // Garantiza que la ruta exista (mkdir -p behaviour). Devuelve true si
-    // la ruta existe tras la llamada o false en error.
+    // Create key directories as needed (mkdir -p). Return false on failure.
     bool ensureDirExists(const std::string& path) const;
     bool ensureKeysDirExists() const;
     bool ensureKeyDirExists(const std::string& safeId) const;
 
-    // --- Configuración de streaming (modo legacy) ---
+    // --- Streaming configuration (legacy mode) ---
     StreamConfiguration getStreamConfig() const;
     void setStreamConfig(const StreamConfiguration& config);
     VideoSettings getVideoSettings() const;

@@ -20,7 +20,7 @@ class SessionAppSelect : public brls::Box
   private:
     void populateAppList();
     void AppSelected(const RemoteAppInfo& app, bool forceStart = false);
-    // Helpers para mostrar/ocultar el diálogo de conexión y gestionar el GridView
+    // Helpers to show/hide the connection dialog and manage the GridView
     brls::Dialog* showConnectingDialog(const std::string& msg, brls::Visibility& outPrevGridVis);
     void restoreGridViewAndInputs(brls::Visibility prevGridVis);
 
@@ -34,15 +34,15 @@ class SessionAppSelect : public brls::Box
     HostInfo host;
     GridView* gridView             = nullptr;
     brls::ProgressSpinner* spinner = nullptr;
-    // Evita remostrar el diálogo de sesión activa si el usuario ya lo gestionó
+    // Avoid displaying the active session dialog if the user has already managed it
     bool suppressActiveDialog = false;
-    // Evita mostrar más de una vez el diálogo de sesión activa dentro de la misma instancia
+    // Avoid showing the active session dialog more than once within the same instance
     bool activeDialogShown = false;
-    // Controla espera previa a cargar apps hasta que Moonmic/Sunshine respondan
+    // Controls waiting before loading apps until Moonmic/Sunshine responds
     bool sunshineReady         = false;
     bool sunshineCheckInFlight = false;
     bool moonmicNotified       = false;
     bool moonmicLastStatus     = false;
-    // Prompt de resolución (se muestra al entrar al host, no al lanzar app)
+    // Resolution prompt (displayed when entering the host, not when launching the app)
     bool resolutionPromptShown = false;
 };

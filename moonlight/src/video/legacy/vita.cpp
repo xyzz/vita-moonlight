@@ -22,7 +22,7 @@
 #include "debug.hpp"
 #include "libgamestream/sps.h" // clase SpsContext + flags
 
-// Módulos refactorizados
+// Refactored modules
 #include "modules/vita_globals.hpp"
 // The .cpp files are compiled separately via CMake
 

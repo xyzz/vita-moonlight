@@ -116,7 +116,7 @@ VitaPauseOverlay::VitaPauseOverlay(std::function<void()> onClose, const HostInfo
     std::vector<std::string> labels = {
         brls::getStr("moonlight/session/pause/resume"),
         brls::getStr("moonlight/tabs/settings"),
-        // Opción para abrir el teclado overlay
+        // Option to open keyboard overlay
         brls::getStr("moonlight/session/pause/keyboard"),
         brls::getStr("moonlight/session/pause/disconnect"),
         brls::getStr("moonlight/session/pause/close_app")
@@ -154,7 +154,7 @@ VitaPauseOverlay::VitaPauseOverlay(std::function<void()> onClose, const HostInfo
                     std::string cfgDir = (p != std::string::npos) ? cfgPath.substr(0, p) : std::string(".");
                     std::string cssPath = cfgDir + "/keyboard/style.css";
 
-                    // Crear y mostrar el overlay del teclado
+                    // Create and display the keyboard overlay
                     KeyboardOverlay* kb = new KeyboardOverlay(cssPath);
                     auto* activity = new brls::Activity(kb);
                     brls::Application::pushActivity(activity);
@@ -170,7 +170,7 @@ VitaPauseOverlay::VitaPauseOverlay(std::function<void()> onClose, const HostInfo
         } });
 
     vita_debug_log("[VitaPauseOverlay] opened for host=%s", host.ip.c_str());
-    // Instrumentación: registrar FPS y estado de video al abrir el overlay
+    // Instrumentation: Record FPS and video status when opening overlay
     try
     {
         int fps_i      = (int)std::lround(brls::Application::getFPS());
@@ -216,7 +216,7 @@ void VitaPauseOverlay::resume()
 void VitaPauseOverlay::disconnect()
 {
     vita_debug_log("[VitaPauseOverlay] disconnect pressed");
-    // Instrumentación: registrar FPS/estado antes de iniciar la secuencia de stop
+    // Instrumentation: record FPS/state before starting stop sequence
     try
     {
         int fps_i = (int)std::lround(brls::Application::getFPS());
@@ -228,7 +228,7 @@ void VitaPauseOverlay::disconnect()
     catch (...)
     {
     }
-    // Ejecutar la destrucción de la sesión en background
+    // Run session destruction in background
     std::string addr   = this->host.ip;
     auto storedOnClose = std::move(onClose);
     onClose            = nullptr;

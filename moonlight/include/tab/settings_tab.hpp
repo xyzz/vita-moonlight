@@ -41,7 +41,7 @@ class SettingsTab : public brls::Box
     BRLS_BIND(brls::DetailCell, notify, "notify");
     BRLS_BIND(brls::SelectorCell, languageSelector, "languageSelector");
 
-    // Nuevos elementos para configuración de streaming
+    // New elements for streaming configuration
     BRLS_BIND(brls::SelectorCell, renderModeSelector, "renderModeSelector");
     BRLS_BIND(brls::SelectorCell, resolutionSelector, "resolutionSelector");
     BRLS_BIND(brls::SelectorCell, fpsSelector, "fpsSelector");
@@ -51,7 +51,7 @@ class SettingsTab : public brls::Box
     BRLS_BIND(brls::BooleanCell, networkOptimizationsToggle, "networkOptimizationsToggle");
     BRLS_BIND(brls::BooleanCell, localAudioToggle, "localAudioToggle");
     BRLS_BIND(brls::BooleanCell, fullscreenToggle, "fullscreenToggle");
-    // lowLatencyToggle eliminado
+    // lowLatencyToggle eliminated
     BRLS_BIND(brls::BooleanCell, framePacerToggle, "framePacerToggle");
     BRLS_BIND(brls::BooleanCell, centerRegionToggle, "centerRegionToggle");
     BRLS_BIND(brls::BooleanCell, showFpsToggle, "showFpsToggle");

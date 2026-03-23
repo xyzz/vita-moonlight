@@ -24,41 +24,31 @@ struct VitaMouseState
     short rightStickY;
 };
 
-// Clase para manejar input en PS Vita
 class ControllerInputManager
 {
   public:
     ControllerInputManager();
     ~ControllerInputManager();
 
-    // Procesar input y enviar eventos
     void handleInput();
 
-    // Resetear estados de input (al desconectar)
     void dropInput();
 
-    // Habilitar/deshabilitar procesamiento/envío de input (útil para overlays/menus)
     void setInputEnabled(bool enabled);
 
     void setTouchscreenMode(int mode) { touchscreenMode = mode; }
 
-    // Validar y cambiar modo touch (con compatibilidad de gamepad)
     bool setTouchscreenModeWithValidation(int newMode);
 
-    // Cambiar modo touch en tiempo de ejecución (como setGamepadType)
-    // Valida compatibilidad, actualiza config y notifica cambio
     bool setTouchscreenModeRuntime(int newMode);
 
-    // Enviar estado de gamepad
     void sendGamepadState(const GamepadState& state);
 
-    // Callback para hotkey de pausa (START+L1+R1)
     void setPauseCallback(const std::function<void()>& cb);
 
     void applyRearTouchSettings(const RearTouchSettings& settings);
     void setRearTouchEnabled(bool enabled);
 
-    // Cambiar tipo de gamepad sin reiniciar sesión
     void setGamepadType(GamepadType type);
 
     void setActiveKeyboard(KeyboardOverlay* kb)
@@ -72,7 +62,6 @@ class ControllerInputManager
     bool inputEnabled;
     bool inputDropped;
 
-    // Estados anteriores para detectar cambios
     GamepadState lastGamepadState;
     VitaMouseState lastMouseState;
     SceCtrlData lastCtrlData;
@@ -86,7 +75,6 @@ class ControllerInputManager
 
     KeyboardOverlay* activeKeyboard = nullptr;
 
-    // Tipo de gamepad actual
     GamepadType currentGamepadType = GAMEPAD_TYPE_XBOX;
 
     struct ButtonMapping

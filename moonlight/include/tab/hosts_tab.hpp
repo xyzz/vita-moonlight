@@ -7,7 +7,7 @@
 #include <atomic>
 #include <borealis.hpp>
 
-#include "model/HostStorage.hpp" // Para HostInfo
+#include "model/HostStorage.hpp" // For HostInfo
 #include "utils/host_search.hpp"
 
 class HostsTab : public brls::Box
@@ -16,12 +16,12 @@ class HostsTab : public brls::Box
     HostsTab();
     static brls::View* create();
     void refreshHostsList();
-    // Solicita que se recargue completamente la actividad principal (reconstruye el home)
-    // Implementación segura: ejecuta la recreación del contenido de MainActivity en el hilo UI.
+    // Requests that the main activity be completely reloaded (rebuilds the home)
+    // Safe implementation: Execute the recreation of the MainActivity content in the UI thread.
     static void requestGlobalRefresh();
     BRLS_BIND(brls::Box, hostsList, "hosts_list");
-    // Indica que el HostsTab ya terminó su construcción e inicialización
-    // (se mantiene para posibles futuras comprobaciones de ciclo de vida)
+    // Indicates that the HostsTab has already finished its construction and initialization
+    // (maintained for possible future lifecycle checks)
     std::atomic<bool> initialized { false };
 };
 // check_host.hpp

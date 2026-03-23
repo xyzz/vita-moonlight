@@ -50,7 +50,6 @@ inline uint32_t makeAnalogBinding(AnalogBinding binding)
 
 }
 
-// Instancia global
 ControllerInputManager* g_controllerInput = nullptr;
 
 ControllerInputManager::ControllerInputManager()
@@ -68,7 +67,6 @@ ControllerInputManager::ControllerInputManager()
     memset(&lastCtrlData, 0, sizeof(SceCtrlData));
     memset(&mapping, 0, sizeof(mapping));
 
-    // Inicializar controles
     sceCtrlSetSamplingMode(SCE_CTRL_MODE_ANALOG_WIDE);
 
     touchManager     = new TouchInputManager();
@@ -80,7 +78,7 @@ ControllerInputManager::ControllerInputManager()
     VideoSettings initialSettings = config.getVideoSettings();
     rearTouchManager->updateSettings(initialSettings.rear_touch);
 
-    // Cargar tipo de gamepad desde config
+    // Load gamepad type from config
     currentGamepadType = initialSettings.gamepad_type;
 
     isPstvModel = (sceKernelGetModel() == SCE_KERNEL_MODEL_VITATV);
@@ -116,14 +114,13 @@ void ControllerInputManager::handleInput()
     inputDropped = false;
     auto t_start = high_resolution_clock::now();
 
-    // Leer controles
     SceCtrlData ctrlData;
     sceCtrlPeekBufferPositive(0, &ctrlData, 1);
 
     if (!isPstvModel)
     {
-        // En PS Vita portátil, los botones físicos L/R aparecen como LTRIGGER/RTRIGGER.
-        // Normalizamos para que también activen los flags de L1/R1 requeridos por los shortcuts.
+        // On the portable PS Vita, the physical L/R buttons appear as LTRIGGER/RTRIGGER.
+        // We normalize so that they also activate the L1/R1 flags required by the shortcuts.
         if (ctrlData.buttons & SCE_CTRL_LTRIGGER)
         {
             ctrlData.buttons |= SCE_CTRL_L1;
@@ -134,10 +131,9 @@ void ControllerInputManager::handleInput()
         }
     }
 
-    // Debug: mostrar botones presionados y valores de triggers
     static int debug_counter = 0;
     if (debug_counter++ % 60 == 0)
-    { // Cada segundo aproximadamente
+    { // Approximately every second
         vita_debug_log("[ControllerInput] Botones: 0x%08X (L1:%d R1:%d L2:%d R2:%d START:%d) LT:%d RT:%d",
             ctrlData.buttons,
             (ctrlData.buttons & SCE_CTRL_L1) ? 1 : 0,
@@ -149,10 +145,8 @@ void ControllerInputManager::handleInput()
             ctrlData.rt);
     }
 
-    // Procesar shortcuts físicos
     if (process_physical_shortcuts(&ctrlData, &lastCtrlData))
     {
-        // Shortcut ejecutado, no procesar input normal
         vita_debug_log("[ControllerInput] Shortcut ejecutado, retornando temprano");
         lastCtrlData = ctrlData;
         return;
@@ -164,17 +158,15 @@ void ControllerInputManager::handleInput()
         rearTouchManager->process(gamepadState, isPstvModel);
     }
 
-    // Enviar si cambió
+    // Send if changed
     if (memcmp(&gamepadState, &lastGamepadState, sizeof(GamepadState)) != 0)
     {
         sendGamepadState(gamepadState);
         lastGamepadState = gamepadState;
     }
 
-    // Actualizar estado anterior
     lastCtrlData = ctrlData;
 
-    // Manejar táctil basado en modo
     touchManager->handleTouch(touchscreenMode);
 
     // Keyboard Polling
@@ -198,7 +190,6 @@ void ControllerInputManager::handleInput()
         }
     }
 
-    // Medir tiempo total de handleInput y loggear periódicamente para detectar bloqueos
     auto t_end                     = high_resolution_clock::now();
     auto dur_us                    = duration_cast<microseconds>(t_end - t_start).count();
     uint64_t now_ms                = duration_cast<milliseconds>(t_end.time_since_epoch()).count();
@@ -210,7 +201,6 @@ void ControllerInputManager::handleInput()
     }
 }
 
-// Enviar estado de gamepad
 void ControllerInputManager::sendGamepadState(const GamepadState& state)
 {
     if (LiSendMultiControllerEvent(0, 1, state.buttonFlags, state.leftTrigger, state.rightTrigger,
@@ -229,7 +219,6 @@ void ControllerInputManager::dropInput()
     GamepadState zeroState = { 0 };
     sendGamepadState(zeroState);
 
-    // Reset touch basado en modo
     touchManager->dropTouch(touchscreenMode);
     if (rearTouchManager)
     {
@@ -240,7 +229,6 @@ void ControllerInputManager::dropInput()
     vita_debug_log("[ControllerInput] Input dropped");
 }
 
-// Callback para hotkey de pausa (START+L1+R1)
 void ControllerInputManager::setPauseCallback(const std::function<void()>& cb)
 {
     pauseCallback = cb;
@@ -248,18 +236,18 @@ void ControllerInputManager::setPauseCallback(const std::function<void()>& cb)
     set_pause_callback(cb);
 }
 
-// Public setter para habilitar/deshabilitar el procesamiento de input.
-// Cuando se deshabilita, se hace un dropInput() inmediato para enviar estado cero
-// al host y evitar que queden botones presionados en la transmisión.
+// Public setter to enable/disable input processing.
+// When disabled, an immediate dropInput() is done to send zero status
+// to the host and prevent buttons being pressed in the transmission.
 void ControllerInputManager::setInputEnabled(bool enabled)
 {
     this->inputEnabled = enabled;
     if (!enabled)
     {
-        // Enviar estado cero INMEDIATO de forma asíncrona para no bloquear el hilo UI.
-        // dropInput() puede invocar LiSendMultiControllerEvent que a veces
-        // puede bloquear si la conexión está en un mal estado; llamarlo en
-        // un hilo separado evita que la UI sufra hitches al abrir overlays.
+        // Send zero status IMMEDIATELY asynchronously to not block the UI thread.
+        // dropInput() can invoke LiSendMultiControllerEvent which sometimes
+        // can block if the connection is in a bad state; call him on
+        // A separate thread prevents the UI from hitches when opening overlays.
         std::thread([this]()
             { this->dropInput(); })
             .detach();
@@ -299,7 +287,7 @@ void ControllerInputManager::initMapping()
     }
     else
     {
-        // En PS Vita portátil no hay gatillos físicos analógicos
+        // There are no physical analog triggers on the portable PS Vita
         mapping.btnL2 = 0;
         mapping.btnR2 = 0;
     }
@@ -308,11 +296,6 @@ void ControllerInputManager::initMapping()
 GamepadState ControllerInputManager::buildGamepadState(const SceCtrlData& ctrlData) const
 {
     GamepadState state {};
-
-    // Mapeo de botones depende del tipo de gamepad
-    // Ambos tipos usan el mismo layout de botones Vita (X/O/△/□ = sur/este/norte/oeste)
-    // La diferencia está en cómo el host interpreta estos botones según el tipo reportado
-    // Xbox: A/B/X/Y siguen el estándar Xbox (Cross=A, Circle=B, Square=X, Triangle=Y)
 
     if (isPressed(mapping.btnDpadUp, ctrlData))
         state.buttonFlags |= UP_FLAG;
@@ -323,7 +306,6 @@ GamepadState ControllerInputManager::buildGamepadState(const SceCtrlData& ctrlDa
     if (isPressed(mapping.btnDpadRight, ctrlData))
         state.buttonFlags |= RIGHT_FLAG;
 
-    // Botones de cara (la conversión se hace en el servidor según tipo reportado)
     if (isPressed(mapping.btnSouth, ctrlData))
         state.buttonFlags |= A_FLAG;
     if (isPressed(mapping.btnEast, ctrlData))
@@ -338,7 +320,7 @@ GamepadState ControllerInputManager::buildGamepadState(const SceCtrlData& ctrlDa
     if (isPressed(mapping.btnSelect, ctrlData))
         state.buttonFlags |= BACK_FLAG;
 
-    // L1/R1 se mapean a LB/RB (consistente con Xbox)
+    // L1/R1 maps to LB/RB (Xbox consistent)
     if (isPressed(mapping.btnL1, ctrlData))
         state.buttonFlags |= LB_FLAG;
     if (isPressed(mapping.btnR1, ctrlData))
@@ -462,23 +444,17 @@ void ControllerInputManager::setGamepadType(GamepadType type)
     vita_debug_log("[ControllerInput] Cambiando tipo de gamepad a %d (%s)",
         (int)type, (type == GAMEPAD_TYPE_PS4) ? "PS4" : "XBOX");
 
-    // Para cambiar el tipo de un controlador existente, necesitamos desconectarlo y reconectarlo
-    // porque Sunshine no soporta cambiar el tipo de controladores ya asignados
-
-    // Paso 1: Desconectar el controlador enviando activeGamepadMask = 0
     vita_debug_log("[ControllerInput] Desconectando controlador para cambio de tipo...");
     if (LiSendMultiControllerEvent(0, 0, 0, 0, 0, 0, 0, 0, 0) != 0)
     {
         vita_debug_log("[ControllerInput][ERR] Fallo al desconectar controlador");
     }
 
-    // Paso 2: Esperar un poco para que Sunshine procese la desconexión
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
-    // Paso 3: Reconectar con el nuevo tipo
     uint8_t liType                = (type == GAMEPAD_TYPE_PS4) ? 0x02 : 0x01;
     uint16_t capabilities         = 0x01 | 0x02; // ANALOG_TRIGGERS | RUMBLE
-    uint32_t supportedButtonFlags = 0xFFFFFFFF; // Todos los botones
+    uint32_t supportedButtonFlags = 0xFFFFFFFF; // All buttons
 
     vita_debug_log("[ControllerInput] Reconectando controlador con nuevo tipo (LI_CTYPE=%d)...", liType);
     if (LiSendControllerArrivalEvent(0, 0x01, liType, supportedButtonFlags, capabilities) != 0)
@@ -490,7 +466,6 @@ void ControllerInputManager::setGamepadType(GamepadType type)
         vita_debug_log("[ControllerInput] Tipo de gamepad notificado al host (LI_CTYPE=%d)", liType);
     }
 
-    // Enviar estado cero inmediato para resetear cualquier botón pendiente
     GamepadState zeroState = { 0 };
     sendGamepadState(zeroState);
 }
@@ -502,7 +477,6 @@ void ControllerInputManager::setRearTouchEnabled(bool enabled)
     }
 }
 
-// Validar y cambiar modo touch con compatibilidad de gamepad
 bool ControllerInputManager::setTouchscreenModeWithValidation(int newMode)
 {
     if (!touchManager)
@@ -511,7 +485,6 @@ bool ControllerInputManager::setTouchscreenModeWithValidation(int newMode)
         return false;
     }
 
-    // Usar el método de validación de TouchInput
     if (touchManager->setTouchMode(newMode, static_cast<int>(currentGamepadType)))
     {
         touchscreenMode = newMode;
@@ -526,7 +499,6 @@ bool ControllerInputManager::setTouchscreenModeWithValidation(int newMode)
     }
 }
 
-// Cambiar modo touch en tiempo de ejecución (guarda config y valida)
 bool ControllerInputManager::setTouchscreenModeRuntime(int newMode)
 {
     if (touchscreenMode == newMode)
@@ -541,7 +513,6 @@ bool ControllerInputManager::setTouchscreenModeRuntime(int newMode)
         return false;
     }
 
-    // Validar compatibilidad con gamepad actual
     if (!touchManager->setTouchMode(newMode, static_cast<int>(currentGamepadType)))
     {
         vita_debug_log("[ControllerInput][WARN] Modo touch %d no compatible con gamepad tipo %d",
@@ -549,11 +520,9 @@ bool ControllerInputManager::setTouchscreenModeRuntime(int newMode)
         return false;
     }
 
-    // Actualizar modo actual
     touchscreenMode = newMode;
     vita_debug_log("[ControllerInput] Modo touch cambiado en tiempo de ejecución a %d", newMode);
 
-    // Guardar en config para persistencia
     ConfigManager config;
     config.load();
     VideoSettings settings    = config.getVideoSettings();

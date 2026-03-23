@@ -1,7 +1,7 @@
 #ifndef KEYBOARD_CODES_H
 #define KEYBOARD_CODES_H
 
-// Defines de códigos HID USB estándar para teclas
+// Defines standard USB HID codes for keys
 #define KEY_A 0x04
 #define KEY_B 0x05
 #define KEY_C 0x06
@@ -122,7 +122,7 @@ static const short keyCodes[] = {
     0xBF, // VK_SLASH
     0x10, // VK_SHIFT Right shift
     0, // VK_KPASTERISK
-    0x11, // VK_ALT Left alt
+    0x11, // VK_ALT Left everything
     0x20, // VK_SPACE
     0x14, // VK_CAPS_LOCK
     0x70, // VK_F1

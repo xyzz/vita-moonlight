@@ -14,10 +14,7 @@
 
 #include <memory>
 
-// Zero-copy eliminado: se simplifica el pipeline a texturas vita2d
-// Se preservan solo métricas mínimas necesarias
-
-// (includes básicos ya movidos arriba)
+// Zero-copy eliminated: pipeline to vita2d textures is simplified
 
 #include <Limelight.h>
 #include <psp2/display.h>
@@ -30,19 +27,9 @@
 #include "debug.hpp"
 #ifdef __cplusplus
 #include "libgamestream/sps.h"
-extern gs::SpsContext* g_sps_ctx; // contexto SPS (puntero crudo)
+extern gs::SpsContext* g_sps_ctx; // SPS context (raw pointer)
 #endif
 
-// --- Mitigación de colisiones de nombres con Borealis ---
-// Limelight.h define macros para botones de ratón: BUTTON_LEFT / BUTTON_RIGHT / etc.
-// Borealis (borealis/core/input.hpp) declara un enum ControllerButton con miembros
-// BUTTON_LEFT, BUTTON_RIGHT, etc. Cuando las macros siguen definidas, el preprocesador
-// reemplaza los identificadores por números dentro del enum provocando errores de sintaxis
-// (ej: '0x03,' en vez de 'BUTTON_RIGHT,').
-// Des-definimos solo los macros conflictivos aquí porque en este módulo (video) no se usan
-// directamente los macros de ratón de Limelight; si se necesitan valores se pueden usar
-// constantes explícitas (0x01 izquierda, 0x03 derecha) o acceder a Limelight.h directamente
-// en otro TU que no incluya este header.
 #ifdef BUTTON_LEFT
 #undef BUTTON_LEFT
 #endif
@@ -116,9 +103,9 @@ extern int frame_front_idx;
 extern int frame_back_idx;
 #define FRAME_FRONT() (frame_textures[frame_front_idx])
 #define FRAME_BACK() (frame_textures[frame_back_idx])
-// Modo de un solo buffer (sin doble buffering). Cuando está activo, FRONT y BACK son el mismo índice.
+// Single buffer mode (no double buffering). When active, FRONT and BACK are the same index.
 extern bool single_frame_buffer;
-// Flag de inicialización de vita2d (nuevo) para asegurarnos de no llamar APIs sin contexto GXM
+// vita2d initialization flag (new) to make sure we don't call APIs without GXM context
 extern bool vita2d_inited;
 
 extern image_scaling_settings image_scaling;
@@ -128,17 +115,17 @@ extern bool frame_ready_flag;
 extern uint32_t frame_count;
 extern int need_drop;
 
-// Modos legacy eliminados
+// Legacy modes removed
 
 extern bool hevc_abort_flag;
 
-// Buffers intermedios (solo usados por modo YUV experimental). En modo RGBA directo no se usan.
+// Intermediate buffers (only used by experimental YUV mode). In direct RGBA mode they are not used.
 extern uint8_t* decoder_yuv_raw;
 extern uint8_t* decoder_yuv_buffer;
 extern size_t decoder_yuv_buffer_size;
 extern size_t decoder_yuv_total_alloc;
-// (Staging RGBA y NVG eliminados: dibujamos directo sobre la textura)
-// Buffer staging RGBA opcional para depuración (se activa cuando decoder_output_mode==0 y queremos aislar overflow)
+// (RGBA and NVG staging removed: we draw directly on the texture)
+// Optional RGBA staging buffer for debugging (activated when decoder_output_mode==0 and we want to isolate overflow)
 extern uint8_t* decoder_linear_rgba;
 extern size_t decoder_linear_rgba_size;
 extern uint8_t* decoder_linear_rgba_guard;
@@ -149,28 +136,28 @@ extern uint32_t decoder_linear_rgba_height;
 extern int decoder_linear_rgba_memblock;
 extern bool decoder_linear_rgba_physically_backed;
 
-// Modo experimental: replicar comportamiento legacy (un solo buffer + decode->draw inmediato)
-extern bool legacy_single_immediate_present; // si true, el submit decodifica y presenta inmediatamente (sin frame_ready_flag)
-// Modo de presentación fullscreen (estira sin conservar aspect)
+// Experimental mode: replicate legacy behavior (single buffer + immediate decode->draw)
+extern bool legacy_single_immediate_present; // if true, submit decodes and presents immediately (no frame_ready_flag)
+// Fullscreen presentation mode (stretches without preserving aspect)
 extern bool video_fullscreen_stretch;
-// low-latency removido: la ruta inmediata es estándar
+// low-latency removed: immediate route is standard
 
-// Buffer físico para salida directa del decoder (cuando la textura no es aceptada)
+// Physical buffer for direct decoder output (when the texture is not accepted)
 extern void* decoder_output_phys_ptr;
 extern size_t decoder_output_phys_size;
 extern int decoder_output_phys_block; // SceUID
 extern bool decoder_output_phys_mapped;
 
-// Estrategia de salida del decoder:
-// 0 = RGBA directo (preferido, decodifica a textura o buffer físico RGBA y copia)
-// 1 = YUV420 planar experimental (decodifica a buffer YUV y se convierte en CPU a RGBA)
+// Decoder output strategy:
+// 0 = Direct RGBA (preferred, decodes to texture or physical RGBA buffer and copies)
+// 1 = YUV420 experimental planar (decodes to YUV buffer and converts CPU to RGBA)
 extern int decoder_output_mode;
 extern bool decoder_tried_direct_texture;
 extern int decoder_src_width;
 extern int decoder_src_height;
 extern int decoder_width;
 extern int decoder_height;
-// Indica si estamos usando fallback: decoder -> buffer físico contiguo -> memcpy a textura
+// Indicates if we are using fallback: decoder -> contiguous physical buffer -> memcpy to texture
 extern bool decoder_use_phys_fallback;
 
 extern VitaVideoStats g_stats;
@@ -182,13 +169,13 @@ extern bool active_pacer_thread;
 
 extern indicator_status poor_net_indicator;
 
-// (SPS context deshabilitado temporalmente en build Vita simplificado)
+// (SPS context temporarily disabled in simplified Vita build)
 
 extern VideoStatusInfo g_video_status_info;
 
 extern ::VideoSettings g_video_settings_snapshot;
 
-// Flag para habilitar/deshabilitar debug logs
+// Flag to enable/disable debug logs
 extern bool g_debug_log_enabled;
 
 // ========================================

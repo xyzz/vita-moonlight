@@ -27,7 +27,7 @@ std::string makeSafeHostId(const std::string& raw)
         if (c == '/' || c == '\\' || c == ':' || c == '*' || c == '?' || c == '"' || c == '<' || c == '>' || c == '|')
             c = '_';
     }
-    // Limitar longitud excesiva para evitar problemas en filesystem
+    // Limit excessive length to avoid problems in filesystem
     if (out.size() > 60)
         out = out.substr(0, 60);
     if (out.empty())
@@ -35,7 +35,7 @@ std::string makeSafeHostId(const std::string& raw)
     return out;
 }
 
-// Genera el archivo device.ini en la carpeta del host
+// Generate the device.ini file in the host folder
 bool HostStorage::writeDeviceIni(const std::string& hostDir, const std::string& safeHostName, const char* address, int port, bool paired, const char* mac)
 {
     std::string deviceIniPath = hostDir + "/device.ini";
@@ -44,38 +44,38 @@ bool HostStorage::writeDeviceIni(const std::string& hostDir, const std::string& 
         return false;
 
     fprintf(f, "[Device]\n");
-    // Nota: no escribimos el campo `uuid` en device.ini.
-    // La referencia Moonlight-Switch no persiste este campo en device.ini; en
-    // su lugar el cliente usa `uniqueid` internamente al construir las URLs
-    // (por ejemplo: /serverinfo?uniqueid=...). Para mantener el mismo
-    // comportamiento y evitar inconsistencias, omitimos la escritura del
-    // uuid aquí. Esto evita que device.ini sea la fuente de verdad para el
-    // uniqueid y reduce riesgo de desincronización.
-    // name: nombre del dispositivo (hostName local, o algo identificable)
+    // Note: we do not write the `uuid` field in device.ini.
+    // The Moonlight-Switch reference does not persist this field in device.ini; in
+    // instead the client uses `uniqueid` internally when constructing URLs
+    // (for example: /serverinfo?uniqueid=...). To keep the same
+    // behavior and avoid inconsistencies, we omit writing the
+    // uuid here. This prevents device.ini from being the source of truth for the
+    // uniqueid and reduces risk of desynchronization.
+    // name: device name (local hostName, or something identifiable)
     fprintf(f, "name=%s\n", safeHostName.c_str());
-    // tipo de dispositivo
+    // device type
     fprintf(f, "type=psvita\n");
     // paired
     fprintf(f, "paired=%s\n", paired ? "true" : "false");
     // internal: IP del host
     fprintf(f, "internal=%s\n", address);
-    // external: dejar vacío por ahora
+    // external: leave empty for now
     fprintf(f, "external=\n");
-    // port: puerto externo usado
+    // port: external port used
     fprintf(f, "port=%d\n", port);
-    // prefer_external: por defecto false
+    // prefer_external: default false
     fprintf(f, "prefer_external=false\n");
-    // microphone_port: puerto del micrófono (default MoonMic)
+    // microphone_port: microphone port (default MoonMic)
     fprintf(f, "microphone_port=48100\n");
 
-    // mac: escribir solo si se pasó un válor válido
+    // mac: write only if a valid value was passed
     if (mac != nullptr)
     {
         std::string macs(mac);
-        // Evitar escribir placeholder conocido o cadenas vacías
+        // Avoid writing known placeholder or empty strings
         if (!macs.empty() && macs != "00:00:00:00:00:00")
         {
-            // Normalizar: eliminar espacios iniciales/finales
+            // Normalize: remove leading/trailing spaces
             size_t b = 0;
             while (b < macs.size() && isspace((unsigned char)macs[b]))
                 ++b;
@@ -91,7 +91,7 @@ bool HostStorage::writeDeviceIni(const std::string& hostDir, const std::string& 
     fclose(f);
     return true;
 }
-// Guarda un host tras pairing exitoso
+// Save a host after successful pairing
 bool HostStorage::savePairedHost(const std::string& name, const std::string& ip, int port, bool paired, const std::string& mac)
 {
     HostInfo host;
@@ -103,13 +103,13 @@ bool HostStorage::savePairedHost(const std::string& name, const std::string& ip,
     return HostStorage::addHost(host);
 }
 
-// Carga todos los hosts escaneando las carpetas y leyendo device.ini
+// Load all hosts by scanning folders and reading device.ini
 std::vector<HostInfo> HostStorage::loadHosts()
 {
     std::vector<HostInfo> hosts;
     ConfigManager config;
     std::string baseDir = config.getKeysDir();
-    // Asegurar que el directorio base existe antes de intentar abrirlo
+    // Make sure the base directory exists before trying to open it
     if (!config.ensureKeysDirExists())
     {
         std::cout << "[DEBUG][HostStorage] No se pudo asegurar baseDir: '" << baseDir << "'\n";
@@ -123,21 +123,21 @@ std::vector<HostInfo> HostStorage::loadHosts()
         return hosts;
     }
     struct dirent* entry;
-    // Helper para sanitizar cadenas que provienen del filesystem (nombres de carpeta, valores)
+    // Helper to sanitize strings coming from filesystem (folder names, values)
     auto sanitize_display = [](const std::string& s)
     {
         std::string out;
         out.reserve(s.size());
         for (unsigned char c : s)
         {
-            // Permitimos caracteres imprimibles ASCII y, para evitar problemas con
-            // bytes de control o secuencias corruptas, reemplazamos otros por '?'
+            // We allow ASCII printable characters and, to avoid problems with
+            // control bytes or corrupt sequences, we replace others with '?'
             if (c >= 32 && c != 127)
                 out.push_back(c);
             else
                 out.push_back('?');
         }
-        // Trim básico
+        // Basic trim
         size_t b = 0;
         while (b < out.size() && std::isspace((unsigned char)out[b]))
             ++b;
@@ -165,8 +165,8 @@ std::vector<HostInfo> HostStorage::loadHosts()
             continue;
         }
         HostInfo host;
-        // Mostrar un nombre seguro al usuario evitando caracteres de control
-        host.name   = sanitize_display(folder); // Por retrocompatibilidad: la carpeta era el nombre
+        // Show a strong name to the user avoiding control characters
+        host.name   = sanitize_display(folder); // For backward compatibility: the folder was the name
         host.safeId = makeSafeHostId(folder);
         std::cout << "[DEBUG][HostStorage] Leyendo device.ini para host: '" << folder << "'\n";
         std::string line;
@@ -218,15 +218,15 @@ std::vector<HostInfo> HostStorage::loadHosts()
     return hosts;
 }
 
-// saveHosts: no implementado, no se usa con device.ini
+// saveHosts: not implemented, not used with device.ini
 bool HostStorage::saveHosts(const std::vector<HostInfo>&) { return false; }
 
-// addHost: usa la ruta configurable de dispositivos
+// addHost: Use device configurable path
 bool HostStorage::addHost(const HostInfo& host)
 {
     ConfigManager config;
     std::string baseDir = config.getKeysDir();
-    // Asegurar directorio base
+    // Secure base directory
     if (!config.ensureKeysDirExists())
         return false;
     std::string safe          = host.safeId.empty() ? makeSafeHostId(host.name.empty() ? host.ip : host.name) : host.safeId;
@@ -234,7 +234,7 @@ bool HostStorage::addHost(const HostInfo& host)
     std::string deviceIniPath = keyDirStr + "/device.ini";
     if (fs::exists(deviceIniPath))
         return false;
-    // Crear directorio por-host (si no existe)
+    // Create per-host directory (if it does not exist)
     if (!config.ensureKeyDirExists(safe))
         return false;
     return HostStorage::writeDeviceIni(keyDirStr, safe, host.ip.c_str(), host.port, host.paired, host.mac.empty() ? nullptr : host.mac.c_str());
@@ -255,7 +255,7 @@ bool HostStorage::removeHost(const std::string& name)
 {
     ConfigManager config;
     std::string baseDir = config.getKeysDir();
-    // name puede ser el nombre visible; intentar ambas rutas (name y safeId derivado)
+    // name can be the display name; try both routes (name and derived safeId)
     std::string keyDirStr = baseDir + "/" + name;
     if (!fs::exists(keyDirStr))
     {
@@ -266,7 +266,7 @@ bool HostStorage::removeHost(const std::string& name)
     }
     if (!fs::exists(keyDirStr))
         return false;
-    // Limpiar cualquier certificado/clave cargada en memoria para este directorio
+    // Clear any certificates/keys loaded in memory for this directory
     try
     {
         std::cout << "[DEBUG][HostStorage] Eliminando archivos de certificados en: '" << keyDirStr << "'\n";
@@ -275,7 +275,7 @@ bool HostStorage::removeHost(const std::string& name)
         fs::remove(keyDirStr + "/key.pem", ec);
         fs::remove(keyDirStr + "/client.p12", ec);
         fs::remove(keyDirStr + "/uniqueid.dat", ec);
-        // También eliminar archivos antiguos si existieran
+        // Also delete old files if they exist
         fs::remove(keyDirStr + "/client.pem.bak", ec);
         fs::remove(keyDirStr + "/key.pem.bak", ec);
     }
@@ -284,7 +284,7 @@ bool HostStorage::removeHost(const std::string& name)
         std::cout << "[DEBUG][HostStorage] Error eliminando certificados (ignorado)\n";
     }
 
-    // Luego eliminar la carpeta completa del host
+    // Then delete the entire folder from the host
     return fs::remove_all(keyDirStr) > 0;
 }
 

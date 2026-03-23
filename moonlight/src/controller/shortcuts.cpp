@@ -1,5 +1,5 @@
 // shortcuts.cpp
-// Gestión de accesos directos físicos para Vita Moonlight
+// Managing physical shortcuts for Vita Moonlight
 #include "controller/shortcuts.hpp"
 
 #include <psp2/ctrl.h>
@@ -9,52 +9,52 @@
 #include "controller/special_inputs.hpp"
 #include "debug.hpp"
 
-// Callback para el hotkey de pausa
+// Callback for pause hotkey
 static std::function<void()> pause_callback = nullptr;
 
-// Estado del hotkey de pausa
+// Pause hotkey status
 static bool pause_shortcut_active         = false;
 static uint64_t pause_shortcut_start_time = 0;
 static bool pause_start_pressed           = false;
 static bool pause_l1_pressed              = false;
 static bool pause_r1_pressed              = false;
-// Tiempo del último disparo del shortcut (us) para debounce y evitar re-disparos
+// Time of the last shot of the shortcut (us) to debounce and avoid re-shots
 static uint64_t last_pause_exec_time = 0;
 
-// Establecer callback para pausa
+// Set callback for pause
 void set_pause_callback(const std::function<void()>& cb)
 {
     pause_callback = cb;
     vita_debug_log("Shortcut: callback de pausa establecido");
 }
 
-// Devuelve true si se ejecutó un acceso directo y se debe limpiar el input
+// Returns true if a shortcut was executed and the input should be cleared
 bool process_physical_shortcuts(const SceCtrlData* pad, const SceCtrlData* pad_old)
 {
     uint64_t now = sceKernelGetSystemTimeWide();
-    // Ignorar shortcuts repetidos si acabamos de ejecutar uno (debounce 300ms)
+    // Ignore repeated shortcuts if we have just executed one (debounce 300ms)
     if (last_pause_exec_time && now - last_pause_exec_time < 300000)
     {
         return false;
     }
 
-    // Verificar botones actuales
+    // Check current buttons
     bool start_pressed = (pad->buttons & SCE_CTRL_START);
     bool l1_pressed    = (pad->buttons & SCE_CTRL_L1);
     bool r1_pressed    = (pad->buttons & SCE_CTRL_R1);
 
-    // Log de debug para ver qué botones se están presionando (menos frecuente)
+    // Debug log to see what buttons are being pressed (less frequent)
     static int log_counter = 0;
     if (log_counter++ % 300 == 0)
-    { // Log cada 5 segundos aproximadamente
+    { // Log every 5 seconds approximately
         vita_debug_log("Shortcut: botones - START:%d L1:%d R1:%d (0x%08X)",
             start_pressed, l1_pressed, r1_pressed, pad->buttons);
     }
 
-    // Lógica del hotkey START + L1 + R1 con tolerancia temporal
+    // START + L1 + R1 hotkey logic with time tolerance
     if (!pause_shortcut_active)
     {
-        // Buscar el inicio de la combinación
+        // Find the start of the combination
         if (start_pressed && !pause_start_pressed)
         {
             vita_debug_log("Shortcut: START presionado, iniciando timer");
@@ -66,31 +66,31 @@ bool process_physical_shortcuts(const SceCtrlData* pad, const SceCtrlData* pad_o
 
     if (pause_shortcut_active)
     {
-        // Actualizar estado de botones
+        // Update button status
         if (l1_pressed)
             pause_l1_pressed = true;
         if (r1_pressed)
             pause_r1_pressed = true;
 
-        // Verificar si todos los botones están presionados
+        // Check if all buttons are pressed
         if (pause_start_pressed && pause_l1_pressed && pause_r1_pressed)
         {
             uint64_t elapsed = now - pause_shortcut_start_time;
             if (elapsed < 500000)
-            { // 500ms de tolerancia
+            { // 500ms tolerance
                 vita_debug_log("Shortcut: START+L1+R1 detectado en %llu us, ejecutando callback", elapsed);
                 if (pause_callback)
                 {
                     vita_debug_log("Shortcut: ejecutando callback de pausa");
                     pause_callback();
-                    // Marcar tiempo de ejecución para evitar reentradas rápidas
+                    // Mark execution time to avoid fast reentries
                     last_pause_exec_time = now;
                 }
                 else
                 {
                     vita_debug_log("Shortcut: callback de pausa es NULL!");
                 }
-                // Resetear estado
+                // Reset status
                 pause_shortcut_active = false;
                 pause_start_pressed   = false;
                 pause_l1_pressed      = false;
@@ -107,7 +107,7 @@ bool process_physical_shortcuts(const SceCtrlData* pad, const SceCtrlData* pad_o
             }
         }
 
-        // Resetear si se soltó START
+        // Reset if START was released
         if (!start_pressed)
         {
             vita_debug_log("Shortcut: START soltado, reseteando estado");
@@ -117,9 +117,9 @@ bool process_physical_shortcuts(const SceCtrlData* pad, const SceCtrlData* pad_o
             pause_r1_pressed      = false;
         }
 
-        // Timeout de seguridad
+        // Security timeout
         if (now - pause_shortcut_start_time > 1000000)
-        { // 1 segundo
+        { // 1 second
             vita_debug_log("Shortcut: timeout de seguridad, reseteando");
             pause_shortcut_active = false;
             pause_start_pressed   = false;

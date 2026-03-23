@@ -38,9 +38,9 @@
 #include "tab/hosts_tab.hpp"
 #include "tab/settings_tab.hpp"
 #include "utils/host_search.hpp"
-// Incluir wrapper de debug para pruebas de salida en consola / Vita
+// Include debug wrapper for console/Vita output testing
 #include "debug.hpp"
-// Para pruebas de conectividad / certificados
+// For connectivity tests/certificates
 // #include "check_test.hpp"
 
 #if defined(__PSV__)
@@ -82,7 +82,7 @@ int main(int argc, char* argv[])
 #endif
     }
 
-    // Crear carpeta para keyboard en data/moonlight y copiar CSS por defecto si no existe
+    // Create keyboard folder in data/moonlight and copy default CSS if it doesn't exist
     {
         std::string cfgPath     = ConfigManager::getConfigPath();
         size_t p                = cfgPath.find_last_of("/\\");
@@ -97,7 +97,7 @@ int main(int argc, char* argv[])
         struct stat st {};
         if (stat(destCss.c_str(), &st) != 0)
         {
-            // No existe el css en data, copiar desde resources
+            // CSS does not exist in data, copy from resources
             std::string srcCss = "resources/keyboard/style.css";
             std::ifstream src(srcCss, std::ios::binary);
             if (src.is_open())
@@ -132,8 +132,8 @@ int main(int argc, char* argv[])
 #endif
     if (!lang.empty())
     {
-        moonlight::settings::applyLanguageEnv(lang); // <-- Forzar el locale solo si hay config
-        // Establecer el locale por defecto en la plataforma antes de init
+        moonlight::settings::applyLanguageEnv(lang); // <-- Force locale only if there is config
+        // Set default locale on platform before init
         if (lang == "es")
         {
             brls::Platform::APP_LOCALE_DEFAULT = "es";
@@ -170,14 +170,14 @@ int main(int argc, char* argv[])
         return EXIT_FAILURE;
     }
 
-    // Cambiar locale en la plataforma después de init
+    // Change locale on platform after init
     if (!lang.empty())
     {
-        // Para PS Vita no necesitamos cambiar el locale dinámicamente
-        // El locale ya se estableció antes de init()
+        // For PS Vita we don't need to change the locale dynamically
+        // The locale was already set before init()
     }
 
-    // Cargar traducciones después de aplicar el idioma desde config
+    // Load translations after applying language from config
     if (!lang.empty())
     {
         brls::loadTranslations();
@@ -194,32 +194,32 @@ int main(int argc, char* argv[])
     std::cout << "[DEBUG] Locale detectado por Borealis: " << brls::Application::getLocale() << std::endl;
 #endif
 
-    // --- BLOQUE DE PRUEBAS DE LOG ---
-    // Imprimir varias formas para comparar comportamiento en consola/Vita
+    // --- LOG TEST BLOCK ---
+    // Print various forms to compare behavior on console/Vita
     std::string testName = "AorsiniYT-PC.local";
-    std::string testUtf8 = u8"á>Àü↕"; // ejemplo con bytes no-ASCII
-    // Correcto: pasar c_str() a funciones estilo printf
-    // Habilitar vita_debug_log según configuración (se carga temprano para permitir prints desde init)
+    std::string testUtf8 = u8"á>Àü↕"; // example with non-ASCII bytes
+    // Correct: pass c_str() to printf-style functions
+    // Enable vita_debug_log as configured (loads early to allow prints from init)
     {
-        extern bool g_debug_log_enabled; // declarado en vita_globals.hpp
+        extern bool g_debug_log_enabled; // declared in vita_globals.hpp
         ConfigManager cfg;
         cfg.load();
         VideoSettings vs    = cfg.getVideoSettings();
         g_debug_log_enabled = vs.save_debug_log;
     }
     vita_debug_log("[TEST] vita_debug_log c_str: %s", testName.c_str());
-    // Otras salidas para comparar
+    // Other outputs to compare
 #if defined(__PSV__)
     brls::Logger::info("[TEST] cout skipped on Vita, testName={} testUtf8={}", testName, testUtf8);
 #else
     std::cout << "[TEST] cout: " << testName << " " << testUtf8 << std::endl;
 #endif
     brls::Logger::info("[TEST] brls::Logger: {} {}", testName, testUtf8);
-    // Ejecutar pruebas diagnósticas (conectividad / certificados)
+    // Run diagnostic tests (connectivity/certificates)
     // moonlight::tests::run_cert_checks();
-    // --- FIN BLOQUE DE PRUEBAS ---
+    // --- END OF TESTING BLOCK ---
 
-    // Cargar settings visuales (selector) después de init
+    // Load visual settings (selector) after init
     moonlight::settings::loadSettingsFromConfig();
 
     brls::Application::createWindow("moonlight/title"_i18n);
@@ -233,8 +233,8 @@ int main(int argc, char* argv[])
     brls::Application::registerXMLView("HostsTab", HostsTab::create);
 
 #if defined(__PSV__)
-    // CapUnlocker deshabilitado: evitamos el cambio de afinidad/prioridad y cualquier comportamiento
-    // que dependa de módulos externos para ampliar límites (reduce consumo/fragmentación de RAM).
+    // CapUnlocker disabled: we prevent affinity/priority change and any behavior
+    // that depends on external modules to expand limits (reduces RAM consumption/fragmentation).
     /*
     int search_unk[2];
     if(_vshKernelSearchModuleByName("CapUnlocker", search_unk) >= 0) {
@@ -251,9 +251,9 @@ int main(int argc, char* argv[])
     */
 #endif
 
-    // El estilo visual de los labels de "about" (fuente y color) se aplica en el controlador de la vista correspondiente
-    // usando setFontSize y setTextColor tras obtener cada Label por su id.
-    // Aquí solo se mantienen las métricas de padding/margen si el layout XML las utiliza.
+    // The visual style of the "about" labels (font and color) is applied in the corresponding view controller
+    // using setFontSize and setTextColor after getting each Label by its id.
+    // Padding/margin metrics are only maintained here if the XML layout uses them.
     brls::getStyle().addMetric("about/padding_top_bottom", 50);
     brls::getStyle().addMetric("about/padding_sides", 75);
     brls::getStyle().addMetric("about/description_margin", 50);

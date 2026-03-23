@@ -27,7 +27,7 @@
 #include <windows.h>
 
 #include <thread>
-// Declaración anticipada para uso global
+// Advance declaration for global use
 std::vector<std::pair<std::string, std::string>>& getDiscoveredHostsWin();
 #endif
 #include <algorithm>
@@ -42,7 +42,7 @@ std::vector<std::pair<std::string, std::string>>& getDiscoveredHostsWin();
 #endif
 
 #include "check_host.hpp"
-// pairing unificado eliminado: futura integración en GameStreamClient (TODO)
+// unified pairing removed: future integration in GameStreamClient (TODO)
 
 using namespace brls::literals;
 
@@ -50,15 +50,15 @@ AddHostTab::AddHostTab()
 {
     brls::Logger::info("[AddHostTab] Constructor: Iniciando inflateFromXMLRes");
     this->inflateFromXMLRes("xml/tabs/add_host.xml");
-    // --- Diagnóstico de núcleos de CPU disponibles y uso actual ---
-// --- Diagnóstico de núcleos de CPU disponibles y uso actual ---
+    // --- Diagnosis of available CPU cores and current usage ---
+// --- Diagnosis of available CPU cores and current usage ---
 #if defined(__PSV__)
-    int cpuCoreCount = 4; // Teórico
+    int cpuCoreCount = 4; // Theoretical
     brls::Logger::info("[AddHostTab][CPU] Núcleos CPU PSVita (teórico): {}", cpuCoreCount);
-    // Obtener affinity mask del hilo principal
+    // Get affinity mask from main thread
     int affinityMask = sceKernelGetThreadCpuAffinityMask(0);
     brls::Logger::info("[AddHostTab][CPU] Affinity mask del hilo principal: 0x{:X}", affinityMask);
-    // Mostrar en el log qué núcleos están disponibles realmente
+    // Show in the log which cores are actually available
     std::string availableCores;
     for (int i = 0; i < 4; ++i)
     {
@@ -75,7 +75,7 @@ AddHostTab::AddHostTab()
     unsigned int cpuCoreCount = std::thread::hardware_concurrency();
     brls::Logger::info("[AddHostTab][CPU] Núcleos CPU detectados: {}", cpuCoreCount);
 #endif
-    // Log de IDs de hilos y afinidad (diagnóstico)
+    // Log of thread IDs and affinity (diagnosis)
 #if defined(__PSV__)
     SceUID threadId = sceKernelGetThreadId();
     brls::Logger::info("[AddHostTab][CPU] ID del hilo principal: 0x{:X}", threadId);
@@ -85,7 +85,7 @@ AddHostTab::AddHostTab()
     brls::Logger::info("[AddHostTab][CPU] ID del hilo principal: {}", ss.str());
 #endif
 
-    // El spinner y el label ya están en el XML, controlar visibilidad por id
+    // The spinner and the label are already in the XML, control visibility by id
     brls::View* spinner     = this->getView("spinner");
     brls::View* searchLabel = this->getView("search_label");
     if (spinner)
@@ -93,9 +93,9 @@ AddHostTab::AddHostTab()
     if (searchLabel)
         searchLabel->setVisibility(brls::Visibility::VISIBLE);
 
-    // Los textos estáticos (title) ya se manejan en XML con i18n.
-    // El placeholder solo puede traducirse en C++.
-    // Prueba manual de traducción y logs
+    // Static texts (title) are already handled in XML with i18n.
+    // The placeholder can only be translated in C++.
+    // Manual translation and log testing
     std::string testKey         = "moonlight/settings/add_host_ip_placeholder";
     std::string testTranslation = brls::getStr(testKey);
     brls::Logger::info("[AddHostTab] Prueba manual: clave='{}', traducción='{}'", testKey, testTranslation);
@@ -106,15 +106,15 @@ AddHostTab::AddHostTab()
     {
         std::string placeholder = brls::getStr("moonlight/settings/add_host_ip_placeholder");
         brls::Logger::info("[AddHostTab] Placeholder resolved: {}", placeholder);
-        // Permitir IP:PUERTO hasta 22 caracteres (ej: 255.255.255.255:65535)
+        // Allow IP:PORT up to 22 characters (ex: 255.255.255.255:65535)
         this->ipField->init(brls::getStr("moonlight/settings/ip"), "", [](std::string) { }, placeholder, "", 22);
     }
     if (this->nameField)
-        // Limite ampliado para nombre de PC: 50 caracteres
+        // Extended limit for PC name: 50 characters
         this->nameField->init(brls::getStr("moonlight/settings/add_host_manual"), "", [](std::string) { }, brls::getStr("moonlight/settings/add_host_name_placeholder"), "", 50);
 
-    // Inicializar el selector de preferencia LAN/Online
-    // Usar init(title, opciones, seleccion por defecto, callback cambio)
+    // Initialize the LAN/Online preference selector
+    // Use init(title, options, default selection, change callback)
     if (this->preferExternalSelector)
     {
         std::vector<std::string> options = {
@@ -125,13 +125,13 @@ AddHostTab::AddHostTab()
             brls::getStr("moonlight/settings/add_host_connection_type"),
             options,
             0,
-            [](int) { } // callback vacío, personalizable
+            [](int) { } // empty callback, customizable
         );
     }
 
     if (this->addButton && this->ipField && this->nameField && this->preferExternalSelector)
     {
-        // Botón de emparejar manual (Add Host Manual)
+        // Manual Pair Button (Add Host Manual)
         this->addButton->registerClickAction([this](brls::View*)
             {
             brls::Logger::info("[AddHostTab][MANUAL] Emparejamiento manual iniciado");
@@ -158,16 +158,16 @@ AddHostTab::AddHostTab()
                 return true;
             }
 #endif
-            // Cancelar cualquier pairing anterior
+            // Cancel any previous pairing
             if (this->pairingContext) this->pairingContext->cancelled = true;
             if (this->pairingThread.joinable()) this->pairingThread.join();
             this->pairingContext = std::make_shared<PairingContext>();
             auto context = this->pairingContext;
-            // Lógica de pairing: delegar la UI del diálogo a pairing.cpp
-            // Marcar que el pairing está en progreso para evitar que la ventana se cierre
-            // y deshabilitar el botón Add para prevenir múltiples inicios simultáneos.
+            // Pairing logic: delegate dialog UI to pairing.cpp
+            // Mark that pairing is in progress to prevent the window from closing
+            // and disable the Add button to prevent multiple simultaneous launches.
             this->pairingInProgress = true;
-            // Reiniciar la marca de desbloqueo por PIN
+            // Reset PIN Unlock Flag
             this->inputsUnblockedByPin.store(false);
             brls::Application::blockInputs();
             if (this->addButton) {
@@ -177,10 +177,10 @@ AddHostTab::AddHostTab()
             }
             auto weakSelf = this->weak_from_this();
             HostInfo h; h.ip = ipInput; h.name = name; h.safeId = makeSafeHostId(name.empty()? ipInput : name);
-            // onPinReady desbloquea inputs cuando el PIN aparece para que el usuario pueda
-            // introducirlo en la máquina host. `inputsUnblockedByPin` evita desbloqueos duplicados.
+            // onPinReady unlocks inputs when the PIN appears so the user can
+            // insert it into the host machine. `inputsUnblockedByPin` prevents duplicate unlocks.
             GameStreamClient::instance().beginPairing(h, [this, name](bool ok){
-                // Restaurar el estado UI y desbloquear inputs en el hilo de UI
+                // Restore UI state and unlock inputs in UI thread
                 brls::sync([this, ok, name]() {
                     this->pairingInProgress = false;
                     if (this->addButton) {
@@ -188,13 +188,13 @@ AddHostTab::AddHostTab()
                         this->addButton->setState(brls::ButtonState::ENABLED);
                         this->addButton->setFocusable(true);
                     }
-                    // Desbloquear inputs para permitir cerrar la ventana u otras acciones
-                    // Si los inputs ya fueron desbloqueados por onPinReady, no llamamos de nuevo
+                    // Unlock inputs to allow closing the window or other actions
+                    // If the inputs have already been unlocked by onPinReady, we do not call again
                     if (!this->inputsUnblockedByPin.load()) {
                         brls::Application::unblockInputs();
                     }
                     if (ok) {
-                        // Mostrar notificación localizada con el nombre del host
+                        // Show localized notification with host name
                         std::string msg = brls::getStr("host_dialog/add_host_paired_success");
                         size_t pos = msg.find("$(name)"); if (pos != std::string::npos) msg.replace(pos, 7, name);
                         brls::Application::notify(msg);
@@ -207,29 +207,29 @@ AddHostTab::AddHostTab()
                     }
                 });
             }, [this](const std::string& pin){
-                // Callback cuando el PIN ya está listo y mostrado en el diálogo de emparejado.
-                // Desbloqueamos inputs en el hilo de UI para que el usuario pueda cambiar a la
-                // máquina host y escribir el PIN.
+                // Callback when the PIN is already ready and displayed in the pairing dialog.
+                // We unlock inputs in the UI thread so that the user can switch to the
+                // host machine and enter the PIN.
                 if (!this->inputsUnblockedByPin.exchange(true)) {
                     brls::sync([this]() {
                         brls::Application::unblockInputs();
-                        // Opcional: podríamos mover el foco a un control si es necesario
+                        // Optional: we could move focus to a control if necessary
                     });
                 }
             });
             return true; });
     }
-    // El label de dispositivos encontrados se traduce en XML, no es necesario aquí
+    // The found devices label is translated into XML, not necessary here
 
     this->startDeviceDiscovery();
 }
 
 // Callbacks para check_host
 
-// Instancias estáticas para callbacks de descubrimiento
+// Static instances for discovery callbacks
 #if defined(__PSV__)
 AddHostTab* AddHostTab::vitaInstance = nullptr;
-// Declaración anticipada para uso en todo el archivo
+// Advance declaration for use in the entire file
 #if defined(_WIN32)
 std::vector<std::pair<std::string, std::string>>& getDiscoveredHostsWin();
 #endif
@@ -242,7 +242,7 @@ extern "C" void AddHostTab::winHostFoundCb(int idx, const char* host, const char
         return;
     brls::Logger::info("[AddHostTab] Host detectado (WIN): {} - {}:{} (host={})", pcname, ip, port, host);
     brls::Logger::info("[AddHostTab] Datos callback WIN: host='{}' pcname='{}' ip='{}' port={}", host, pcname, ip, port);
-    // Usar la lista global de hosts descubiertos en Windows
+    // Use the global list of discovered hosts in Windows
     auto& discoveredHostsWin = getDiscoveredHostsWin();
     std::string name(pcname ? pcname : "");
     std::string ipStr(ip ? ip : "");
@@ -261,7 +261,7 @@ extern "C" void AddHostTab::winHostFoundCb(int idx, const char* host, const char
         brls::Logger::error("[AddHostTab] Host detectado pero sin datos válidos (WIN)");
         return;
     }
-    // Evitar duplicados
+    // Avoid duplicates
     for (const auto& h : discoveredHostsWin)
     {
         if (h.first == displayName && h.second == ipStr)
@@ -274,14 +274,14 @@ extern "C" void AddHostTab::winHostFoundCb(int idx, const char* host, const char
             brls::Logger::error("[AddHostTab] hostsList es nulo (WIN)");
             return;
         }
-        // Limpiar todo menos el spinner
+        // Clean everything except the spinner
         brls::View* spinnerRow = AddHostTab::winInstance->getView("spinner_row");
         auto children = AddHostTab::winInstance->hostsList->getChildren();
         for (auto* child : children) {
             if (child != spinnerRow)
                 AddHostTab::winInstance->hostsList->removeView(child);
         }
-        // Parámetros de grid
+        // grid parameters
         const int cardsPerRow = 3;
         int count = 0;
         brls::Box* currentRow = nullptr;
@@ -295,8 +295,8 @@ extern "C" void AddHostTab::winHostFoundCb(int idx, const char* host, const char
             card->setFocusable(true);
             card->setMarginRight(16);
             card->setMarginBottom(0);
-            // La lógica de truncado/animación se maneja internamente en PCCard
-            // Captura por valor el par host (name, ip)
+            // Truncation/animation logic is handled internally in PCCard
+            // Capture the host pair (name, ip) by value
             card->setClickAction([host]() {
                 std::string msg = brls::getStr("moonlight/settings/add_host_connect_question_dialog");
                 size_t pos_ip = msg.find("$(ip)");
@@ -320,7 +320,7 @@ extern "C" void AddHostTab::winHostFoundCb(int idx, const char* host, const char
                 currentRow->addView(card);
             count++;
         }
-        // Spinner siempre al final
+        // Spinner always at the end
         if (spinnerRow)
             spinnerRow->setVisibility(brls::Visibility::VISIBLE);
         else
@@ -330,7 +330,7 @@ extern "C" void AddHostTab::winHostFoundCb(int idx, const char* host, const char
 
 void AddHostTab::startDeviceDiscovery()
 {
-    // Limpiar la lista de hosts y mostrar el spinner
+    // Clear host list and show spinner
     brls::View* spinnerRow = this->getView("spinner_row");
     if (!this->hostsList)
     {
@@ -350,7 +350,7 @@ void AddHostTab::startDeviceDiscovery()
         }
         spinnerRow->setVisibility(brls::Visibility::VISIBLE);
     }
-    // Iniciar descubrimiento usando la nueva interfaz centralizada
+    // Launch discovery using the new centralized interface
 #if defined(__PSV__)
     AddHostTab::vitaInstance = this;
     this->discoveredHosts.clear();
@@ -395,22 +395,22 @@ void AddHostTab::startDeviceDiscovery()
         }); });
 #elif defined(_WIN32)
     AddHostTab::winInstance = this;
-    // Limpiar la lista de hosts descubiertos al iniciar búsqueda
+    // Clear the list of hosts discovered when searching
     getDiscoveredHostsWin().clear();
     check_host::startWinDiscovery(winHostFoundCb);
 #endif
-    // Cuando termine la búsqueda, el callback se encarga de ocultar el spinner si no hay hosts
+    // When the search is finished, the callback is responsible for hiding the spinner if there are no hosts
 }
 
 brls::View* AddHostTab::create()
 {
-    // Crear la instancia como puntero crudo, Borealis gestiona el ciclo de vida
+    // Create the instance as a raw pointer, Borealis manages the life cycle
     return new AddHostTab();
 }
 
 void AddHostTab::refreshHostsList()
 {
-    // No hacer nada aquí, la lista se maneja en startDeviceDiscovery
+    // Do nothing here, the list is handled in startDeviceDiscovery
 }
 
 AddHostTab::~AddHostTab()
@@ -424,12 +424,12 @@ AddHostTab::~AddHostTab()
     AddHostTab::winInstance = nullptr;
     getDiscoveredHostsWin().clear();
 #endif
-    // Cancelar pairing seguro
+    // Cancel secure pairing
     if (this->pairingContext)
         this->pairingContext->cancelled = true;
     if (this->pairingThread.joinable())
         this->pairingThread.join();
-    // Si por alguna razón el pairing estaba en progreso, desbloquear inputs para no dejar la UI bloqueada
+    // If for some reason the pairing was in progress, unblock inputs so as not to leave the UI blocked
     if (this->pairingInProgress)
     {
         brls::Application::unblockInputs();
@@ -438,7 +438,7 @@ AddHostTab::~AddHostTab()
 }
 
 #if defined(_WIN32)
-// Acceso global a la lista de hosts descubiertos en Windows
+// Global access to the list of discovered hosts in Windows
 std::vector<std::pair<std::string, std::string>>& getDiscoveredHostsWin()
 {
     static std::vector<std::pair<std::string, std::string>> discoveredHostsWin;

@@ -21,7 +21,7 @@ void settings::loadSettingsFromConfig()
     ConfigManager config;
     config.load();
     std::string lang = config.get("general", "language", "en-US");
-    // Ajustar el selector visual (solo después de init)
+    // Adjust visual selector (only after init)
     if (lang == "es" || lang == "es-ES")
     {
         if (SettingsTab::languageSelectorPtr)
@@ -32,19 +32,19 @@ void settings::loadSettingsFromConfig()
         if (SettingsTab::languageSelectorPtr)
             SettingsTab::languageSelectorPtr->setSelection(1);
     }
-    // Aquí puedes cargar más settings y aplicarlos
+    // Here you can load more settings and apply them
 }
 
 void settings::saveSettingsToConfig()
 {
     ConfigManager config;
-    // Ejemplo: guardar el idioma
+    // Example: save language
     int langIdx = 1;
     if (SettingsTab::languageSelectorPtr)
         langIdx = SettingsTab::languageSelectorPtr->getSelection();
     std::string lang = (langIdx == 0) ? "es" : "en-US";
     config.set("general", "language", lang);
-    // Aquí puedes guardar más settings
+    // Here you can save more settings
     config.save();
 }
 
@@ -52,7 +52,7 @@ std::string settings::getLanguageFromConfig()
 {
     ConfigManager config;
     if (!config.load())
-        return "en-US"; // Valor por defecto si no se puede cargar
+        return "en-US"; // Default value if unable to load
     return config.get("general", "language", "en-US");
 }
 

@@ -4,20 +4,20 @@ extern "C"
 {
 #endif
 
-    // Habilita/deshabilita las optimizaciones de IDR
+    // Enable/disable IDR optimizations
     void vita_netopt_set_enabled(int enable);
-    // Fuerza una IDR ignorando debounce
+    // Force an IDR ignoring debounce
     void vita_netopt_force_idr();
-    // Reporta frames perdidos (gap de secuencia)
+    // Report lost frames (sequence gap)
     void vita_netopt_report_loss(unsigned lostFrames);
-    // Tick periódico (cada ~500ms recomendable)
+    // Periodic tick (every ~500ms recommended)
     void vita_netopt_tick();
-    // Dump rápido a stdout
+    // Fast dump to stdout
     void vita_netopt_dump_stats();
-    // Solicitud inteligente (si se invoca manualmente)
+    // Smart Request (if invoked manually)
     void vita_netopt_request_idr_smart();
 
-    // Exponer estructura de stats (snapshot)
+    // Expose stats structure (snapshot)
     struct VitaNetOptSnapshot
     {
         unsigned idrRequests;
@@ -32,21 +32,21 @@ extern "C"
 
     int vita_netopt_get_stats(struct VitaNetOptSnapshot* out);
 
-    // ===== Extensiones avanzadas (legacy-inspired) =====
-    // Frame pacing y frameskip adaptativo
-    void vita_netopt_set_target_fps(unsigned fps); // FPS objetivo para cálculo de drops
-    void vita_netopt_frame_produced(); // Llamar cuando un frame se decodifica (antes de presentar)
-    unsigned vita_netopt_consume_drop_budget(); // Devuelve cuántos frames deberían saltarse (y consume ese presupuesto)
+    // ===== Advanced Extensions (legacy-inspired) =====
+    // Adaptive frame pacing and frameskip
+    void vita_netopt_set_target_fps(unsigned fps); // Objective FPS for calculating drops
+    void vita_netopt_frame_produced(); // Call when a frame is decoded (before rendering)
+    unsigned vita_netopt_consume_drop_budget(); // Returns how many frames should be skipped (and consumes that budget)
 
-    // Tracking de frames para cálculo de pérdida y estado de conexión
-    void vita_netopt_on_frame_seen(unsigned frameIndex); // visto (packet completado o detectado por secuencia)
-    void vita_netopt_on_frame_completed(unsigned frameIndex); // frame completo decodificado
-    void vita_netopt_on_frame_loss_range(unsigned startFrame, unsigned endFrame); // rango perdido (RFI intento)
+    // Frame tracking to calculate loss and connection status
+    void vita_netopt_on_frame_seen(unsigned frameIndex); // seen (packet completed or detected by sequence)
+    void vita_netopt_on_frame_completed(unsigned frameIndex); // full frame decoded
+    void vita_netopt_on_frame_loss_range(unsigned startFrame, unsigned endFrame); // lost range (RFI attempt)
 
-    // Tick de alta resolución (llamar cada ~50ms idealmente) para ventana de pérdida
+    // High resolution tick (call every ~50ms ideally) for loss window
     void vita_netopt_tick_50ms();
 
-    // Estado de conexión derivado
+    // Derived connection status
     enum VitaNetConnQuality
     {
         VITA_NET_CONN_OKAY = 0,
@@ -55,38 +55,38 @@ extern "C"
     };
     struct VitaNetConnSnapshot
     {
-        unsigned intervalMs; // Duración ventana actual
-        unsigned goodFrames; // Frames buenos en ventana
-        unsigned totalFrames; // Frames esperados (estimado)
+        unsigned intervalMs; // Current window duration
+        unsigned goodFrames; // Good window frames
+        unsigned totalFrames; // Expected frames (estimated)
         unsigned lossPercent; // (total-good)/total *100
         enum VitaNetConnQuality quality;
     };
     int vita_netopt_get_conn_snapshot(struct VitaNetConnSnapshot* out);
 
-    // RFI (Reference Frame Invalidation) stub: en esta versión solo contabiliza y decide IDR si overflow
+    // RFI (Reference Frame Invalidation) stub: in this version it only counts and decides IDR if overflow
     void vita_netopt_try_invalidate_ref_range(unsigned startFrame, unsigned endFrame);
 
-    // Dump extendido (incluye estado de conexión y drops)
+    // Extended dump (includes connection status and drops)
     void vita_netopt_dump_extended();
 
-    // ===== Instrumentación de timings de video (latencias) =====
-    // Llamar una vez por frame cuando se tiene timing completo. Si no hay presentMs (no low-latency), pasar 0.
+    // ===== Instrumentation of video timings (latencies) =====
+    // Call once per frame when you have full timing. If there is no presentMs (no low-latency), pass 0.
     void vita_netopt_on_frame_timing(uint64_t decodeStartMs, uint64_t decodeEndMs, uint64_t presentMs);
 
     struct VitaNetVideoTimingSnapshot
     {
-        // Promedios exponenciales (EMA) en ms
+        // Exponential Averages (EMA) in ms
         float avgDecodeMs;
         float avgPresentLatencyMs; // present - arrival/decodeEnd aproximado
         float emaAlpha; // alpha usada (debug)
-        uint32_t framesTimed; // cuántos frames alimentaron la estadística
-        uint32_t p95DecodeMs; // aproximación p95 (máx de ventana reducida)
+        uint32_t framesTimed; // how many frames fed the statistic
+        uint32_t p95DecodeMs; // p95 approximation (reduced window max)
         uint32_t p95PresentLatencyMs; // idem
         uint32_t lastDecodeMs;
         uint32_t lastPresentLatencyMs;
-        uint32_t forcedIdrRecently; // # IDR forzadas últimos ~10s
-        uint32_t waitingIdrMs; // si >0, tiempo acumulado esperando IDR
-        uint32_t lossBurstModeActive; // 1 si en modo burst
+        uint32_t forcedIdrRecently; // # IDR forced last ~10s
+        uint32_t waitingIdrMs; // if >0, accumulated time waiting for IDR
+        uint32_t lossBurstModeActive; // 1 yes in burst mode
     };
 
     int vita_netopt_get_video_timing(struct VitaNetVideoTimingSnapshot* out);

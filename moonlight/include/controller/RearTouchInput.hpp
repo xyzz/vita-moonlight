@@ -16,10 +16,8 @@ class RearTouchInputManager
     void setEnabled(bool enabled);
     bool isEnabled() const { return enabled; }
 
-    // Procesa el panel trasero y actualiza el estado del gamepad
     void process(GamepadState& state, bool isPstvModel);
 
-    // Resetea cualquier estado interno
     void dropState();
 
     const RearTouchSettings& getSettings() const { return currentSettings; }

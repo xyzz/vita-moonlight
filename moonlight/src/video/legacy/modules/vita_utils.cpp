@@ -19,12 +19,12 @@
 // External pixel processor
 extern PixelFormat::IPixelProcessor* g_pixelProcessor;
 
-// Definir constantes que pueden faltar
+// Define constants that may be missing
 #ifndef SCE_VIDEODEC_TYPE_HW_AVCDEC
 #define SCE_VIDEODEC_TYPE_HW_AVCDEC ((SceVideodecType)0x1001)
 #endif
 
-// Tiempo monotónico en ms
+// Monotonic time in ms
 uint64_t vita_monotonic_ms()
 {
     return sceKernelGetSystemTimeWide() / 1000ULL;
@@ -36,56 +36,56 @@ int vita_pacer_thread_main(SceSize args, void* argp)
     (void)args;
     (void)argp;
     VITA_DEBUG_LOG("[Video][PACER] thread iniciado");
-    // Ajustar afinidad: permitir que el pacer use dos núcleos si disponibles (user 0 y 1)
+    // Adjust affinity: allow the pacer to use two cores if available (user 0 and 1)
     sceKernelChangeThreadCpuAffinityMask(sceKernelGetThreadId(), SCE_KERNEL_CPU_MASK_USER_0 | SCE_KERNEL_CPU_MASK_USER_1);
     uint64_t last_50_tick      = vita_monotonic_ms();
     uint64_t last_500_tick     = last_50_tick;
-    uint64_t last_fps_reset_ms = last_50_tick; // Para resetear frame_count periódicamente (como legacy)
-    // Sincronizar target fps con configuración actual (curr_fps[1] se actualiza externamente)
+    uint64_t last_fps_reset_ms = last_50_tick; // To reset frame_count periodically (like legacy)
+    // Synchronize target fps with current settings (curr_fps[1] is updated externally)
     vita_netopt_set_target_fps(curr_fps[1] > 0 ? curr_fps[1] : 60);
     uint32_t fps_window_frames = 0;
     uint32_t logCounter        = 0;
     while (active_pacer_thread)
     {
-        sceKernelDelayThread(5 * 1000); // sleep corto (~5ms) para granularidad sin busy-wait
+        sceKernelDelayThread(5 * 1000); // short sleep (~5ms) for granularity without busy-wait
         uint64_t now = vita_monotonic_ms();
 
-        // Tick granular 50ms (loss window / conexión)
+        // Granular tick 50ms (loss window / connection)
         if (now - last_50_tick >= 50)
         {
             vita_netopt_tick_50ms();
             last_50_tick = now;
         }
-        // Tick backoff general (reusa anterior función)
+        // General backoff tick (reuse previous function)
         if (now - last_500_tick >= 500)
         {
             vita_netopt_tick();
             last_500_tick = now;
         }
 
-        // Resetear frame_count cada 1 segundo (como legacy) para evitar acumulación infinita
+        // Reset frame_count every 1 second (like legacy) to avoid infinite accumulation
         if (now - last_fps_reset_ms >= 1000)
         {
             fps_window_frames = frame_count;
-            frame_count       = 0; // Resetear frame_count para nueva ventana de 1s
+            frame_count       = 0; // Reset frame_count for new 1s window
             if (logCounter % 10 == 0)
-            { // Log cada 10 segundos (~10x 1000ms)
+            { // Log every 10 seconds (~10x 1000ms)
                 VITA_DEBUG_LOG("[Video][PACER][FPS] fps_window=%u need_drop=%d", fps_window_frames, need_drop);
             }
             logCounter++;
             last_fps_reset_ms = now;
         }
 
-        // Consumir drop budget adaptativo y cargar en need_drop (legacy variable) para compatibilidad
-        // CAMBIO: usar fps_window_frames fresco para calcular drops (no acumular indefinidamente)
+        // Consume adaptive drop budget and load into need_drop (legacy variable) for compatibility
+        // CHANGE: use fresh fps_window_frames to calculate drops (do not accumulate indefinitely)
         unsigned drops = vita_netopt_consume_drop_budget();
         if (drops)
         {
-            // En lugar de += (que acumula), usar un modelo similar a legacy: si fps_window > target, calcular drops frescos
-            // Por ahora, agregar con un límite razonable para evitar que need_drop explote
+            // Instead of += (which accumulates), use a model similar to legacy: if fps_window > target, calculate fresh drops
+            // For now, add with a reasonable limit to prevent need_drop from exploding
             need_drop += (int)drops;
             if (need_drop > 120)
-            { // Límite: no dejar que crezca más allá de 2 segundos de frames a 60fps
+            { // Limit: do not let it grow beyond 2 seconds of frames at 60fps
                 need_drop = 120;
             }
         }
@@ -124,7 +124,7 @@ extern "C" void vita_cleanup()
         vita2d_wait_rendering_done();
     }
 
-    // Liberar buffers que no afectan GXM (para evitar leaks entre sesiones)
+    // Release buffers that do not affect GXM (to avoid leaks between sessions)
     if (decoder_buffer)
     {
         free(decoder_buffer);
@@ -132,10 +132,10 @@ extern "C" void vita_cleanup()
         decoder_buffer_size = 0;
     }
 
-    // No liberar texturas aquí para evitar crash de GPU si Borealis aún las usa.
-    // Se liberarán en vita_init si la resolución cambia.
+    // Do not release textures here to avoid GPU crashes if Borealis still uses them.
+    // They will be freed in vita_init if the resolution changes.
 
-    // Liberar procesador de píxeles
+    // Unlock Pixel Processor
     if (g_pixelProcessor)
     {
         PixelFormat::destroyProcessor(g_pixelProcessor);
@@ -174,7 +174,7 @@ extern "C" void vita_cleanup()
     }
 
     // Mark video subsystem as not initialized and return after waiting for
-    // rendering to quiesce.
+    // rendering to rest
     video_status = VITA_VIDEO_NOT_INIT;
     VITA_DEBUG_LOG("[Video] soft cleanup completed (buffers freed, AVC termination done, full teardown deferred)");
 }

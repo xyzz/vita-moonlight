@@ -1,21 +1,21 @@
-// VitaVideoRenderer.hpp - Renderer simplificado centralizado (sin staging NVG)
+// VitaVideoRenderer.hpp - Simplified centralized renderer (without NVG staging)
 #pragma once
 
 #include <stdint.h>
 #include <vita2d.h>
-extern bool vita2d_inited; // definido en vita_globals.cpp
+extern bool vita2d_inited; // defined in vita_globals.cpp
 struct NVGcontext; // forward
 
-// No dependemos de NanoVG para el render (solo vita2d)
+// We do not depend on NanoVG for rendering (vita2d only)
 
 class VitaVideoRenderer final
 {
   public:
     static VitaVideoRenderer& instance();
     void draw(float viewportW, float viewportH);
-    // Compatibilidad con llamada antigua que incluía NVGcontext/alpha
+    // Support for old call that included NVGcontext/alpha
     void draw(struct NVGcontext* vg, float viewportW, float viewportH, float alpha = 1.0f);
-    // Nueva ruta: dibujar usando NanoVG (evita begin/end duplicados de vita2d)
+    // New path: draw using NanoVG (avoid duplicate begin/end of vita2d)
     void drawNVG(struct NVGcontext* vg, float viewportW, float viewportH, float alpha = 1.0f);
     void setFullscreenStretch(bool stretch);
     bool isFullscreenStretch() const { return fullscreenStretch; }
@@ -25,8 +25,8 @@ class VitaVideoRenderer final
 
   private:
     VitaVideoRenderer()    = default;
-    bool fullscreenStretch = true; // sincronizado con global video_fullscreen_stretch
-    // Recursos para imagen NVG (textura GXM directa)
+    bool fullscreenStretch = true; // synchronized with global video_fullscreen_stretch
+    // Resources for NVG image (direct GXM texture)
     struct NvgImageCacheEntry
     {
         const vita2d_texture* tex = nullptr;
@@ -35,10 +35,10 @@ class VitaVideoRenderer final
         int height                = 0;
     };
 
-    // Cache simple (max 2-3 entradas usualmente)
+    // Simple cache (max 2-3 entries usually)
     NvgImageCacheEntry imageCache[4];
     int imageCacheSize = 0;
 
-    // Diagnósticos
+    // Diagnostics
     uint32_t nvgImageCreateCount = 0;
 };

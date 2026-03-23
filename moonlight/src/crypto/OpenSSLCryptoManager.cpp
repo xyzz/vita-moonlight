@@ -310,12 +310,12 @@ static bool _generate_new_cert_key_pair(const std::string& keyDir)
     m_cert = _cert_data(cert);
     m_key  = _key_data(pk);
 
-    // --- Generar y guardar PKCS#12 (client.p12) con password "limelight" y alias "GameStream" ---
+    // GFE expects this legacy PKCS#12 password and alias.
     std::string p12Path = keyDir + "/client.p12";
     PKCS12* p12         = PKCS12_create(
         (char*)"limelight", // password
         (char*)"GameStream", // alias
-        pk, // clave privada
+        pk, // private key
         cert, // certificado
         NULL, 0, 0, 0, 0, 0);
     if (p12)

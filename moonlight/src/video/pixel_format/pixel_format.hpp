@@ -70,14 +70,14 @@ IPixelProcessor* createProcessor(int mode);
  */
 void destroyProcessor(IPixelProcessor* processor);
 
-// Modos disponibles
+// Available modes
 enum ProcessorMode
 {
-    MODE_RGBA_HARDWARE = 0, // Decoder produce RGBA en hardware (rápido, compatible)
+    MODE_RGBA_HARDWARE = 0, // Decoder produces RGBA in hardware (fast, compatible)
     MODE_YUV_GPU       = 1 // Decoder produce YUV para GPU shaders (futuro, 60 FPS)
 };
 
-// Constantes de formato de píxel del decoder
+// Decoder pixel format constants
 #ifndef SCE_AVCDEC_PIXELFORMAT_RGBA8888
 #define SCE_AVCDEC_PIXELFORMAT_RGBA8888 0x0
 #endif

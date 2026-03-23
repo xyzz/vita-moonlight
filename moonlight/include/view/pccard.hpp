@@ -6,7 +6,7 @@
 #pragma once
 #include <borealis.hpp>
 
-// Widget reutilizable para mostrar una "PC card" como un botón grande con imagen y nombre centrados.
+// Reusable widget to display a "PC card" as a large button with centered image and name.
 class PCCard : public brls::Button
 {
   public:
@@ -19,6 +19,6 @@ class PCCard : public brls::Button
   private:
     brls::Image* image = nullptr;
     brls::Label* label = nullptr;
-    brls::Box* box     = nullptr; // Guarda el layout para poder actualizarlo si se requiere
+    brls::Box* box     = nullptr; // Save the layout so you can update it if required
     std::function<void()> clickCb;
 };

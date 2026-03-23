@@ -18,10 +18,8 @@
 
 #include "controller/ControllerInput.hpp"
 
-// Asegura que el destructor virtual esté definido para evitar el error de vtable
 MainActivity::MainActivity()
 {
-    // Inicializar input manager si no existe
     if (!g_controllerInput)
     {
         g_controllerInput = new ControllerInputManager();

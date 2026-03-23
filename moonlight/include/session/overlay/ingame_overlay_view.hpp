@@ -4,8 +4,8 @@
 #include "borealis.hpp"
 #include "session/vita_session.hpp"
 
-// Overlay ingame inspirado en Moonlight-Switch pero simplificado para Vita.
-// Usa pestañas (Logout / Opciones) con posibilidad de expansión futura.
+// Ingame overlay inspired by Moonlight-Switch but simplified for Vita.
+// Uses tabs (Logout / Options) with the possibility of future expansion.
 
 class IngameOverlayView : public brls::TabFrame
 {
@@ -18,7 +18,7 @@ class IngameOverlayView : public brls::TabFrame
 
     VitaSession* m_session;
 
-    // Controles dinámicos básicos
+    // Basic dynamic controls
     brls::Label* m_statusLabel = nullptr;
 
     void updateStatus();

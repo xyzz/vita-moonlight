@@ -15,8 +15,8 @@ struct PrepCallbacks
     std::function<void()> onCancel; // Called if user cancels at the prompt
 };
 
-// Coordina el prompt de resolución y el handshake Moonmic/Sunshine.
-// resolutionPromptShown se actualiza para evitar mostrar el diálogo más de una vez.
+// Coordinates the resolution prompt and the Moonmic/Sunshine handshake.
+// resolutionPromptShown is updated to avoid showing the dialog more than once.
 void ensureSunshineReadyWithPrompt(const HostInfo& host,
     const StreamConfiguration& streamCfg,
     const VideoSettings& videoCfg,

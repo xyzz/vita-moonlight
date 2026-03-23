@@ -17,7 +17,7 @@
 #include <sstream>
 #include <string>
 
-// Definición fuera de clase para static std::string ConfigManager::getConfigPath();
+// Out-of-class definition for static std::string ConfigManager::getConfigPath();
 #ifdef _WIN32
 #include <windows.h>
 #endif
@@ -25,7 +25,7 @@
 std::string ConfigManager::getConfigPath()
 {
 #ifdef _WIN32
-    // En la misma carpeta que el exe
+    // In the same folder as the exe
     char buffer[MAX_PATH];
     GetModuleFileNameA(NULL, buffer, MAX_PATH);
     std::string path(buffer);
@@ -40,7 +40,7 @@ std::string ConfigManager::getConfigPath()
 #endif
 }
 
-// Helper privado: crear directorio recursivamente (mkdir -p)
+// Private Helper: create directory recursively (mkdir -p)
 static bool config_mkdir_recursive(const std::string& path, mode_t mode = 0777)
 {
     if (path.empty())
@@ -132,12 +132,12 @@ static int iniHandler(void* user, const char* section, const char* name, const c
 
 ConfigManager::ConfigManager() { }
 
-// Obtiene el directorio de llaves/dispositivos, configurable por archivo o por código
+// Gets the keys/devices directory, configurable by file or by code
 std::string ConfigManager::getKeysDir() const
 {
     if (keysDirLoaded)
         return cachedKeysDir;
-    // 1. Intentar leer de la config
+    // 1. Try to read from the config
     std::string dir = get("general", "keys_dir", "");
     if (!dir.empty())
     {
@@ -145,7 +145,7 @@ std::string ConfigManager::getKeysDir() const
         keysDirLoaded = true;
         return cachedKeysDir;
     }
-    // 2. Si no está en config, usar valor multiplataforma por defecto
+    // 2. If not in config, use cross-platform default value
 #if defined(__PSV__) || defined(__psp2__) || defined(__PSP2__)
     cachedKeysDir = "ux0:data/moonlight/devices";
 #elif defined(_WIN32)
@@ -217,8 +217,6 @@ void ConfigManager::set(const std::string& section, const std::string& key, cons
 {
     data[section][key] = value;
 }
-
-// --- Implementación de configuración de streaming ---
 
 StreamConfiguration ConfigManager::getStreamConfig() const
 {
@@ -303,7 +301,7 @@ VideoSettings ConfigManager::getVideoSettings() const
     settings.pixel_format_mode            = std::stoi(get("video", "pixel_format_mode", "0"));
     settings.gamepad_type                 = static_cast<GamepadType>(std::stoi(get("video", "gamepad_type", "0")));
 
-    // Configuración del Trackpad
+    // Trackpad Settings
     settings.trackpad_pointer_speed          = std::stoi(get("trackpad", "pointer_speed", "100"));
     settings.trackpad_dead_zone              = std::stoi(get("trackpad", "dead_zone", "50"));
     settings.trackpad_tap_to_click           = get("trackpad", "tap_to_click", "true") == "true";
@@ -396,7 +394,7 @@ void ConfigManager::setVideoSettings(const VideoSettings& settings)
     set("video", "pixel_format_mode", std::to_string(settings.pixel_format_mode));
     set("video", "gamepad_type", std::to_string(static_cast<int>(settings.gamepad_type)));
 
-    // Configuración del Trackpad
+    // Trackpad Settings
     set("trackpad", "pointer_speed", std::to_string(settings.trackpad_pointer_speed));
     set("trackpad", "dead_zone", std::to_string(settings.trackpad_dead_zone));
     set("trackpad", "tap_to_click", settings.trackpad_tap_to_click ? "true" : "false");

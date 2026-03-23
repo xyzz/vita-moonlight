@@ -127,7 +127,7 @@ TrackpadSettingsTab::TrackpadSettingsTab()
     deadZoneSlider->setDetailText(std::to_string(videoSettings.trackpad_dead_zone) + "px");
 }
 
-// Función auxiliar para aplicar cambios instantáneos del trackpad
+// Auxiliary function to apply instant trackpad changes
 void TrackpadSettingsTab::applyTrackpadSettingsLive()
 {
     if (!g_touchInput)
@@ -147,7 +147,7 @@ void TrackpadSettingsTab::applyTrackpadSettingsLive()
         settings.trackpad_multi_touch,
         settings.trackpad_edge_zone);
 
-    // Limpiar el estado del trackpad para garantizar que use el nuevo caché en el siguiente frame
+    // Clear trackpad state to ensure it uses the new cache in the next frame
     g_touchInput->dropTouch(TOUCHSCREEN_MODE_TRACKPAD);
 
     vita_debug_log(

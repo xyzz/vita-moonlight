@@ -8,8 +8,6 @@
 
 #include "audio/MicrophoneManager.hpp"
 #include "video/legacy/modules/vita_globals.hpp"
-// Evitamos dependencia de std::string por problemas de toolchain Vita
-// Renderer legacy eliminado: la presentación ahora la realiza SessionMainView usando VitaVideoRenderer
 
 static uint64_t monotonicMs()
 {
@@ -27,40 +25,34 @@ VitaStreamOverlayView::VitaStreamOverlayView()
 
 void VitaStreamOverlayView::onLayout()
 {
-    // Nada especial: el Box padre controla tamaño; si queremos ocupar todo podemos forzar dimensiones AUTO
-    // Podríamos ajustarnos al frame actual si se requiere.
 }
 
 void VitaStreamOverlayView::draw(NVGcontext* vg, float x, float y, float width, float height, brls::Style style, brls::FrameContext* ctx)
 {
-    // El frame de video ya se dibuja en SessionMainView::draw antes de los overlays.
 
     if (!g_video_settings_snapshot.show_fps)
         return;
 
     uint64_t now = monotonicMs();
     if (now - lastFetchMs > 500)
-    { // refrescar cada 0.5s
+    { // refresh every 0.5s
         vitavideo_get_stats(&cached);
         lastFetchMs = now;
     }
 
-    // Dibujar el panel base
     BaseOverlay::draw(vg, x, y, width, height, style, ctx);
 
-    // Dibujar las estadísticas encima del panel
     nvgFontSize(vg, 18.0f);
-    // Intentar reutilizar fuente de un label estándar si existe; como fallback usar font id 0
     nvgFontFaceId(vg, 0);
     nvgFillColor(vg, nvgRGBA(255, 255, 255, 255));
 
     char statsBuf[512];
     int off = 0;
-    // current_fps ahora refleja presentedFPS en la ventana más reciente calculada por renderer
+    // current_fps now reflects presentedFPS in the most recent window calculated by renderer
     off += snprintf(statsBuf + off, sizeof(statsBuf) - off, "FPS (presented/target): %u/%u\n", (unsigned)cached.current_fps, (unsigned)cached.target_fps);
-    // Añadir ratio decoded vs presented
+    // Add decoded vs presented ratio
     off += snprintf(statsBuf + off, sizeof(statsBuf) - off, "Frames dec/pres: %u/%u\n", (unsigned)cached.frames_decoded, (unsigned)cached.frames_presented);
-    // Mostrar FPS de decodificación calculado por el renderer
+    // Show decoding FPS calculated by the renderer
     off += snprintf(statsBuf + off, sizeof(statsBuf) - off, "Decoded FPS: %u\n", (unsigned)cached.decoded_fps);
     if (cached.frames_decoded > 0)
     {

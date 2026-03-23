@@ -1,6 +1,6 @@
 #include "keyboardkeys.hpp"
 
-// Diccionario para layout EN_US (teclado inglés)
+// Dictionary for EN_US layout (English keyboard)
 static const struct CharVKMap char_to_vk_dict_en_us[] = {
     { L'a', 0x41, 0 },
     { L'A', 0x41, 1 },
@@ -103,7 +103,7 @@ static const struct CharVKMap char_to_vk_dict_en_us[] = {
     { L'\b', 0x08, 0 },
 };
 
-// Diccionario para layout ES_ES (teclado español España)
+// Dictionary for layout ES_ES (Spanish keyboard Spain)
 static const struct CharVKMap char_to_vk_dict_es_es[] = {
     { L'a', 0x41, 0 },
     { L'A', 0x41, 1 },
@@ -200,7 +200,7 @@ static const struct CharVKMap char_to_vk_dict_es_es[] = {
     { L'\b', 0x08, 0 },
 };
 
-// Diccionario para layout ES_LATAM (teclado español latinoamericano)
+// Dictionary for ES_LATAM layout (Latin American Spanish keyboard)
 static const struct CharVKMap char_to_vk_dict_es_latam[] = {
     { L'a', 0x41, 0 },
     { L'A', 0x41, 1 },

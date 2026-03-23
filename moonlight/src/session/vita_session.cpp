@@ -1,4 +1,4 @@
-// vita_session.cpp - Stub Fase1 (solo administración mínima y notificación de frames)
+// vita_session.cpp - Stub Phase1 (minimal administration and frame notification only)
 #include "session/vita_session.hpp"
 
 #include <borealis/core/application.hpp>
@@ -42,13 +42,13 @@ void VitaSession::notifyGamepadType()
     if (!s_active || !s_active->m_is_active)
         return;
 
-    // Cargar el tipo de gamepad desde configuración
+    // Load gamepad type from settings
     ConfigManager config;
     config.load();
     VideoSettings settings = config.getVideoSettings();
     GamepadType type       = settings.gamepad_type;
 
-    // Enviar al servidor: LI_CTYPE_XBOX = 0x01, LI_CTYPE_PS = 0x02
+    // Send to server: LI_CTYPE_XBOX = 0x01, LI_CTYPE_PS = 0x02
     uint8_t liType                = (type == GAMEPAD_TYPE_PS4) ? 0x02 : 0x01;
     uint16_t capabilities         = 0x01 | 0x02; // ANALOG_TRIGGERS | RUMBLE
     uint32_t supportedButtonFlags = 0xFFFFFFFF;
@@ -113,7 +113,7 @@ bool VitaSession::start()
 {
     if (m_is_active)
         return true;
-    // Intentar reutilizar configuración previa (para mantener keys) si existe
+    // Try to reuse previous configuration (to maintain keys) if it exists
     STREAM_CONFIGURATION prev {};
     bool havePrev = GameStreamClient::instance().lastStreamConfig(m_address, prev);
     if (havePrev)
@@ -126,23 +126,23 @@ bool VitaSession::start()
         LiInitializeStreamConfiguration(&m_config);
         m_config.width              = 960;
         m_config.height             = 544;
-        m_config.fps                = 60; // objetivo 60
+        m_config.fps                = 60; // goal 60
         m_config.bitrate            = 8000; // Kbps (placeholder; luego leer settings)
         m_config.audioConfiguration = AUDIO_CONFIGURATION_STEREO;
         m_config.streamingRemotely  = STREAM_CFG_AUTO;
         m_config.packetSize         = 1024;
 #ifdef VIDEO_FORMAT_H264
-        m_config.supportedVideoFormats = VIDEO_FORMAT_H264; // Solo H.264 en Vita
+        m_config.supportedVideoFormats = VIDEO_FORMAT_H264; // H.264 only on Vita
 #endif
         m_config.encryptionFlags = m_is_sunshine ? ENCFLG_ALL : ENCFLG_NONE;
     }
-    // Limpiar cualquier bit no H.264
+    // Clear any non-H.264 bits
     if ((m_config.supportedVideoFormats & ~VIDEO_FORMAT_H264) != 0)
     {
         m_config.supportedVideoFormats = VIDEO_FORMAT_H264;
     }
 
-    // Inicializar callbacks conexión
+    // Initialize connection callbacks
     LiInitializeConnectionCallbacks(&m_conn_callbacks);
     m_conn_callbacks.stageStarting          = connection_stage_starting;
     m_conn_callbacks.stageComplete          = connection_stage_complete;
@@ -152,7 +152,7 @@ bool VitaSession::start()
     m_conn_callbacks.logMessage             = connection_log_message;
     m_conn_callbacks.connectionStatusUpdate = connection_status_update;
 
-    // Video callbacks: usar VideoManager para elegir entre legacy y FFmpeg
+    // Video callbacks: use VideoManager to choose between legacy and FFmpeg
     if (!VideoManager::instance()->initialize())
     {
         brls::Logger::error("[VitaSession] Fallo al inicializar VideoManager");
@@ -162,7 +162,7 @@ bool VitaSession::start()
     LiInitializeVideoCallbacks(&m_video_callbacks);
     m_video_callbacks = VideoManager::instance()->getDecoderCallbacks();
 
-    // Audio callbacks stub por ahora
+    // Audio callbacks stub for now
     LiInitializeAudioCallbacks(&m_audio_callbacks);
     m_audio_callbacks.init                = audio_renderer_init;
     m_audio_callbacks.start               = audio_renderer_start;
@@ -176,7 +176,7 @@ bool VitaSession::start()
 bool VitaSession::internalStart()
 {
     SERVER_DATA& srv = GameStreamClient::instance().serverData(m_address);
-    // Pasar el contexto de renderizado en renderContext
+    // Pass render context in renderContext
     void* renderContext = VideoManager::instance()->getRenderContext();
     int res             = LiStartConnection(&srv.serverInfo, &m_config, &m_conn_callbacks, &m_video_callbacks, &m_audio_callbacks, renderContext, 0, nullptr, 0);
     if (res != 0)
@@ -211,7 +211,7 @@ bool VitaSession::attemptReconnect()
         return false;
     m_reconnect_attempts++;
     brls::Logger::info("[VitaSession] Reconnect intento {}", m_reconnect_attempts);
-    // Simple: detener y reiniciar
+    // Simple: stop and restart
     LiStopConnection();
     return internalStart();
 }
@@ -291,7 +291,7 @@ void VitaSession::connection_status_update(int status)
         s_active->m_poor = (status == CONN_STATUS_POOR);
 }
 
-// ==== Video callbacks (hooks delegados a decoder vita actual) ====
+// ==== Video callbacks (hooks delegated to decode current vita) ====
 int VitaSession::video_decoder_setup(int a, int b, int c, int d, void* e, int f)
 {
     (void)a;

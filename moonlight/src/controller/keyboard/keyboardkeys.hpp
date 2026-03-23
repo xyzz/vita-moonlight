@@ -2,7 +2,7 @@
 
 #include <cwchar>
 
-// Estructura para el mapeo carácter → VK + shift
+// Structure for mapping character → VK + shift
 struct CharVKMap
 {
     wchar_t ch;
@@ -10,7 +10,7 @@ struct CharVKMap
     int needs_shift;
 };
 
-// Enumeración de layouts soportados
+// Enumeration of supported layouts
 enum KeyboardLayout
 {
     KB_LAYOUT_EN_US = 0,
@@ -19,8 +19,8 @@ enum KeyboardLayout
     KB_LAYOUT_COUNT
 };
 
-// Devuelve el diccionario y el tamaño para el layout seleccionado
+// Returns the dictionary and size for the selected layout
 const struct CharVKMap* get_char_vk_dict(KeyboardLayout layout, int* out_count);
 
-// Permite cambiar layout en tiempo de ejecución
+// Allows you to change layout at run time
 void keyboardsystem_set_layout(KeyboardLayout layout);

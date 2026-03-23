@@ -34,13 +34,13 @@ void AudioManager::pushPacket(const AudioPacket& pkt)
 
 void AudioManager::update(uint64_t nowMs)
 {
-    // Placeholder: drenar de forma simple (sin reproducción real aún)
-    // Política: mantener <= 60 paquetes en cola, descartar más antiguos si excede
+    // Placeholder: simple drain (no actual playback yet)
+    // Policy: keep <= 60 packets in queue, discard older ones if exceed
     const size_t MAX_QUEUE = 60;
     if (queue.size() > MAX_QUEUE)
     {
         size_t drop = queue.size() - MAX_QUEUE;
-        stats.packetsLost += (uint32_t)drop; // contar como pérdida lógica por overflow local
+        stats.packetsLost += (uint32_t)drop; // count as logical loss due to local overflow
         queue.erase(queue.begin(), queue.begin() + drop);
     }
     stats.queuedFrames = (uint32_t)queue.size();

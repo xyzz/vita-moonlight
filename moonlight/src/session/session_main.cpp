@@ -36,7 +36,7 @@
 #include "video/legacy/modules/vita_globals.hpp"
 #include "video/legacy/vita.hpp"
 
-// Implementación del constructor
+// Constructor implementation
 SessionMainView::SessionMainView(const HostInfo& host, const RemoteAppInfo& app)
     : brls::Box()
     , host(host)
@@ -48,7 +48,7 @@ SessionMainView::SessionMainView(const HostInfo& host, const RemoteAppInfo& app)
 
     this->inflateFromXMLRes("xml/views/session_main.xml");
 
-    // Asegurar que vita2d esté listo ANTES de cualquier potencial draw (defensivo)
+    // Ensure vita2d is ready BEFORE any potential draw (defensive)
     extern bool vita2d_inited;
     if (!vita2d_inited)
     {
@@ -60,20 +60,20 @@ SessionMainView::SessionMainView(const HostInfo& host, const RemoteAppInfo& app)
     // Inicializar input manager
     g_controllerInput = new ControllerInputManager();
 
-    // Notificar al servidor del tipo de gamepad guardado en config
+    // Notify server of gamepad type saved in config
     VitaSession::notifyGamepadType();
 
-    // Registrar callback de pausa en ControllerInputManager (START+L+R)
-    // Evitar abrir múltiples overlays si se mantiene la combinación pulsada.
+    // Register the pause shortcut with ControllerInputManager (START+L+R)
+    // Avoid opening multiple overlays by holding down the combination.
     g_controllerInput->setPauseCallback([this]()
         {
         // Atomically check-and-set the pause flag to avoid duplicate overlays
         if (SessionMainView::pauseOverlayOpen.exchange(true)) return;
-        // Deshabilitar envío de input mientras el overlay esté abierto para
-        // evitar que los botones interactúen con la transmisión.
+        // Disable input sending while the overlay is open to
+        // prevent buttons from interacting with the stream.
         if (g_controllerInput) g_controllerInput->setInputEnabled(false);
         auto overlay = new VitaPauseOverlay([this]() {
-            // restablecer el flag y reactivar el input cuando el overlay se cierre
+            // reset the flag and reactivate the input when the overlay closes
             SessionMainView::pauseOverlayOpen.store(false);
             if (g_controllerInput) g_controllerInput->setInputEnabled(true);
             // pop the overlay activity (Application::popActivity will manage input tokens and focus)
@@ -81,11 +81,11 @@ SessionMainView::SessionMainView(const HostInfo& host, const RemoteAppInfo& app)
         }, this->host);
         auto* activity = new brls::Activity(overlay);
         brls::Application::pushActivity(activity);
-        brls::Application::giveFocus(overlay->getDefaultFocus()); }); // Resetear input para evitar estados residuales de la UI anterior
+        brls::Application::giveFocus(overlay->getDefaultFocus()); }); // Reset input to avoid residual states of the previous UI
     if (g_controllerInput)
         g_controllerInput->dropInput();
 
-    // Ocultar UI base para dejar solo video y overlay
+    // Hide base UI to leave only video and overlay
     if (title)
         title->setVisibility(brls::Visibility::GONE);
     if (appLabel)
@@ -95,14 +95,14 @@ SessionMainView::SessionMainView(const HostInfo& host, const RemoteAppInfo& app)
     if (endBtn)
         endBtn->setVisibility(brls::Visibility::GONE);
 
-    // Nota: la gestión de atajo de pausa se realiza desde ControllerInputManager.
-    // Antes se registraba también en HotkeyManager pero esto causaba que el
-    // overlay se creara dos veces en condiciones de carrera. Se evita la
-    // duplicación registrando el callback solo en el input manager.
+    // Note: Pause shortcut management is done from ControllerInputManager.
+    // Previously it was also registered in HotkeyManager but this caused the
+    // overlay will be created twice in race conditions. It avoids the
+    // duplication by registering the callback only in the input manager.
 
 
-    // Intentar forzar loop de render a 60fps si el host negocia >30.
-    // Recuperar configuración de streaming y video.
+    // Try to force render loop at 60fps if the host negotiates >30.
+    // Recover streaming and video settings.
     ConfigManager cfgMgr;
     cfgMgr.load();
     StreamConfiguration streamCfg = cfgMgr.getStreamConfig();
@@ -119,14 +119,14 @@ SessionMainView::SessionMainView(const HostInfo& host, const RemoteAppInfo& app)
         this->addView(overlayStatsView.get());
     }
 
-    // Overlay de prueba: desactivado
+    // Test Overlay: Off
     // if (!testOverlay) {
     //     testOverlay = std::make_unique<TestOverlayStream>();
     // }
     // if (testOverlay) {
     //     testOverlay->setVisibility(brls::Visibility::GONE); // Desactivado
     //     this->addView(testOverlay.get());
-    //     // Dar foco al overlay de prueba para que pueda recibir navegación
+    //     // Give focus to the test overlay so it can receive navigation
     //     // brls::sync([this]() {
     //     //     if (testOverlay) brls::Application::giveFocus(testOverlay.get());
     //     // });
@@ -139,11 +139,11 @@ SessionMainView::SessionMainView(const HostInfo& host, const RemoteAppInfo& app)
         targetFps = 60;
     if (targetFps > 60)
         targetFps = 60;
-    brls::Application::setLimitedFPS(targetFps); // limitar FPS según configuración
-    brls::Application::setSwapInterval(1); // habilitar vsync para estabilidad
+    brls::Application::setLimitedFPS(targetFps); // limit FPS according to configuration
+    brls::Application::setSwapInterval(1); // enable vsync for stability
     brls::Logger::info("[SessionMainView] Init render config (cfg_fps={} -> limitedFPS={} swapInterval=1)", targetFps, targetFps);
 
-    // Modo Direct GXM eliminado. render_mode se normaliza: 0=legacy,1=ffmpeg (futuro)
+    // Direct GXM mode eliminated. render_mode normalizes: 0=legacy,1=ffmpeg (future)
     bool settingsChanged = false;
     if (videoSettings.render_mode > 1)
     {
@@ -168,14 +168,14 @@ void SessionMainView::draw(NVGcontext* vg, float x, float y, float width, float 
         g_controllerInput->handleInput();
     auto t1 = high_resolution_clock::now();
 
-    // Nueva ruta: usar NanoVG si está disponible para pintar el frame sin tocar el ciclo vita2d
+    // New route: use NanoVG if available to paint the frame without touching the vita2d cycle
     if (vg)
     {
         VitaVideoRenderer::instance().drawNVG(vg, width, height, 1.0f);
     }
     else
     {
-        // Fallback (sin vg): ruta directa vita2d (no debería suceder normalmente en Borealis)
+        // Fallback (without vg): vita2d direct path (should not happen normally in Borealis)
         VitaVideoRenderer::instance().draw(width, height);
     }
     auto t2 = high_resolution_clock::now();
@@ -183,7 +183,7 @@ void SessionMainView::draw(NVGcontext* vg, float x, float y, float width, float 
     Box::draw(vg, x, y, width, height, style, ctx);
     auto t3 = high_resolution_clock::now();
 
-    // Throttled logging (una vez cada ~500ms) para evitar spam
+    // Throttled logging (once every ~500ms) to avoid spam
     static uint64_t lastFrameLogMs = 0;
     uint64_t now_ms                = duration_cast<milliseconds>(t3.time_since_epoch()).count();
     if (now_ms - lastFrameLogMs > 500)
@@ -199,7 +199,7 @@ void SessionMainView::draw(NVGcontext* vg, float x, float y, float width, float 
     }
 }
 
-// Función para lanzar la pantalla principal de sesión
+// Function to launch the main session screen
 void showSessionMain(const HostInfo& host, const RemoteAppInfo& app)
 {
     auto* view = new SessionMainView(host, app);

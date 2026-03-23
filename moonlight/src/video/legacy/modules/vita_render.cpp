@@ -12,17 +12,17 @@
 
 #include "vita_globals.hpp"
 
-// Función para presentación externa
-// Presentación externa legacy eliminada (migrado a pipeline NanoVG). Mantener archivo para futuras rutas alternativas.
+// External presentation function
+// Legacy external presentation removed (migrated to NanoVG pipeline). Keep file for future alternative routes.
 
-// Función para iniciar el video
+// Function to start the video
 extern "C" void vitavideo_start()
 {
     VITA_DEBUG_LOG("[Video] vitavideo_start called");
     const VideoSettings& settings = g_video_settings_snapshot;
     active_video_thread           = true;
     vita2d_set_vblank_wait(settings.enable_vita_vblank_wait);
-    // Nota: presentación externa activada por defecto; no se dibuja dentro de submit
+    // Note: external presentation enabled by default; not drawn inside submit
     VITA_DEBUG_LOG("[Video] vitavideo_start completado");
     if (stats_start_ms == 0)
     {
@@ -31,7 +31,7 @@ extern "C" void vitavideo_start()
     }
 }
 
-// Función para detener el video
+// Video stop function
 extern "C" void vitavideo_stop()
 {
     VITA_DEBUG_LOG("[Video] vitavideo_stop called");
@@ -40,17 +40,17 @@ extern "C" void vitavideo_stop()
     VITA_DEBUG_LOG("[Video] vitavideo_stop completado");
 }
 
-// Función para configurar el pacer
+// Function to configure the pacer
 extern "C" void vitavideo_set_pacer(int pacer)
 {
     VITA_DEBUG_LOG("[Video] vitavideo_set_pacer: %d", pacer);
-    // Implementación del pacer si es necesario
+    // Implementation of the pacer if necessary
 }
 
-// Función para obtener estadísticas
+// Function to obtain statistics
 // Moved to vita_control.cpp
 
-// Función para obtener el estado del video
+// Feature to get video status
 extern "C" int vitavideo_get_status(VideoStatusInfo* status)
 {
     if (!status)

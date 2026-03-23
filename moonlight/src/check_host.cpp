@@ -4,7 +4,7 @@
     SPDX-License-Identifier: GPL-3.0-only
 */
 // check_host.cpp
-// Lógica centralizada de descubrimiento de hosts para PSVita y Windows
+// Centralized host discovery logic for PSVita and Windows
 
 #include <atomic>
 #include <borealis/core/logger.hpp>
@@ -22,7 +22,7 @@
 #include "tab/add_host_tab.hpp"
 #include "tab/hosts_tab.hpp"
 #endif
-// --- No se requiere inicialización manual de red Vita, udp_sniffer_vita lo gestiona ---
+// --- No manual Vita network initialization required, udp_sniffer_vita handles it ---
 
 #if defined(__PSV__)
 #include <psp2/kernel/threadmgr.h>
@@ -53,10 +53,8 @@ void stopVitaDiscovery()
     vitaThreadActive = false;
 }
 
-// --- Callback C para logging y reenvío ---
 extern "C"
 {
-    // Macro de log compatible con Vita y PC (como en legacy)
 #if defined(__PSV__)
 #include <psp2/kernel/clib.h>
 #define MDNS_LOG(...) sceClibPrintf(__VA_ARGS__)
@@ -86,7 +84,6 @@ void startVitaDiscovery(void (*hostFoundCb)(int, const char*, const char*, const
 #endif
     stopVitaDiscovery();
     brls::Logger::info("[check_host] startVitaDiscovery: después de stopVitaDiscovery");
-    // --- Inicialización manual de red Vita (como legacy) ---
     static void* net_mem        = nullptr;
     static bool net_initialized = false;
     if (!net_initialized)
@@ -179,13 +176,12 @@ void startVitaDiscovery(void (*hostFoundCb)(int, const char*, const char*, const
 #endif
         vitaDiscoveryStatus = 2;
         vitaThreadActive = false;
-        // Notificar al hilo principal para ocultar el spinner
         brls::sync([]() {
             if (AddHostTab::vitaInstance) {
                 brls::View* spinnerRow = AddHostTab::vitaInstance->getView("spinner_row");
                 if (spinnerRow)
                     spinnerRow->setVisibility(brls::Visibility::GONE);
-                // Limpiar la instancia de AddHostTab
+                // Clean up the AddHostTab instance
                 AddHostTab::vitaInstance = nullptr;
             }
         });
@@ -263,7 +259,6 @@ void startWinDiscovery(void (*hostFoundCb)(int, const char*, const char*, const 
         }
         udp_sniffer_win_deinit();
         winThreadActive = false;
-        // Notificar al hilo principal para ocultar el spinner
         brls::sync([]() {
             if (AddHostTab::winInstance) {
                 brls::View* spinnerRow = AddHostTab::winInstance->getView("spinner_row");

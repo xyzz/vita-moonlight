@@ -6,7 +6,7 @@
 #include <time.h>
 
 extern "C" uint64_t LiGetMillis();
-// Función original envuelta por el linker con --wrap
+// Original function wrapped by the linker with --wrap
 extern "C" void __real_LiRequestIdrFrame(void);
 
 typedef struct
@@ -24,13 +24,13 @@ typedef struct
     uint32_t suppressedSinceLastReal;
     uint64_t lastIdrCallBurstStartMs;
     uint32_t idrCallsInBurst;
-    // Nueva instrumentación
-    uint64_t waitingIdrStartMs; // >0 si estamos en ventana sin frame decodable
-    uint32_t forcedIdrWindowCount; // # forzadas en ventana móvil
-    uint64_t forcedIdrWindowStart; // inicio ventana (10s)
-    uint64_t lastDecodeEndMs; // para detectar gaps
-    uint8_t lossBurstMode; // modo agresivo tras burst
-    uint64_t lossBurstModeUntil; // timestamp fin modo
+    // New instrumentation
+    uint64_t waitingIdrStartMs; // >0 if we are in a window without a decodable frame
+    uint32_t forcedIdrWindowCount; // # forced in moving window
+    uint64_t forcedIdrWindowStart; // window start (10s)
+    uint64_t lastDecodeEndMs; // to detect gaps
+    uint8_t lossBurstMode; // aggressive mode after burst
+    uint64_t lossBurstModeUntil; // timestamp so
 } VitaNetOptStats;
 
 static volatile int g_enabled      = 1;
@@ -39,31 +39,31 @@ static VitaNetOptStats g_net_stats = { 0 };
 static const uint32_t BACKOFF_LEVELS[]    = { 350, 500, 750, 1000, 1500, 2000 };
 static const uint32_t BACKOFF_DECAY_MS    = 4000;
 static const uint32_t IDR_MAX_SUPPRESS_MS = 2500;
-// Timeout duro de espera sin frames decodificados (escalonado)
-static const uint32_t IDR_TIMEOUT_1_MS = 400; // primer forzado si ya suprimimos varias
-static const uint32_t IDR_TIMEOUT_2_MS = 900; // siempre forzar
-// Ventana para contar IDR forzadas recientes
+// Hard wait timeout without decoded frames (staggered)
+static const uint32_t IDR_TIMEOUT_1_MS = 400; // first forced if we already delete several
+static const uint32_t IDR_TIMEOUT_2_MS = 900; // always force
+// Window to count recent forced IDRs
 static const uint32_t FORCED_IDR_WINDOW_MS  = 10000;
 static const uint32_t LOSS_BURST_THRESHOLD  = 4;
 static const uint32_t BURST_FORCE_IDR_COUNT = 3;
-// Ventanas y parámetros de conexión
+// Windows and connection parameters
 static const uint32_t LOSS_SAMPLE_INTERVAL_MS = 50; // granular (legacy 50ms)
-static const uint32_t CONN_WINDOW_MS          = 1000; // ventana de estado
-static const uint32_t POOR_LOSS_PCT           = 15; // umbral degradación severa
+static const uint32_t CONN_WINDOW_MS          = 1000; // status window
+static const uint32_t POOR_LOSS_PCT           = 15; // severe degradation threshold
 static const uint32_t WARN_LOSS_PCT           = 5; // umbral aviso
 
-// Frame pacing adaptativo
+// adaptive frame pacing
 static unsigned g_target_fps           = 60;
 static uint64_t g_pace_window_start    = 0;
-static unsigned g_pace_frames_produced = 0; // decodificados en ventana
-static int g_drop_budget               = 0; // cuantos frames saltar próximamente
+static unsigned g_pace_frames_produced = 0; // decoded in window
+static int g_drop_budget               = 0; // how many frames to skip next
 
-// Tracking de pérdida (visto vs completado)
+// Loss tracking (viewed vs completed)
 static unsigned g_interval_good          = 0;
-static unsigned g_interval_total         = 0; // estimado (seen)
+static unsigned g_interval_total         = 0; // estimated (seen)
 static uint64_t g_interval_start_ms      = 0;
 static unsigned g_loss_percent_cached    = 0;
-static uint64_t g_last_loss_tick50       = 0; // último tick de 50ms
+static uint64_t g_last_loss_tick50       = 0; // last tick 50ms
 static VitaNetConnQuality g_conn_quality = VITA_NET_CONN_OKAY;
 
 // RFI simple
@@ -101,7 +101,7 @@ extern "C" void vita_netopt_request_idr_smart()
     uint32_t minInterval          = (g_net_stats.backoffLevel < (sizeof(BACKOFF_LEVELS) / sizeof(BACKOFF_LEVELS[0])) ? BACKOFF_LEVELS[g_net_stats.backoffLevel] : BACKOFF_LEVELS[sizeof(BACKOFF_LEVELS) / sizeof(BACKOFF_LEVELS[0]) - 1]);
     g_net_stats.lastMinIntervalMs = minInterval;
 
-    // Actualizar burst de llamadas: si pasó más de 120ms reiniciar ventana
+    // Refresh call burst: if more than 120ms passed restart window
     if (now - g_net_stats.lastIdrCallBurstStartMs > 120)
     {
         g_net_stats.lastIdrCallBurstStartMs = now;
@@ -118,17 +118,17 @@ extern "C" void vita_netopt_request_idr_smart()
         return;
     }
     bool urgent = false;
-    // Heurística de urgencia: muchas llamadas en ráfaga sin IDR real reciente
+    // Urgency heuristic: many burst calls without recent real IDR
     if (g_net_stats.idrCallsInBurst >= 6 && since > 200)
     {
-        urgent = true; // Depacketizer atrapado pidiendo IDR repetidamente
+        urgent = true; // Depacketizer caught asking for IDR repeatedly
     }
-    // Si hemos suprimido demasiadas veces y ya pasaron 500ms, forzar
+    // If we have deleted too many times and 500ms have already passed, force
     if (g_net_stats.suppressedSinceLastReal >= 5 && since > 500)
     {
         urgent = true;
     }
-    // Timeout duro escalonado si estamos esperando IDR (no frames buenos)
+    // Staggered hard timeout if we are waiting for IDR (not good frames)
     if (!urgent && g_net_stats.waitingIdrStartMs)
     {
         uint64_t waitingMs = now - g_net_stats.waitingIdrStartMs;
@@ -137,7 +137,7 @@ extern "C" void vita_netopt_request_idr_smart()
         else if (waitingMs >= IDR_TIMEOUT_1_MS && g_net_stats.suppressedSinceLastReal >= 2)
             urgent = true;
     }
-    // Si la última pérdida fue reciente y el tiempo desde IDR es moderado, permitir antes
+    // If the last loss was recent and the time since IDR is moderate, allow before
     if (!urgent)
     {
         if (since < minInterval)
@@ -158,7 +158,7 @@ extern "C" void vita_netopt_request_idr_smart()
     g_net_stats.idrRequests++;
     if (urgent)
     {
-        g_net_stats.forcedIdr++; // cuenta como forzado para diagnósticos
+        g_net_stats.forcedIdr++; // counts as forced for diagnostics
         if (g_net_stats.forcedIdrWindowStart == 0 || now - g_net_stats.forcedIdrWindowStart > FORCED_IDR_WINDOW_MS)
         {
             g_net_stats.forcedIdrWindowStart = now;
@@ -223,12 +223,12 @@ extern "C" void vita_netopt_tick()
         g_net_stats.consecutiveLossBursts = 0;
     if (g_net_stats.backoffLevel > 0 && now - g_net_stats.lastLossMs > BACKOFF_DECAY_MS)
         g_net_stats.backoffLevel--;
-    // Salir de modo burst si expira
+    // Exit burst mode if it expires
     if (g_net_stats.lossBurstMode && now >= g_net_stats.lossBurstModeUntil)
     {
         g_net_stats.lossBurstMode = 0;
     }
-    // Reset waitingIdr si tuvimos IDR real hace poco (<120ms) o decode volvió
+    // Reset waitingIdr if we had real IDR recently (<120ms) or decode returned
     if (g_net_stats.waitingIdrStartMs && g_net_stats.lastDecodeEndMs && (now - g_net_stats.lastDecodeEndMs) < 60)
     {
         g_net_stats.waitingIdrStartMs = 0;
@@ -260,7 +260,7 @@ extern "C" int vita_netopt_get_stats(struct VitaNetOptSnapshot* out)
     return 0;
 }
 
-// ====== Pacing y frameskip adaptativo ======
+// ====== Adaptive pacing and frameskip ======
 extern "C" void vita_netopt_set_target_fps(unsigned fps)
 {
     if (fps == 0 || fps > 240)
@@ -277,11 +277,11 @@ extern "C" void vita_netopt_frame_produced()
     uint64_t elapsed = now - g_pace_window_start;
     if (elapsed >= 1000)
     {
-        // Calcular exceso
+        // Calculate excess
         if (g_pace_frames_produced > g_target_fps)
         {
             int excess = (int)g_pace_frames_produced - (int)g_target_fps;
-            g_drop_budget += excess; // acumular como legacy
+            g_drop_budget += excess; // accumulate as legacy
             if (g_drop_budget > (int)g_target_fps)
                 g_drop_budget = g_target_fps; // cap
         }
@@ -299,7 +299,7 @@ extern "C" unsigned vita_netopt_consume_drop_budget()
     return drops;
 }
 
-// ====== Tracking de frames y pérdida ======
+// ====== Frame tracking and loss ======
 extern "C" void vita_netopt_on_frame_seen(unsigned frameIndex)
 {
     (void)frameIndex;
@@ -313,7 +313,7 @@ extern "C" void vita_netopt_on_frame_completed(unsigned frameIndex)
 {
     (void)frameIndex;
     g_interval_good++;
-    // Frame completado -> ya no esperamos IDR si había espera
+    // Frame completed -> we no longer wait for IDR if there was a wait
     g_net_stats.waitingIdrStartMs = 0;
 }
 
@@ -343,12 +343,12 @@ extern "C" void vita_netopt_tick_50ms()
     if (now - g_last_loss_tick50 >= LOSS_SAMPLE_INTERVAL_MS)
     {
         g_last_loss_tick50 = now;
-        // No reiniciamos cada 50ms, solo dejamos correr ventana de 1s
+        // We do not restart every 50ms, we only let the 1s window run
         if (g_interval_start_ms && now - g_interval_start_ms >= CONN_WINDOW_MS)
         {
-            // Recalcular calidad sobre la ventana
+            // Recalculate quality on the window
             recompute_conn_quality();
-            // Reiniciar ventana
+            // Restart window
             g_interval_start_ms = now;
             g_interval_good     = 0;
             g_interval_total    = 0;
@@ -382,7 +382,7 @@ extern "C" int vita_netopt_get_conn_snapshot(struct VitaNetConnSnapshot* out)
     return 0;
 }
 
-// ====== RFI rango simple ======
+// ====== RFI single range ======
 extern "C" void vita_netopt_try_invalidate_ref_range(unsigned startFrame, unsigned endFrame)
 {
     if (startFrame > endFrame)
@@ -398,7 +398,7 @@ extern "C" void vita_netopt_try_invalidate_ref_range(unsigned startFrame, unsign
         g_rfi_overflows++;
         // Overflow -> forzar IDR (similar a legacy queueFrameInvalidationTuple)
         vita_netopt_force_idr();
-        g_rfi_count = 0; // reset lista
+        g_rfi_count = 0; // reset list
     }
 }
 
@@ -406,11 +406,11 @@ extern "C" void vita_netopt_on_frame_loss_range(unsigned startFrame, unsigned en
 {
     vita_netopt_report_loss(endFrame >= startFrame ? (endFrame - startFrame + 1) : 1);
     vita_netopt_try_invalidate_ref_range(startFrame, endFrame);
-    // Activar modo burst agresivo (reduce supresión) durante 500ms
+    // Activate aggressive burst mode (reduces suppression) for 500ms
     uint64_t now                   = monotonicMs();
     g_net_stats.lossBurstMode      = 1;
     g_net_stats.lossBurstModeUntil = now + 500;
-    // Si todavía no había waitingIdrStart, inícialo (pérdida grave probablemente impide decode)
+    // If there was still no waitingIdrStart, start it (serious leak probably prevents decode)
     if (!g_net_stats.waitingIdrStartMs)
         g_net_stats.waitingIdrStartMs = now;
 }
@@ -428,7 +428,7 @@ extern "C" void vita_netopt_dump_extended()
         c.intervalMs, c.goodFrames, c.totalFrames, c.lossPercent, (int)c.quality, g_drop_budget, g_rfi_count, g_rfi_overflows, (unsigned)g_net_stats.lossBurstMode);
 }
 
-// Intercepción global del símbolo LiRequestIdrFrame
+// Global Interception of LiRequestIdrFrame Symbol
 extern "C" void __wrap_LiRequestIdrFrame(void)
 {
     vita_netopt_request_idr_smart();
@@ -451,19 +451,19 @@ typedef struct
 } VitaNetVideoTiming;
 
 static VitaNetVideoTiming g_video_timing = { 0 };
-static const float TIMING_EMA_ALPHA      = 0.12f; // respuesta rápida sin demasiado ruido
+static const float TIMING_EMA_ALPHA      = 0.12f; // fast response without too much noise
 
 static uint32_t compute_p95(uint32_t* arr, uint32_t count)
 {
     if (count == 0)
         return 0;
-    // copia pequeña y selección parcial (n<=32)
+    // small copy and partial selection (n<=32)
     uint32_t tmp[32];
     if (count > 32)
         count = 32;
     for (uint32_t i = 0; i < count; i++)
         tmp[i] = arr[i];
-    // ordenar simple (insertion) porque n pequeño
+    // sort simple (insertion) because n small
     for (uint32_t i = 1; i < count; i++)
     {
         uint32_t v = tmp[i];
@@ -512,7 +512,7 @@ extern "C" void vita_netopt_on_frame_timing(uint64_t decodeStartMs, uint64_t dec
     vt->p95DecodeMs  = compute_p95(vt->ringDecode, used);
     vt->p95PresentMs = compute_p95(vt->ringPresent, used);
 
-    // Señalar último decode para lógica de waiting
+    // Set last decode for waiting logic
     g_net_stats.lastDecodeEndMs = decodeEndMs;
 }
 

@@ -9,12 +9,12 @@
 #include "model/HostStorage.hpp"
 #include "utils/overlay_utils.hpp"
 
-// Overlay lateral para menú de pausa (aparece desde la derecha)
+// Side overlay for pause menu (appears from the right)
 class VitaPauseOverlay : public BaseOverlay
 {
   public:
-    // onClose será llamado cuando el overlay se cierre (para que el llamador
-    // pueda restablecer su flag de "overlay abierto").
+    // onClose will be called when the overlay closes (so that the caller
+    // can reset its "open overlay" flag).
     VitaPauseOverlay(std::function<void()> onClose, const HostInfo& hostInfo);
     ~VitaPauseOverlay() override;
     const char* describe() const { return "VitaPauseOverlay"; }

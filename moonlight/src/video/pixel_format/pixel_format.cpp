@@ -18,7 +18,7 @@ IPixelProcessor* createProcessor(int mode)
             return createYUVProcessor();
 
         default:
-            // Por defecto usar RGBA (compatible)
+            // By default use RGBA (compatible)
             return createRGBAProcessor();
     }
 }

@@ -129,7 +129,7 @@ void audio_decode_and_play_sample(char* data, int length)
 
     if (decoded != FRAME_SIZE)
     {
-        // Opus entregó menos samples de lo esperado; para mantener el timing, ignoramos este fragmento.
+        // Opus delivered fewer samples than expected; To maintain timing, we ignore this fragment.
         vita_debug_log("[Audio] Decode parcial=%d", decoded);
         return;
     }

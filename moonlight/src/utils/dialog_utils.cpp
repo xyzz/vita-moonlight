@@ -120,7 +120,7 @@ bool updateLoadingDialogText(brls::Dialog* dialog, const std::string& message)
 {
     if (!dialog)
         return false;
-    // Buscar recursivamente la primera Label dentro del diálogo
+    // Recursively search for the first Label within the dialog
     std::function<brls::View*(brls::View*)> findLabel;
     findLabel = [&findLabel](brls::View* v) -> brls::View*
     {

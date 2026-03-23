@@ -7,7 +7,7 @@
 
 #include "vita_globals.hpp"
 
-// Funciones de control y configuración
+// Control and configuration functions
 extern "C" void vitavideo_show_poor_net_indicator()
 {
     poor_net_indicator.activated = true;
@@ -23,9 +23,9 @@ extern "C" int vitavideo_initialized()
     return video_status != VITA_VIDEO_NOT_INIT;
 }
 
-// (Funciones legacy de configuración eliminadas; modos simplificados a pixel_format_mode y flags básicos)
+// (Legacy configuration functions removed; modes simplified to pixel_format_mode and basic flags)
 
-// Funciones de estadísticas
+// Statistics functions
 extern "C" void vitavideo_get_stats(VitaVideoStats* outStats)
 {
     if (!outStats)
@@ -44,7 +44,7 @@ extern "C" void vitavideo_reset_stats()
     last_fps_window_ms = stats_start_ms;
 }
 
-// Exponer textura actual
+// Expose current texture
 extern "C" vita2d_texture* vitavideo_get_current_texture()
 {
     return FRAME_FRONT();

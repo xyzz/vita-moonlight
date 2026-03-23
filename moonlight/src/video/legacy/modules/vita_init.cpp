@@ -40,7 +40,6 @@ static inline size_t align_up_size(size_t value, size_t alignment)
     return aligned;
 }
 
-// Definir constantes que pueden faltar
 #ifndef SCE_VIDEODEC_TYPE_HW_AVCDEC
 #define SCE_VIDEODEC_TYPE_HW_AVCDEC ((SceVideodecType)0x1001)
 #endif
@@ -54,21 +53,19 @@ extern "C" int vitavideo_setup(int videoFormat, int width, int height, int redra
     (void)videoFormat;
     (void)redrawRate;
     (void)context;
-    (void)drFlags; // de momento no usados en esta ruta simplificada
+    (void)drFlags; // currently not used on this simplified route
     int ret = 0;
-    // Registrar target FPS si es válido (>0)
     if (redrawRate > 0)
     {
         g_stats.target_fps = (uint32_t)redrawRate;
     }
-    // Paso 1: framebuffer y buffers iniciales
     if (video_status == VITA_VIDEO_NOT_INIT)
     {
         if (!vita2d_inited)
         {
             vita2d_init();
             vita2d_inited = true;
-            vita2d_set_vblank_wait(0); // desactivar espera de vblank para baja latencia
+            vita2d_set_vblank_wait(0); // disable vblank wait for low latency
         }
 
         // Ensure we register a one-time application-exit hook that will
@@ -84,17 +81,16 @@ extern "C" int vitavideo_setup(int videoFormat, int width, int height, int redra
             goto cleanup;
         }
 
-        vitavideo_update_scaling_settings(width, height); // define image_scaling basándose en resolución original
+        vitavideo_update_scaling_settings(width, height); // define image_scaling based on original resolution
 
         uint32_t alignedW      = VITA_DECODER_RESOLUTION(width);
         uint32_t alignedH      = VITA_DECODER_RESOLUTION(height);
         size_t rowBytesAligned = (size_t)alignedW * 4;
 
-        // Preparar staging RGBA antes de crear las texturas
         decoder_src_width            = width;
         decoder_src_height           = height;
         decoder_tried_direct_texture = false;
-        decoder_use_phys_fallback    = false; // intentar primero decode directo a textura; activar fallback dinámico si falla
+        decoder_use_phys_fallback    = false; // try first decode direct to texture; activate dynamic fallback if it fails
         decoder_output_mode          = g_video_settings_snapshot.pixel_format_mode;
         decoder_yuv_raw              = nullptr;
         decoder_yuv_buffer           = nullptr;
@@ -106,7 +102,7 @@ extern "C" int vitavideo_setup(int videoFormat, int width, int height, int redra
             decoder_output_mode = 0;
         }
 
-        // Inicializar procesador de píxeles modular
+        // Initialize modular pixel processor
         if (g_pixelProcessor)
         {
             PixelFormat::destroyProcessor(g_pixelProcessor);
@@ -136,16 +132,12 @@ extern "C" int vitavideo_setup(int videoFormat, int width, int height, int redra
             }
         }
 
-        // El sistema modular de pixel format maneja todos los buffers internamente
-        // No se necesita allocación legacy de staging buffers
-
         video_fullscreen_stretch = g_video_settings_snapshot.fullscreen;
         if (g_stats.target_fps == 0 && redrawRate > 0)
         {
             g_stats.target_fps = (uint32_t)redrawRate;
         }
         vita_netopt_set_target_fps(g_stats.target_fps ? g_stats.target_fps : 60);
-// Crear contexto SPS (fix) si no existe
 #ifdef __cplusplus
         if (!g_sps_ctx)
         {
@@ -171,7 +163,6 @@ extern "C" int vitavideo_setup(int videoFormat, int width, int height, int redra
         decoder_width        = init->horizontal;
         decoder_height       = init->vertical;
 
-        // Usar API Internal para resoluciones > 720p (requiere módulos PAF/AVCDEC)
         if (width > 1280 || height > 720)
         {
             VITA_DEBUG_LOG("[Video] Detectada resolución > 720p, usando API Internal");
@@ -185,7 +176,6 @@ extern "C" int vitavideo_setup(int videoFormat, int width, int height, int redra
         }
         else
         {
-            // API estándar para 720p o menos
             ret = sceVideodecInitLibrary(SCE_VIDEODEC_TYPE_HW_AVCDEC, init);
             if (ret < 0)
             {
@@ -213,7 +203,6 @@ extern "C" int vitavideo_setup(int videoFormat, int width, int height, int redra
         decoder_info->numOfRefFrames          = init->numOfRefFrames;
         SceAvcdecDecoderInfo decoder_info_out = { 0 };
 
-        // Usar API Internal para 1080p
         if (width > 1280 || height > 720)
         {
             ret = sceAvcdecQueryDecoderMemSizeInternal(SCE_VIDEODEC_TYPE_HW_AVCDEC, decoder_info, &decoder_info_out);
@@ -238,10 +227,9 @@ extern "C" int vitavideo_setup(int videoFormat, int width, int height, int redra
         size_t sz              = (decoder_info_out.frameMemSize + 0xFFFFF) & ~0xFFFFF;
         decoder->frameBuf.size = sz;
 
-        // CRÍTICO: Reutilizar decoderblock si ya existe (evita fragmentación en CDRAM)
+        // Reallocating this block fragments CDRAM between sessions.
         if (decoderblock >= 0)
         {
-            // Verificar si el tamaño es suficiente
             if (decoder_block_size < sz)
             {
                 VITA_DEBUG_LOG("[Video] Decoder existente insuficiente (size=%uMB req=%uMB), liberando...",
@@ -252,7 +240,6 @@ extern "C" int vitavideo_setup(int videoFormat, int width, int height, int redra
             }
             else
             {
-                // Reutilizar decoder existente de sesión previa
                 ret = sceKernelGetMemBlockBase(decoderblock, &decoder->frameBuf.pBuf);
                 if (ret >= 0 && decoder->frameBuf.pBuf)
                 {
@@ -260,7 +247,6 @@ extern "C" int vitavideo_setup(int videoFormat, int width, int height, int redra
                 }
                 else
                 {
-                    // Si falló GetBase, liberar y asignar nuevo
                     sceKernelFreeMemBlock(decoderblock);
                     decoderblock       = -1;
                     decoder_block_size = 0;
@@ -270,8 +256,7 @@ extern "C" int vitavideo_setup(int videoFormat, int width, int height, int redra
 
         if (decoderblock < 0)
         {
-            // Asignar nuevo decoder
-            // CRÍTICO: Usar CDRAM para decoder en 1080p (112MB disponibles vs 26MB PHYCONT)
+            // The 1080p decoder does not fit in PHYCONT.
             SceKernelMemBlockType decoderMemType = (width > 1280 || height > 720) ? SCE_KERNEL_MEMBLOCK_TYPE_USER_CDRAM_RW : SCE_KERNEL_MEMBLOCK_TYPE_USER_MAIN_PHYCONT_NC_RW;
             const char* memTypeName              = (width > 1280 || height > 720) ? "CDRAM" : "PHYCONT";
             VITA_DEBUG_LOG("[Video] Asignando decoder %uMB en %s", (unsigned)(sz >> 20), memTypeName);
@@ -298,7 +283,6 @@ extern "C" int vitavideo_setup(int videoFormat, int width, int height, int redra
     {
         VITA_DEBUG_LOG("[Video] Creando decoder AVC...");
 
-        // Usar API Internal para 1080p
         if (width > 1280 || height > 720)
         {
             ret = sceAvcdecCreateDecoderInternal(SCE_VIDEODEC_TYPE_HW_AVCDEC, decoder, decoder_info);
@@ -315,11 +299,10 @@ extern "C" int vitavideo_setup(int videoFormat, int width, int height, int redra
             goto cleanup;
         }
 
-        // === Reutilizar o crear texturas vita2d ===
         bool texturesOk      = true;
         bool reusingTextures = false;
 
-        // Verificar si las texturas existentes son del tamaño correcto
+        // Check if existing textures are the correct size
         if (frame_textures[0] && frame_textures[1])
         {
             unsigned int tex0_w = vita2d_texture_get_width(frame_textures[0]);
@@ -334,7 +317,7 @@ extern "C" int vitavideo_setup(int videoFormat, int width, int height, int redra
             }
             else
             {
-                // Tamaño diferente, liberar texturas viejas
+                // Different size, release old textures
                 VITA_DEBUG_LOG("[Video] Liberando texturas con tamaño incorrecto (old=%ux%u, new=%ux%u)",
                     tex0_w, tex0_h, width, height);
                 vita2d_free_texture(frame_textures[0]);
@@ -346,7 +329,7 @@ extern "C" int vitavideo_setup(int videoFormat, int width, int height, int redra
 
         if (!reusingTextures)
         {
-            // Crear nuevas texturas a resolución del stream
+            // Create new textures at stream resolution
             auto prevTexMemType = vita2d_texture_get_alloc_memblock_type();
             vita2d_texture_set_alloc_memblock_type(SCE_KERNEL_MEMBLOCK_TYPE_USER_CDRAM_RW);
             for (int i = 0; i < 2; i++)
@@ -392,13 +375,11 @@ extern "C" int vitavideo_setup(int videoFormat, int width, int height, int redra
         pacer_thread        = ret;
         active_pacer_thread = true;
         sceKernelStartThread(pacer_thread, 0, NULL);
-        // Ajustar afinidad del hilo principal (este thread que hace setup) para dejar un core libre al decoder/renderer
+        // Adjust affinity of the main thread (this thread that does setup) to leave a free core for the decoder/renderer
         SceUID selfId = sceKernelGetThreadId();
         sceKernelChangeThreadCpuAffinityMask(selfId, SCE_KERNEL_CPU_MASK_USER_0 | SCE_KERNEL_CPU_MASK_USER_2);
         video_status = VITA_VIDEO_INIT_FRAME_PACER_THREAD;
     }
-    // Configuración inicial: direct output ON, pure copy ON, sin síntesis de start codes (fallback los activará si es necesario)
-    // Modos legacy eliminados: no se requiere configuración adicional
     VITA_DEBUG_LOG("[Video] vitavideo_setup completado exitosamente, retornando 0");
     if (video_status_canary_pre != 0xDEADBEEF || video_status_canary_post != 0xBAADF00D)
     {
@@ -407,7 +388,7 @@ extern "C" int vitavideo_setup(int videoFormat, int width, int height, int redra
     return 0;
 cleanup:
     if (ret != 0 && vita2d_inited)
-    { // si falló setup parcial, liberar
+    { // if partial setup failed, release
         vita2d_fini();
         vita2d_inited = false;
     }

@@ -13,17 +13,17 @@
 typedef struct FFmpegVideoContext FFmpegVideoContext;
 #endif
 
-// VideoManager - Gestiona la selección y configuración del sistema de video
+// VideoManager - Manage video system selection and configuration
 class VideoManager
 {
   public:
     VideoManager();
     ~VideoManager();
 
-    // Inicialización
+    // Initialization
     bool initialize();
 
-    // Configuración del modo de renderizado
+    // Rendering mode settings
     void setRenderMode(const std::string& mode);
     std::string getRenderMode() const;
 
@@ -33,18 +33,18 @@ class VideoManager
     // If the selected renderer needs a render context (FFmpeg wrapper), expose it here
     void* getRenderContext();
 
-    // Control del video
+    // Video control
     void startVideo();
     void stopVideo();
 
-    // Instancia singleton
+    // singleton instance
     static VideoManager* instance();
 
     // Estado
     bool isInitialized() const { return _initialized; }
 
   private:
-    // Contextos de video
+    // Video contexts
     FFmpegVideoContext* _ffmpegContext;
 
     // Estado

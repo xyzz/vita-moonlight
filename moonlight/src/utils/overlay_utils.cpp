@@ -7,7 +7,7 @@ BaseOverlay::BaseOverlay()
 {
     this->setFocusable(true);
     this->setHideHighlight(true);
-    // No establecer background color para mantener transparencia
+    // Do not set background color to maintain transparency
 
     focusDummy = new FocusDummy();
     focusDummy->setFocusable(true);
@@ -32,12 +32,12 @@ BaseOverlay::BaseOverlay()
             return true; });
         focusDummy->registerAction(brls::getStr("global/back"), brls::BUTTON_B, [this](brls::View*)
             {
-            // Por defecto, activar como si fuera resume (índice 0)
+            // By default, activate as if it were resume (index 0)
             if (activateCallback) activateCallback(0);
             return true; });
         focusDummy->registerAction("Cerrar", brls::BUTTON_START, [this](brls::View*)
             {
-            // Por defecto, activar como si fuera resume
+            // By default, activate as if it were resume
             if (activateCallback) activateCallback(0);
             return true; });
     }
@@ -61,13 +61,13 @@ BaseOverlay::BaseOverlay()
         } });
     this->addGestureRecognizer(tapRecognizer);
 
-    // No usar brls::sync aquí - focusDummy puede no ser válido más tarde
-    // Dejar que willAppear() maneje el foco inicial
+    // Don't use brls::sync here - focusDummy may not be valid later
+    // Let willAppear() handle initial focus
 }
 
 BaseOverlay::~BaseOverlay()
 {
-    // focusDummy se elimina automáticamente por ser hijo
+    // focusDummy is automatically removed because it is a child
 }
 
 void BaseOverlay::setButtons(const std::vector<std::string>& labels)
@@ -163,7 +163,7 @@ void BaseOverlay::draw(NVGcontext* vg, float x, float y, float width, float heig
 
     float btnY = panelY + btnYStart;
     nvgFontSize(vg, 22.0f);
-    nvgFontFaceId(vg, 0); // Usar font ID como en test
+    nvgFontFaceId(vg, 0);
     for (size_t i = 0; i < buttonLabels.size(); ++i)
     {
         float btnX = panelX + btnXOffset;
@@ -189,7 +189,7 @@ void BaseOverlay::draw(NVGcontext* vg, float x, float y, float width, float heig
     {
         nvgFontSize(vg, 18.0f);
         nvgFontFaceId(vg, 0);
-        nvgFillColor(vg, nvgRGBA(200, 200, 200, 255)); // Color más tenue para footer
+        nvgFillColor(vg, nvgRGBA(200, 200, 200, 255));
         nvgText(vg, panelX + btnXOffset, btnY + 20.0f, footerText.c_str(), nullptr);
     }
 
@@ -199,7 +199,7 @@ void BaseOverlay::draw(NVGcontext* vg, float x, float y, float width, float heig
     if (now_ms - this->lastDrawLogMs > 500)
     {
         this->lastDrawLogMs = now_ms;
-        // Opcional: log draw time, pero por ahora silencioso
+        // Optional: log draw time, but silent for now
     }
 
     Box::draw(vg, x, y, width, height, style, ctx);
@@ -207,15 +207,15 @@ void BaseOverlay::draw(NVGcontext* vg, float x, float y, float width, float heig
 
 void BaseOverlay::drawFocus(NVGcontext* vg, float x, float y, float width, float height, brls::Style style, brls::FrameContext* ctx)
 {
-    // No dibujar el foco por defecto de Borealis
+    // Do not draw the default focus of Borealis
 }
 
 void FocusDummy::draw(NVGcontext* vg, float x, float y, float width, float height, brls::Style style, brls::FrameContext* ctx)
 {
-    // No dibujar nada
+    // Don't draw anything
 }
 
 void FocusDummy::drawFocus(NVGcontext* vg, float x, float y, float width, float height, brls::Style style, brls::FrameContext* ctx)
 {
-    // No dibujar foco
+    // Don't draw focus
 }

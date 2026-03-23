@@ -6,20 +6,20 @@
 #include "borealis.hpp"
 #include "client.h"
 
-// Estructura ligera de estadísticas (placeholder, ampliar luego)
+// Lightweight statistics structure (placeholder, expand later)
 struct VitaSessionStats
 {
     uint64_t videoFrames           = 0; // frames decodificados (onFrameDecoded)
-    uint64_t videoBytes            = 0; // futuro: acumular tamaño AU
-    uint64_t lastFrameNumber       = 0; // no usado aún (para drops network en Fase3)
+    uint64_t videoBytes            = 0; // future: accumulate size AU
+    uint64_t lastFrameNumber       = 0; // not used yet (for drops network in Phase3)
     uint64_t firstFrameTimestampMs = 0;
     // Ventana FPS
     uint32_t windowFrames  = 0;
     uint64_t windowStartMs = 0;
-    uint32_t fps           = 0; // calculado cada ~1000ms
+    uint32_t fps           = 0; // calculated every ~1000ms
 };
 
-// Mini snapshot para overlay (agregado sin exponer VitaVideoStats directamente)
+// Mini snapshot for overlay (added without exposing VitaVideoStats directly)
 struct VitaOverlaySnapshot
 {
     uint32_t fps_presented    = 0;
@@ -35,7 +35,7 @@ class VitaSession
     VitaSession(const std::string& address, int appId, bool isSunshine);
     ~VitaSession();
 
-    // Inicia la sesión (devuelve bool inmediato; logs profundos en callbacks)
+    // Start session (returns immediate bool; deep logs in callbacks)
     bool start();
     void stop(bool terminateApp);
 
@@ -44,28 +44,28 @@ class VitaSession
 
     const VitaSessionStats& stats() const { return m_stats; }
 
-    // Reconexión manual
+    // manual reconnection
     bool attemptReconnect();
 
-    // Acceso a la sesión activa
+    // Access to active session
     static VitaSession* active();
-    // Destruye (stop + free) la sesión activa si existe
+    // Destroy (stop + free) the active session if it exists
     static void destroyActive(bool terminateApp);
 
-    // Notificación desde el decoder cuando un frame queda listo (post swap)
+    // Notification from the decoder when a frame is ready (post swap)
     static void onFrameDecoded();
 
-    // Dibuja frame actual
+    // Draw current frame
     void draw(float viewportW, float viewportH);
 
-    // Obtiene snapshot para overlay (usa vitavideo_get_stats internamente)
+    // Get snapshot for overlay (uses vitavideo_get_stats internally)
     VitaOverlaySnapshot overlaySnapshot() const;
 
-    // Notificar al servidor del tipo de gamepad guardado en config
+    // Notify server of gamepad type saved in config
     static void notifyGamepadType();
 
   private:
-    // Callbacks estáticos estilo Moonlight-Switch
+    // Moonlight-Switch style static callbacks
     static void connection_stage_starting(int stage);
     static void connection_stage_complete(int stage);
     static void connection_stage_failed(int stage, int error_code);
@@ -103,7 +103,7 @@ class VitaSession
     bool m_poor          = false;
 
     int m_reconnect_attempts    = 0;
-    const int m_reconnect_limit = 1; // simple por ahora
+    const int m_reconnect_limit = 1; // simple for now
 
     VitaSessionStats m_stats {};
     uint64_t m_startMonotonicMs = 0;

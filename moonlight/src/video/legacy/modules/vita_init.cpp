@@ -16,7 +16,6 @@
 #include "video/pixel_format/pixel_format.hpp"
 #include "vita_globals.hpp"
 #include "vita_sceAvcInternal.hpp"
-// #include "libgamestream/sps.h" // deshabilitado (SPS context temporalmente fuera)
 
 // External pixel processor from vita_decode.cpp
 extern PixelFormat::IPixelProcessor* g_pixelProcessor;

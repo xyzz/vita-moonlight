@@ -218,7 +218,7 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/third_party/moonlight-common-c/s
 
 target_include_directories(${PROJECT_NAME} PRIVATE moonlight ${APP_PLATFORM_INCLUDE} ${CMAKE_SOURCE_DIR}/third_party ${CMAKE_SOURCE_DIR}/third_party/moonlight-common-c/reedsolomon ${CMAKE_SOURCE_DIR}/third_party/moonlight-common-c/src)
 
-# Incluye los headers principales, crypto y libgamestream para todo el proyecto
+# Incluye los headers principales, crypto y gamestream para todo el proyecto
 target_include_directories(${PROJECT_NAME} PUBLIC
     moonlight/include
     moonlight/src
@@ -226,19 +226,18 @@ target_include_directories(${PROJECT_NAME} PUBLIC
     third_party/
 )
 target_compile_options(${PROJECT_NAME} PRIVATE -ffunction-sections -fdata-sections ${APP_PLATFORM_OPTION})
-target_link_libraries(${PROJECT_NAME} PRIVATE borealis ${APP_PLATFORM_LIB} inih mdnsniff libgamestream libmoonmic)
+target_link_libraries(${PROJECT_NAME} PRIVATE borealis ${APP_PLATFORM_LIB} inih mdnsniff gamestream libmoonmic)
 
 if(PLATFORM_PSV)
     # Enlaza todas las librerías de PSVita necesarias (igual que moonlight-legacy)
-    if(BUILD_FFMPEG)
-        set(CRYPTO_LIBS "")
-    else()
-        set(CRYPTO_LIBS -lssl -lcrypto)
-    endif()
+    # curl del sysroot puede venir con backend OpenSSL (openssl.c.obj), incluso
+    # cuando BUILD_FFMPEG=ON. Enlazamos ssl+crypto para cubrir ambos casos.
+    set(CRYPTO_LIBS -lssl -lcrypto)
     target_link_libraries(${PROJECT_NAME} PRIVATE
         -lSceVshBridge_stub
         -lexpat
         -lcurl
+        -lzstd
         -lz
         ${CRYPTO_LIBS}
         -lopus
@@ -290,7 +289,7 @@ if(PLATFORM_PSV)
     moonlight/src
     third_party/moonlight-common-c/src/
     third_party/moonlight-common-c/reedsolomon/
-    third_party/libgamestream/
+    third_party/gamestream/
     third_party/h264bitstream/
     third_party/enet/include/
     third_party/inih/
@@ -298,7 +297,7 @@ if(PLATFORM_PSV)
 )
     # Si FFmpeg-vita está instalado en el sysroot, enlazar sus bibliotecas para
     # resolver símbolos usados por los sources FFmpeg que ahora se compilan
-    # dentro del árbol global de fuentes. Solo hacerlo si BUILD_FFMPEG está activo.
+    # dentro del árbol global de fuentes.
     if(BUILD_FFMPEG)
         if (EXISTS "$ENV{VITASDK}/arm-vita-eabi/lib/libavcodec.a")
             message(STATUS "Linking FFmpeg libs from VITASDK sysroot (absolute paths)")
@@ -330,6 +329,18 @@ if(PLATFORM_PSV)
             )
 
             target_link_libraries(${PROJECT_NAME} PRIVATE ${FFMPEG_LIBS})
+        endif()
+    else()
+        # yuv_gles2_renderer.cpp usa libswscale/libavutil independientemente
+        # de BUILD_FFMPEG, así que si están disponibles enlazamos también.
+        if (EXISTS "$ENV{VITASDK}/arm-vita-eabi/lib/libavutil.a" AND EXISTS "$ENV{VITASDK}/arm-vita-eabi/lib/libswscale.a")
+            message(STATUS "Linking libavutil and libswscale from VITASDK sysroot for YUV swscale renderer")
+            target_link_libraries(${PROJECT_NAME} PRIVATE
+                "$ENV{VITASDK}/arm-vita-eabi/lib/libavutil.a"
+                "$ENV{VITASDK}/arm-vita-eabi/lib/libswscale.a"
+            )
+        else()
+            message(WARNING "BUILD_FFMPEG=OFF and libavutil.a/libswscale.a not found. yuv_gles2_renderer.cpp requires these libs for swscale conversion.")
         endif()
     endif()
 endif()

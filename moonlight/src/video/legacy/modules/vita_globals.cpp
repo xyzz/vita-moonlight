@@ -1,6 +1,8 @@
 #include "vita_globals.hpp"
 
-#include "libgamestream/sps.h"
+#include <mutex>
+
+#include "gamestream/sps.h"
 
 VideoStatus video_status          = VITA_VIDEO_NOT_INIT;
 uint32_t video_status_canary_pre  = 0xDEADBEEF;
@@ -18,7 +20,8 @@ SceVideodecQueryInitInfoHwAvcdec* init  = NULL;
 vita2d_texture* frame_textures[2] = { nullptr, nullptr };
 int frame_front_idx               = 0;
 int frame_back_idx                = 1;
-bool single_frame_buffer          = false; // default double buffer; can be activated for legacy testing
+std::mutex g_frame_slots_mutex;
+bool single_frame_buffer = false; // default double buffer; can be activated for legacy testing
 // vita2d initialization state
 bool vita2d_inited = false;
 

@@ -26,7 +26,9 @@
 #include "ConfigManager.hpp"
 #include "debug.hpp"
 #ifdef __cplusplus
-#include "libgamestream/sps.h"
+#include <mutex>
+
+#include "gamestream/sps.h"
 extern gs::SpsContext* g_sps_ctx; // SPS context (raw pointer)
 #endif
 
@@ -103,6 +105,9 @@ extern int frame_front_idx;
 extern int frame_back_idx;
 #define FRAME_FRONT() (frame_textures[frame_front_idx])
 #define FRAME_BACK() (frame_textures[frame_back_idx])
+#ifdef __cplusplus
+extern std::mutex g_frame_slots_mutex;
+#endif
 // Single buffer mode (no double buffering). When active, FRONT and BACK are the same index.
 extern bool single_frame_buffer;
 // vita2d initialization flag (new) to make sure we don't call APIs without GXM context

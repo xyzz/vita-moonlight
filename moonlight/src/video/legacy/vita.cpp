@@ -20,7 +20,7 @@
 
 #include "ConfigManager.hpp"
 #include "debug.hpp"
-#include "libgamestream/sps.h" // clase SpsContext + flags
+#include "gamestream/sps.h" // clase SpsContext + flags
 
 // Refactored modules
 #include "modules/vita_globals.hpp"

@@ -12,7 +12,7 @@
 
 #include "vita_globals.hpp"
 #ifdef __cplusplus
-#include "libgamestream/sps.h"
+#include "gamestream/sps.h"
 extern gs::SpsContext* g_sps_ctx;
 #endif
 #include <borealis/extern/nanovg/nanovg.h>

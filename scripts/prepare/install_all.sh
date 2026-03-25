@@ -171,9 +171,9 @@ install_package_dir() {
       popd >/dev/null
       return 2
     fi
-    # Use vdpm to install
-    echo "Installing ${armpkg%%$'\n'*} via vdpm..."
-    vdpm ${armpkg%%$'\n'*}
+    # Use vdpm to install (force replace if package was previously installed)
+    echo "Installing ${armpkg%%$'\n'*} via vdpm (-f)..."
+    vdpm -f ${armpkg%%$'\n'*}
   else
     echo "vita-makepkg failed in $pkgdir" >&2
     popd >/dev/null
@@ -217,7 +217,16 @@ uninstall_existing_for_pkgdir() {
       # use vdpm uninstall mode
       if command -v vdpm >/dev/null 2>&1; then
         if ! vdpm -u "$pkgname"; then
-          echo "vdpm uninstall failed for $pkgname" >&2
+          # Fallback: try the base package token (e.g. curl from curl-8.9.1-2-arm)
+          local base_pkg="${pkgname%%-[0-9]*}"
+          if [ -n "$base_pkg" ] && [ "$base_pkg" != "$pkgname" ]; then
+            echo "vdpm uninstall failed for $pkgname; trying fallback package name: $base_pkg"
+            if ! vdpm -u "$base_pkg"; then
+              echo "vdpm uninstall failed for fallback package $base_pkg" >&2
+            fi
+          else
+            echo "vdpm uninstall failed for $pkgname" >&2
+          fi
         fi
       else
         echo "vdpm not found: cannot uninstall $pkgname" >&2
@@ -270,7 +279,7 @@ else
       rm -rf "$TMPDIR"
       exit 11
     fi
-    vdpm ${armpkg%%$'\n'*}
+    vdpm -f ${armpkg%%$'\n'*}
   else
     echo "vita-makepkg failed for OpenSSL curl" >&2
     popd >/dev/null
@@ -300,6 +309,9 @@ cleanup_package_artifacts() {
   # Remove generated package files
   rm -f ./*-arm.tar.xz ./*-arm.tar.gz || true
 
+  # Remove local packaging staging/output directory created by vita-makepkg
+  rm -rf pkg || true
+
   # Remove any extracted source directories
   # These are typically named like: curl-8.9.1, mbedtls-3.4.1, FFmpeg-n6.0, SDL-<gitrev>
   for dir in curl-* mbedtls-* FFmpeg-* SDL-* ffmpeg-*; do
@@ -322,7 +334,7 @@ cleanup_package_artifacts "$SCRIPT_DIR/sdl2"
 cleanup_package_artifacts "$SCRIPT_DIR/curl"
 
 # If curl was built with OpenSSL using a temporary directory, it was already cleaned up above
-echo "Cleanup complete. Package directories now contain only VITABUILD and patch files."
+echo "Cleanup complete. Package directories now contain only VITABUILD, patches and helper scripts."
 
 echo "If you used Docker, the Dockerfile already automates this (see scripts/prepare/Dockerfile and scripts/prepare/gxm.Dockerfile)."
 

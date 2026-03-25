@@ -5,13 +5,14 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <atomic>
 #include <borealis/core/logger.hpp>
 #include <mutex>
 #include <unordered_map>
-#include <unordered_set>
+#include <vector>
 
-#include "libgamestream/client.h"
-#include "libgamestream/errors.h"
+#include "gamestream/client.h"
+#include "gamestream/errors.h"
 
 extern "C"
 {
@@ -78,28 +79,45 @@ static std::mutex g_dr_mutex;
 // Track VRAM mapping counts and deferred frees by memblock id.
 static std::mutex g_vram_mutex;
 static std::unordered_map<SceUID, int> g_vram_map_count;
-static std::unordered_set<SceUID> g_vram_pending_free;
+static std::unordered_map<SceUID, uint64_t> g_vram_pending_free;
+static std::atomic<uint64_t> g_decode_epoch { 0 };
+static const uint64_t k_vram_free_grace_epochs = 16;
 
 static void process_pending_vram_frees_if_safe()
 {
     std::lock_guard<std::mutex> lock(g_vram_mutex);
+    bool decoderActive = (g_active_decodes.load(std::memory_order_acquire) > 0);
+    bool stopRequested = g_ffmpeg_stop_request.load(std::memory_order_acquire);
+    if (decoderActive || stopRequested)
+    {
+        return;
+    }
     if (!g_vram_pending_free.empty())
     {
         std::vector<SceUID> to_free;
         to_free.reserve(g_vram_pending_free.size());
-        for (SceUID mb : g_vram_pending_free)
+        uint64_t nowEpoch = g_decode_epoch.load(std::memory_order_acquire);
+        for (const auto& pending : g_vram_pending_free)
         {
-            auto it = g_vram_map_count.find(mb);
-            if (it == g_vram_map_count.end() || it->second == 0)
+            SceUID mb           = pending.first;
+            uint64_t deferEpoch = pending.second;
+            auto it             = g_vram_map_count.find(mb);
+            bool unmapped       = (it == g_vram_map_count.end() || it->second == 0);
+            bool graceElapsed   = (nowEpoch >= deferEpoch) && ((nowEpoch - deferEpoch) >= k_vram_free_grace_epochs);
+            if (unmapped && graceElapsed)
             {
                 to_free.push_back(mb);
             }
         }
         for (SceUID mb : to_free)
         {
+            auto pit            = g_vram_pending_free.find(mb);
+            uint64_t deferEpoch = (pit != g_vram_pending_free.end()) ? pit->second : 0;
             g_vram_pending_free.erase(mb);
             sceKernelFreeMemBlock(mb);
-            VITA_DEBUG_LOG("[FFMPEG] process_pending_vram_frees_if_safe: freed memblock %d", mb);
+            VITA_DEBUG_LOG("[FFMPEG] process_pending_vram_frees_if_safe: freed memblock %d (epoch_delta=%llu)",
+                mb,
+                (unsigned long long)(nowEpoch - deferEpoch));
         }
     }
 }
@@ -120,7 +138,12 @@ static void vram_free(void* opaque, uint8_t* data)
     {
         // Some dr_texture still has mapped VRAM: defer free until unmapped.
         VITA_DEBUG_LOG("[FFMPEG] vram_free: memblock %d map_count=%d decoderActive=%d stop_request=%d -> defer free", mb, isMapped ? it->second : 0, decoderActive ? 1 : 0, (int)g_ffmpeg_stop_request.load());
-        g_vram_pending_free.insert(mb);
+        uint64_t nowEpoch = g_decode_epoch.load(std::memory_order_acquire);
+        auto existing     = g_vram_pending_free.find(mb);
+        if (existing == g_vram_pending_free.end())
+        {
+            g_vram_pending_free.emplace(mb, nowEpoch);
+        }
     }
     else
     {
@@ -240,11 +263,15 @@ static void dr_texture_detach(dr_texture* tex)
                 if (it->second == 0)
                 {
                     g_vram_map_count.erase(it);
-                    // if there was a deferred free, perform it now
+                    // If there was a deferred free, only release when no decode is active.
                     if (g_vram_pending_free.count(mb))
                     {
-                        g_vram_pending_free.erase(mb);
-                        sceKernelFreeMemBlock(mb);
+                        bool decoderActive = (g_active_decodes.load(std::memory_order_acquire) > 0);
+                        bool stopRequested = g_ffmpeg_stop_request.load(std::memory_order_acquire);
+                        VITA_DEBUG_LOG("[FFMPEG] dr_texture_detach: keeping deferred memblock %d (decoderActive=%d stop_request=%d)",
+                            mb,
+                            decoderActive ? 1 : 0,
+                            stopRequested ? 1 : 0);
                     }
                 }
             }
@@ -331,8 +358,13 @@ static void dr_texture_attach(dr_texture* tex, AVFrame* frame)
 }
 #endif // BOREALIS_USE_GXM
 
+#ifndef BOREALIS_USE_GXM
+static inline void process_pending_vram_frees_if_safe() { }
+#endif
+
 static void reset_global_slots()
 {
+    std::lock_guard<std::mutex> slotLock(g_frame_slots_mutex);
     frame_textures[0]   = nullptr;
     frame_textures[1]   = nullptr;
     frame_front_idx     = 0;
@@ -448,8 +480,6 @@ static bool publish_direct_frame(FFmpegVideoContext* ctx, AVFrame* frame)
     dr_texture_detach(texBack);
     dr_texture_attach(texBack, frame);
 
-    // Ensure we use double buffer mode to swap textures and keep NVG updated
-    single_frame_buffer = false;
     // Swap front/back so front points to newly attached texture
     int tmp           = ctx->dr_front_idx;
     ctx->dr_front_idx = ctx->dr_back_idx;
@@ -473,7 +503,12 @@ static bool publish_sw_frame(FFmpegVideoContext* ctx, AVFrame* frame)
     (void)frame;
     return false;
 #else
-    VITA_DEBUG_LOG("[FFMPEG] publish_sw_frame: frame=%p", frame);
+    static uint32_t s_sw_log_counter = 0;
+    bool verboseSwLog                = ((s_sw_log_counter++ % 180) == 0);
+    if (verboseSwLog)
+    {
+        VITA_DEBUG_LOG("[FFMPEG] publish_sw_frame: frame=%p", frame);
+    }
     if (!frame)
     {
         return false;
@@ -484,8 +519,11 @@ static bool publish_sw_frame(FFmpegVideoContext* ctx, AVFrame* frame)
         VITA_DEBUG_LOG("[FFMPEG] publish_sw_frame: frame->data[0] is null");
         return false;
     }
-    VITA_DEBUG_LOG("[FFMPEG] publish_sw_frame: frame data[0]=%p linesize[0]=%d", frame->data[0], frame->linesize[0]);
-    VITA_DEBUG_LOG("[FFMPEG] frame data[1]=%p linesize[1]=%d data[2]=%p linesize[2]=%d", frame->data[1], frame->linesize[1], frame->data[2], frame->linesize[2]);
+    if (verboseSwLog)
+    {
+        VITA_DEBUG_LOG("[FFMPEG] publish_sw_frame: frame data[0]=%p linesize[0]=%d", frame->data[0], frame->linesize[0]);
+        VITA_DEBUG_LOG("[FFMPEG] frame data[1]=%p linesize[1]=%d data[2]=%p linesize[2]=%d", frame->data[1], frame->linesize[1], frame->data[2], frame->linesize[2]);
+    }
 
     if (ensure_sw_texture(ctx, frame->width, frame->height) < 0)
     {
@@ -494,8 +532,11 @@ static bool publish_sw_frame(FFmpegVideoContext* ctx, AVFrame* frame)
 
     // Use the actual source pixel format reported by the decoder/frame.
     enum AVPixelFormat srcFmt = (enum AVPixelFormat)frame->format;
-    VITA_DEBUG_LOG("[FFMPEG] frame->format=%d, using srcFmt=%d for sws_getCachedContext (w=%d h=%d)",
-        frame->format, (int)srcFmt, frame->width, frame->height);
+    if (verboseSwLog)
+    {
+        VITA_DEBUG_LOG("[FFMPEG] frame->format=%d, using srcFmt=%d for sws_getCachedContext (w=%d h=%d)",
+            frame->format, (int)srcFmt, frame->width, frame->height);
+    }
     ctx->sws_context = sws_getCachedContext(ctx->sws_context,
         frame->width,
         frame->height,
@@ -503,7 +544,7 @@ static bool publish_sw_frame(FFmpegVideoContext* ctx, AVFrame* frame)
         frame->width,
         frame->height,
         AV_PIX_FMT_RGBA,
-        SWS_BILINEAR,
+        SWS_FAST_BILINEAR,
         nullptr,
         nullptr,
         nullptr);
@@ -586,15 +627,12 @@ static bool publish_sw_frame(FFmpegVideoContext* ctx, AVFrame* frame)
                     tmp_inStride[1] = packed_lines[1];
                     tmp_inStride[2] = packed_lines[2];
                     used_temp       = true;
-                    VITA_DEBUG_LOG("[FFMPEG] publish_frame (direct): front_tex=%p back_tex=%p dr_front_idx=%d dr_back_idx=%d",
-                        frame_textures[0], frame_textures[1], ctx->dr_front_idx, ctx->dr_back_idx);
-                    tmp_y = packed_buf;
+                    tmp_y           = packed_buf;
                 }
                 else
                 {
                     av_free(packed_buf);
                 }
-                VITA_DEBUG_LOG("[FFMPEG] publish_frame (sw): tex=%p", frame_textures[0]);
             }
         }
         if (!used_temp)
@@ -672,13 +710,20 @@ static bool publish_sw_frame(FFmpegVideoContext* ctx, AVFrame* frame)
         }
     }
 
-    VITA_DEBUG_LOG("[FFMPEG] sws_scale: inStride[0]=%d inStride[1]=%d inStride[2]=%d outStride[0]=%d sw_texture_stride=%d",
-        tmp_inStride[0], tmp_inStride[1], tmp_inStride[2], outStride[0], ctx->sw_texture_stride);
+    if (verboseSwLog)
+    {
+        VITA_DEBUG_LOG("[FFMPEG] sws_scale: inStride[0]=%d inStride[1]=%d inStride[2]=%d outStride[0]=%d sw_texture_stride=%d",
+            tmp_inStride[0], tmp_inStride[1], tmp_inStride[2], outStride[0], ctx->sw_texture_stride);
+    }
     int swsRet = sws_scale(ctx->sws_context, (const uint8_t**)tmp_inData, tmp_inStride, 0, frame->height, outData, outStride);
-    VITA_DEBUG_LOG("[FFMPEG] sws_scale returned %d", swsRet);
+    if (verboseSwLog)
+    {
+        VITA_DEBUG_LOG("[FFMPEG] sws_scale returned %d", swsRet);
+    }
 
-    // Diagnostics: if sws_scale failed, log plane VRAM status and a few bytes
-    if (swsRet <= 0)
+    // Diagnostics: treat only negative values as errors.
+    // On some Vita FFmpeg builds sws_scale may return 0 while still producing output.
+    if (swsRet < 0)
     {
         bool p0_vram = is_vram_ptr(inData[0]);
         bool p1_vram = is_vram_ptr(inData[1]);
@@ -729,21 +774,36 @@ static bool publish_sw_frame(FFmpegVideoContext* ctx, AVFrame* frame)
             av_free(tmp_u);
             av_free(tmp_v);
         }
-
-        // If we used an intermediate RGBA output buffer, copy it into the vita texture now
-        if (used_out_tmp && rgba_tmp)
+        if (rgba_tmp)
         {
-            // Copy row-by-row because texture stride may be larger than width*4
-            for (int yy = 0; yy < h; ++yy)
-            {
-                uint8_t* dstrow = dst + (size_t)yy * (size_t)ctx->sw_texture_stride;
-                uint8_t* srcrow = rgba_tmp + (size_t)yy * (size_t)rgba_stride;
-                memcpy(dstrow, srcrow, (size_t)rgba_stride);
-            }
             av_free(rgba_tmp);
             rgba_tmp = nullptr;
         }
         return false;
+    }
+
+    if (swsRet == 0 && verboseSwLog)
+    {
+        VITA_DEBUG_LOG("[FFMPEG] sws_scale returned 0; accepting frame as valid on Vita path");
+    }
+
+    if (used_temp)
+    {
+        av_free(tmp_y);
+        av_free(tmp_u);
+        av_free(tmp_v);
+    }
+
+    if (used_out_tmp && rgba_tmp)
+    {
+        for (int yy = 0; yy < h; ++yy)
+        {
+            uint8_t* dstrow = dst + (size_t)yy * (size_t)ctx->sw_texture_stride;
+            uint8_t* srcrow = rgba_tmp + (size_t)yy * (size_t)rgba_stride;
+            memcpy(dstrow, srcrow, (size_t)rgba_stride);
+        }
+        av_free(rgba_tmp);
+        rgba_tmp = nullptr;
     }
 
     ctx->current_frame.texture       = ctx->sw_texture;
@@ -778,7 +838,11 @@ static bool publish_frame(FFmpegVideoContext* ctx, AVFrame* frame, uint64_t ptsU
         return false;
     }
 
-    VITA_DEBUG_LOG("[FFMPEG] publish_frame: ctx=%p frame=%p pts=%llu format=%d width=%d height=%d", ctx, frame, ptsUs, frame->format, frame->width, frame->height);
+    static uint32_t s_publish_log_counter = 0;
+    if ((s_publish_log_counter++ % 240) == 0)
+    {
+        VITA_DEBUG_LOG("[FFMPEG] publish_frame: pts=%llu format=%d %dx%d", ptsUs, frame->format, frame->width, frame->height);
+    }
 
     bool published = false;
 #ifdef BOREALIS_USE_GXM
@@ -797,25 +861,41 @@ static bool publish_frame(FFmpegVideoContext* ctx, AVFrame* frame, uint64_t ptsU
         return false;
     }
 
-    reset_global_slots();
-    if (ctx->using_direct_memory)
     {
-        // Use dedicated dr_textures for double-buffering so NVG re-creates image ids
-        dr_texture* front   = reinterpret_cast<dr_texture*>(ctx->dr_textures[ctx->dr_front_idx]);
-        dr_texture* back    = reinterpret_cast<dr_texture*>(ctx->dr_textures[ctx->dr_back_idx]);
-        frame_textures[0]   = front ? &front->impl : ctx->current_frame.texture;
-        frame_textures[1]   = back ? &back->impl : ctx->current_frame.texture;
-        frame_front_idx     = 0;
-        frame_back_idx      = 1;
-        single_frame_buffer = false;
-    }
-    else
-    {
-        frame_textures[0]   = ctx->current_frame.texture;
-        frame_textures[1]   = ctx->current_frame.texture;
+        std::lock_guard<std::mutex> slotLock(g_frame_slots_mutex);
+        frame_textures[0]   = nullptr;
+        frame_textures[1]   = nullptr;
         frame_front_idx     = 0;
         frame_back_idx      = 0;
         single_frame_buffer = true;
+
+        if (ctx->using_direct_memory)
+        {
+#ifdef BOREALIS_USE_GXM
+            // Use dedicated dr_textures for double-buffering so NVG re-creates image ids
+            dr_texture* front   = reinterpret_cast<dr_texture*>(ctx->dr_textures[ctx->dr_front_idx]);
+            dr_texture* back    = reinterpret_cast<dr_texture*>(ctx->dr_textures[ctx->dr_back_idx]);
+            frame_textures[0]   = front ? &front->impl : ctx->current_frame.texture;
+            frame_textures[1]   = back ? &back->impl : ctx->current_frame.texture;
+            frame_front_idx     = 0;
+            frame_back_idx      = 1;
+            single_frame_buffer = false;
+#else
+            frame_textures[0]   = ctx->current_frame.texture;
+            frame_textures[1]   = ctx->current_frame.texture;
+            frame_front_idx     = 0;
+            frame_back_idx      = 0;
+            single_frame_buffer = true;
+#endif
+        }
+        else
+        {
+            frame_textures[0]   = ctx->current_frame.texture;
+            frame_textures[1]   = ctx->current_frame.texture;
+            frame_front_idx     = 0;
+            frame_back_idx      = 0;
+            single_frame_buffer = true;
+        }
     }
 
     uint32_t texW  = ctx->current_frame.width > 0 ? (uint32_t)ctx->current_frame.width : image_scaling.texture_width;
@@ -958,8 +1038,9 @@ extern "C"
 
         // Ensure the NVG image is dropped before we invalidate/free the GXM textures
         // associated with the stream to avoid Borealis sampling freed VRAM.
-        NVGcontext* vg = brls::Application::getNVGContext();
-        VitaVideoRenderer::instance().destroyImage(vg);
+#ifdef BOREALIS_USE_GXM
+        VitaVideoRenderer::instance().destroyImage(nullptr);
+#endif
 
         // Ensure the renderer won't use textures about to be freed.
         VideoFrameHolder::instance().clear();
@@ -984,8 +1065,9 @@ extern "C"
         g_ffmpeg_stop_request.store(true, std::memory_order_release);
         // Immediately clear any renderer-held references so the UI stops sampling
         // the soon-to-be-destroyed textures while we wait for the decoder to drain.
-        NVGcontext* vg = brls::Application::getNVGContext();
-        VitaVideoRenderer::instance().destroyImage(vg);
+#ifdef BOREALIS_USE_GXM
+        VitaVideoRenderer::instance().destroyImage(nullptr);
+#endif
         VideoFrameHolder::instance().clear();
         reset_global_slots();
         // Wait with a timeout in a loop to avoid deadlock. Decodes increment and
@@ -1132,22 +1214,21 @@ extern "C"
             return DR_NEED_IDR;
         }
 
-        VITA_DEBUG_LOG("[FFMPEG] submit_decode_unit: size=%d pts=%llu", decodeUnit->fullLength, decodeUnit->presentationTimeUs);
+        bool verboseDecodeLog = ((g_ffmpeg_submit_counter % 180) == 0);
+        if (verboseDecodeLog)
+        {
+            VITA_DEBUG_LOG("[FFMPEG] submit_decode_unit: size=%d pts=%llu", decodeUnit->fullLength, decodeUnit->presentationTimeUs);
+        }
 
         std::unique_lock<std::mutex> lock(g_ffmpeg_mutex);
         // Track active decodes so vram_free can defer frees while we are decoding.
         struct ActiveDecodeGuard
         {
-            ActiveDecodeGuard()
-            {
-                int v = g_active_decodes.fetch_add(1, std::memory_order_acq_rel) + 1;
-                VITA_DEBUG_LOG("[FFMPEG] ActiveDecodeGuard enter: count=%d", v);
-            }
+            ActiveDecodeGuard() { g_active_decodes.fetch_add(1, std::memory_order_acq_rel); }
             ~ActiveDecodeGuard()
             {
                 int prev = g_active_decodes.fetch_sub(1, std::memory_order_acq_rel);
                 int now  = prev - 1;
-                VITA_DEBUG_LOG("[FFMPEG] ActiveDecodeGuard leave: count=%d", now);
                 if (now == 0)
                 {
                     process_pending_vram_frees_if_safe();
@@ -1157,7 +1238,6 @@ extern "C"
         FFmpegVideoContext* context = g_ffmpeg_context;
         if (!context || !context->initialized || !context->decoder.initialized)
         {
-            lock.unlock();
             // The decode unit memory is owned by the depacketizer/submitter. Do not free here
             // (freeing it here caused double-free/data-abort). The caller of submitDecodeUnit
             // (reassembleFrame) will handle completion/freeing via LiCompleteVideoFrame.
@@ -1167,13 +1247,19 @@ extern "C"
         AVCodecContext* avctx = context->decoder.avctx;
         AVPacket* pkt         = context->decoder.pkt;
         AVFrame* frame        = context->decoder.frame;
+        lock.unlock();
 
-        VITA_DEBUG_LOG("[FFMPEG] before drain loop");
+        if (verboseDecodeLog)
+        {
+            VITA_DEBUG_LOG("[FFMPEG] before drain loop");
+        }
         while (true)
         {
-            VITA_DEBUG_LOG("[FFMPEG] draining frame attempt");
             int drain = avcodec_receive_frame(avctx, frame);
-            VITA_DEBUG_LOG("[FFMPEG] avcodec_receive_frame drain ret=%d", drain);
+            if (verboseDecodeLog)
+            {
+                VITA_DEBUG_LOG("[FFMPEG] avcodec_receive_frame drain ret=%d", drain);
+            }
             if (drain == AVERROR(EAGAIN) || drain == AVERROR_EOF)
             {
                 break;
@@ -1188,24 +1274,27 @@ extern "C"
                 av_frame_unref(frame);
             }
         }
-        VITA_DEBUG_LOG("[FFMPEG] after drain loop");
-
-        VITA_DEBUG_LOG("[FFMPEG] before av_new_packet size=%d", decodeUnit->fullLength);
-        VITA_DEBUG_LOG("[FFMPEG] pkt=%p avctx=%p frame=%p", pkt, avctx, frame);
+        if (verboseDecodeLog)
+        {
+            VITA_DEBUG_LOG("[FFMPEG] after drain loop");
+            VITA_DEBUG_LOG("[FFMPEG] before av_new_packet size=%d", decodeUnit->fullLength);
+            VITA_DEBUG_LOG("[FFMPEG] pkt=%p avctx=%p frame=%p", pkt, avctx, frame);
+        }
         if (av_new_packet(pkt, decodeUnit->fullLength) < 0)
         {
             brls::Logger::error("[FFMPEG] av_new_packet failed size={}", decodeUnit->fullLength);
-            lock.unlock();
             // Do not free decodeUnit here; ownership belongs to the depacketizer.
             return DR_NEED_IDR;
         }
-        VITA_DEBUG_LOG("[FFMPEG] av_new_packet ok, pkt->data=%p", pkt->data);
+        if (verboseDecodeLog)
+        {
+            VITA_DEBUG_LOG("[FFMPEG] av_new_packet ok, pkt->data=%p", pkt->data);
+        }
 
         uint8_t* dst  = pkt->data;
         PLENTRY entry = decodeUnit->bufferList;
         while (entry)
         {
-            VITA_DEBUG_LOG("[FFMPEG] copying data entry=%p entry->data=%p entry->length=%d", entry, entry->data, entry->length);
             memcpy(dst, entry->data, entry->length);
             dst += entry->length;
             entry = entry->next;
@@ -1224,23 +1313,25 @@ extern "C"
 
         int sendRes = avcodec_send_packet(avctx, pkt);
         av_packet_unref(pkt);
-        VITA_DEBUG_LOG("[FFMPEG] after send_packet res=%d", sendRes);
+        if (verboseDecodeLog)
+        {
+            VITA_DEBUG_LOG("[FFMPEG] after send_packet res=%d", sendRes);
+        }
         if (sendRes < 0 && sendRes != AVERROR(EAGAIN))
         {
             brls::Logger::error("[FFMPEG] send_packet error=0x{:X}", sendRes);
-            lock.unlock();
-            free_decode_unit(decodeUnit);
             return DR_NEED_IDR;
         }
 
         vita_netopt_on_frame_seen(g_ffmpeg_frame_index);
 
-        bool producedFrame = false;
         while (true)
         {
-            VITA_DEBUG_LOG("[FFMPEG] before receive_frame");
             int ret = avcodec_receive_frame(avctx, frame);
-            VITA_DEBUG_LOG("[FFMPEG] avcodec_receive_frame ret=%d", ret);
+            if (verboseDecodeLog)
+            {
+                VITA_DEBUG_LOG("[FFMPEG] avcodec_receive_frame ret=%d", ret);
+            }
             if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF)
             {
                 break;
@@ -1248,14 +1339,12 @@ extern "C"
             if (ret < 0)
             {
                 brls::Logger::error("[FFMPEG] receive_frame error=0x{:X}", ret);
-                lock.unlock();
                 // Do not free decodeUnit here; caller (depacketizer) handles freeing.
                 return DR_NEED_IDR;
             }
 
             if (publish_frame(context, frame, decodeUnit->presentationTimeUs))
             {
-                producedFrame = true;
                 if (stats_start_ms == 0)
                 {
                     stats_start_ms = monotonic_ms_local();
@@ -1270,7 +1359,7 @@ extern "C"
         }
 
         g_ffmpeg_submit_counter++;
-        lock.unlock();
+        g_decode_epoch.fetch_add(1, std::memory_order_acq_rel);
         // Do not free decodeUnit here; the depacketizer will call LiCompleteVideoFrame after
         // evaluating our return value and will perform any necessary frees.
         return DR_OK;

@@ -9,6 +9,7 @@
 
 #include <borealis/core/application.hpp>
 #include <borealis/views/label.hpp>
+#include <mutex>
 
 #include "legacy/modules/vita_globals.hpp"
 
@@ -108,6 +109,7 @@ void VitaVideoRenderer::draw(float viewportW, float viewportH)
         }
         return;
     }
+    std::lock_guard<std::mutex> slotLock(g_frame_slots_mutex);
     vita2d_texture* tex = FRAME_FRONT();
     if (!tex)
     {
@@ -163,6 +165,7 @@ void VitaVideoRenderer::drawNVG(NVGcontext* vg, float viewportW, float viewportH
     }
     if (g_stats.frames_decoded == 0)
         return;
+    std::lock_guard<std::mutex> slotLock(g_frame_slots_mutex);
     const vita2d_texture* tex = FRAME_FRONT();
     if (!tex)
         return;
@@ -277,6 +280,11 @@ void VitaVideoRenderer::drawNVG(NVGcontext* vg, float viewportW, float viewportH
 
 void VitaVideoRenderer::destroyImage(NVGcontext* vg)
 {
+    if (!vg)
+    {
+        vg = brls::Application::getNVGContext();
+    }
+
     if (vg)
     {
         // Ensure any GPU rendering referencing the image is finished.

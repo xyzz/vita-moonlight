@@ -97,20 +97,37 @@ int ffmpeg_decoder_init(FFmpegDecoderContext* ctx)
 #ifdef BOREALIS_USE_GXM
     if (codec->id == AV_CODEC_ID_H264)
     {
-        // Use Vita VRAM-backed buffers by default for H264 on GXM to enable
-        // direct rendering path (zero-copy) similar to the legacy decoder.
-        // This forces the decoder to allocate frame data using get_buffer2_direct
-        // and prefers AVBuffer-backed frames suitable for mapping to GXM.
-        av_dict_set(&opts, "vita_h264_dr", "1", 0);
-        ctx->avctx->get_buffer2 = get_buffer2_direct;
-        ctx->use_direct_render  = true;
+        // Direct-render with h264_vita has shown runtime instability on some
+        // sessions (GPU crash). Keep it as opt-in via env var while defaulting
+        // to the safer software upload path.
+        bool enableDirectRender = false;
+        const char* drEnv       = getenv("MOONLIGHT_FFMPEG_DIRECT_RENDER");
+        if (drEnv && strcmp(drEnv, "0") != 0 && strcmp(drEnv, "false") != 0 && strcmp(drEnv, "off") != 0)
+        {
+            enableDirectRender = true;
+        }
+
+        if (enableDirectRender)
+        {
+            av_dict_set(&opts, "vita_h264_dr", "1", 0);
+            ctx->avctx->get_buffer2 = get_buffer2_direct;
+            ctx->use_direct_render  = true;
+            VITA_DEBUG_LOG("[FFMPEG] Direct render ENABLED by MOONLIGHT_FFMPEG_DIRECT_RENDER=%s", drEnv ? drEnv : "1");
+        }
+        else
+        {
+            ctx->use_direct_render = false;
+            ctx->avctx->pix_fmt    = AV_PIX_FMT_YUV420P;
+            VITA_DEBUG_LOG("[FFMPEG] Direct render DISABLED by default (set MOONLIGHT_FFMPEG_DIRECT_RENDER=1 to enable)");
+        }
+
         // Mark if this is the hardware assisted vita decoder
         ctx->is_vita_hw = (strcmp(codec->name, "h264_vita") == 0);
         if (ctx->is_vita_hw)
         {
             VITA_DEBUG_LOG("[FFMPEG] Vita hardware codec detected: %s", codec->name);
         }
-        VITA_DEBUG_LOG("[FFMPEG] ffmpeg_decoder_init: H264 on GXM: enabling get_buffer2_direct and direct render");
+        VITA_DEBUG_LOG("[FFMPEG] ffmpeg_decoder_init: H264 on GXM: direct_render=%d", ctx->use_direct_render ? 1 : 0);
         // Set conservative fixed defaults for the Vita: slice threading and skip loop filter
         // We default to 1 thread and slice-type threading to avoid oversubscription and high latency.
         ctx->avctx->thread_count = 1;

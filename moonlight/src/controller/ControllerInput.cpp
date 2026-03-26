@@ -48,6 +48,13 @@ inline uint32_t makeAnalogBinding(AnalogBinding binding)
     return static_cast<uint32_t>(binding) | INPUT_TYPE_ANALOG;
 }
 
+inline short quantizeAxis(short value)
+{
+    // Quantize to reduce tiny analog jitter that causes excessive network updates.
+    constexpr short kStep = 2048;
+    return static_cast<short>((value / kStep) * kStep);
+}
+
 }
 
 ControllerInputManager* g_controllerInput = nullptr;
@@ -111,6 +118,15 @@ void ControllerInputManager::handleInput()
     if (!inputEnabled)
         return;
 
+    static uint64_t lastInputPollUs = 0;
+    const uint64_t nowPollUs        = (uint64_t)duration_cast<microseconds>(high_resolution_clock::now().time_since_epoch()).count();
+    // Limit polling to 250Hz to avoid duplicate expensive touch/controller reads.
+    if (lastInputPollUs != 0 && (nowPollUs - lastInputPollUs) < 4000)
+    {
+        return;
+    }
+    lastInputPollUs = nowPollUs;
+
     inputDropped = false;
     auto t_start = high_resolution_clock::now();
 
@@ -158,11 +174,39 @@ void ControllerInputManager::handleInput()
         rearTouchManager->process(gamepadState, isPstvModel);
     }
 
-    // Send if changed
-    if (memcmp(&gamepadState, &lastGamepadState, sizeof(GamepadState)) != 0)
+    // Send if changed. Button/trigger changes go out immediately; analog-only
+    // changes are rate-limited to avoid CPU/network spikes from stick jitter.
+    const bool stateChanged          = (memcmp(&gamepadState, &lastGamepadState, sizeof(GamepadState)) != 0);
+    static uint64_t lastAnalogSendUs = 0;
+    static GamepadState pendingAnalogState {};
+    static bool hasPendingAnalogState = false;
+
+    const uint64_t nowUs                        = (uint64_t)duration_cast<microseconds>(high_resolution_clock::now().time_since_epoch()).count();
+    constexpr uint64_t kMinAnalogSendIntervalUs = 8000; // 125Hz
+
+    if (stateChanged)
     {
-        sendGamepadState(gamepadState);
-        lastGamepadState = gamepadState;
+        const bool digitalChanged = gamepadState.buttonFlags != lastGamepadState.buttonFlags || gamepadState.leftTrigger != lastGamepadState.leftTrigger || gamepadState.rightTrigger != lastGamepadState.rightTrigger;
+
+        if (digitalChanged || lastAnalogSendUs == 0 || (nowUs - lastAnalogSendUs) >= kMinAnalogSendIntervalUs)
+        {
+            sendGamepadState(gamepadState);
+            lastGamepadState      = gamepadState;
+            lastAnalogSendUs      = nowUs;
+            hasPendingAnalogState = false;
+        }
+        else
+        {
+            pendingAnalogState    = gamepadState;
+            hasPendingAnalogState = true;
+        }
+    }
+    else if (hasPendingAnalogState && (nowUs - lastAnalogSendUs) >= kMinAnalogSendIntervalUs)
+    {
+        sendGamepadState(pendingAnalogState);
+        lastGamepadState      = pendingAnalogState;
+        lastAnalogSendUs      = nowUs;
+        hasPendingAnalogState = false;
     }
 
     lastCtrlData = ctrlData;
@@ -421,7 +465,11 @@ short ControllerInputManager::readAxis(uint32_t binding, const SceCtrlData& pad)
 
 short ControllerInputManager::applyDeadzone(short value) const
 {
-    return (std::abs(value) < 1024) ? 0 : value;
+    if (std::abs(value) < 2048)
+    {
+        return 0;
+    }
+    return quantizeAxis(value);
 }
 
 void ControllerInputManager::applyRearTouchSettings(const RearTouchSettings& settings)

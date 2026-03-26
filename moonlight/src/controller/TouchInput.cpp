@@ -79,12 +79,12 @@ bool TouchInputManager::setTouchMode(int newMode, int gamepadType)
 
 void TouchInputManager::handleTouch(int touchscreenMode)
 {
-    sceTouchPeek(SCE_TOUCH_PORT_FRONT, &touchData, 1);
-
     if (touchscreenMode == TOUCHSCREEN_MODE_OFF)
     {
         return;
     }
+
+    sceTouchPeek(SCE_TOUCH_PORT_FRONT, &touchData, 1);
 
     switch (touchscreenMode)
     {

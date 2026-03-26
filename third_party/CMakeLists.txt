@@ -26,8 +26,8 @@ target_include_directories(inih PUBLIC inih)
 
 add_subdirectory(borealis/library)
 
-# libgamestream static library
-add_subdirectory(libgamestream)
+# gamestream static library
+add_subdirectory(gamestream)
 
 # libmoonmic - Microphone capture and transmission library
 add_subdirectory(libmoonmic)

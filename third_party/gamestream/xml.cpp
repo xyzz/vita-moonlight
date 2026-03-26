@@ -36,21 +36,18 @@ struct xml_query {
     void* data;
 };
 
-// Estructura segura para búsqueda de un único nodo
 struct xml_string_query {
-    const char* target;        // nombre del nodo objetivo
-    int depth;                 // profundidad de coincidencia anidada
-    bool capturing;            // estamos capturando texto
-    std::string* out;          // acumulador destino
+    const char* target;
+    int depth;
+    bool capturing;
+    std::string* out;
 };
 
-// Callbacks para búsqueda de nodo (versión segura)
 static void XMLCALL _xml_string_start(void* userData, const char* name, const char** atts) {
     xml_string_query* q = (xml_string_query*)userData;
     if (strcmp(name, q->target) == 0) {
-        // Entramos en el nodo objetivo (soportamos anidación rara)
         if (q->depth == 0) {
-            q->capturing = true; // empezar a capturar
+            q->capturing = true;
         }
         q->depth++;
     }
@@ -62,7 +59,7 @@ static void XMLCALL _xml_string_end(void* userData, const char* name) {
         if (q->depth > 0) {
             q->depth--;
             if (q->depth == 0) {
-                q->capturing = false; // terminamos nodo raíz objetivo
+                q->capturing = false;
             }
         }
     }
@@ -100,7 +97,7 @@ static void XMLCALL _xml_end_applist_element(void* userData, const char* name) {
             free(search->memory);
             search->memory = NULL;
         } else if (strcmp("AppTitle", name) == 0) {
-            // Copiar la memoria para evitar punteros colgantes
+            // Expat's buffer is only valid during the callback.
             if (search->memory) {
                 list->name = strdup(search->memory);
                 free(search->memory);
@@ -167,7 +164,6 @@ static void XMLCALL _xml_write_data_string(void* userData, const XML_Char* s, in
         q->out->append(s, len);
     }
 }
-
 
 int xml_search(const Data& data, const std::string node, int* result) {
     std::string text;

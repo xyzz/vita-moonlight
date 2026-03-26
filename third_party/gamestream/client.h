@@ -19,7 +19,7 @@
 
 #pragma once
 
-// NOTE: C++ ONLY header (uses std::string) – no intentar incluir desde C puro
+// C++ only: this interface uses std::string.
 #include "Data.hpp"
 #include "xml.h"
 #include <Limelight.h>

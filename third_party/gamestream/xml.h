@@ -17,7 +17,7 @@
  * along with Moonlight; if not, see <http://www.gnu.org/licenses/>.
  */
 
-// C++ ONLY header (usa std::string y clase Data)
+// C++ only: this interface uses std::string and Data.
 #pragma once
 #include "Data.hpp"
 #include <string>

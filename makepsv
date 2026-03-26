@@ -259,9 +259,6 @@ build_project() {
     echo -e "[+] Configurando para PS Vita (Build Type: $1)..."
     cmake -B "$BUILD_DIR" \
         -DPLATFORM_PSV=ON \
-        -DUSE_SYSTEM_CURL=ON \
-        -DUSE_SYSTEM_SDL2=ON \
-        -DMPV_NO_FB=ON \
         -DSIMPLE_HIGHLIGHT=ON \
         -DUSE_GXM=$USE_GXM \
         -DBUILD_FFMPEG=${BUILD_FFMPEG} \
@@ -277,7 +274,6 @@ build_project() {
         -DCMAKE_STRIP="${STRIP}" \
         -DCMAKE_C_COMPILER_WORKS=ON \
         -DCMAKE_CXX_COMPILER_WORKS=ON \
-        -DCMAKE_ASM_FLAGS="-x assembler-with-cpp" \
         -DCMAKE_SYSTEM_NAME="Generic" \
         -DCMAKE_SYSTEM_PROCESSOR="arm" \
         -DCMAKE_FIND_ROOT_PATH="${VITASDK}/arm-vita-eabi" \
@@ -540,8 +536,8 @@ main() {
     fi
 }
 
-# Ejecutar la función principal
-if main; then
+# Ejecutar la función principal (pasando argumentos CLI)
+if main "$@"; then
     echo -e "\n[+] Proceso completado con éxito"
     exit 0
 else

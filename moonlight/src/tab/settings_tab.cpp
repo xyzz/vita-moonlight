@@ -66,12 +66,6 @@ SettingsTab::SettingsTab()
     config.load();
     StreamConfiguration streamConfig = config.getStreamConfig();
     VideoSettings videoSettings      = config.getVideoSettings();
-    if (videoSettings.render_mode != 0 && videoSettings.pixel_format_mode != 0)
-    {
-        videoSettings.pixel_format_mode = 0;
-        config.setVideoSettings(videoSettings);
-        config.save();
-    }
 
     // Initialize global flag for debug logs
     extern bool g_debug_log_enabled;
@@ -86,28 +80,17 @@ SettingsTab::SettingsTab()
 #ifdef BUILD_FFMPEG
     renderModes.push_back(brls::getStr("moonlight/settings_tab/render_mode/modern_option"));
 #endif
-    auto updatePixelSelectorVisibility = [this](int renderMode, bool persistReset)
+    auto updateModeDependentVisibility = [this](int renderMode, bool persistReset)
     {
         bool legacyMode = (renderMode == 0);
+        bool modernMode = (renderMode == 1);
+        (void)persistReset;
+
         if (pixelFormatSelector)
         {
-            pixelFormatSelector->setVisibility(legacyMode ? brls::Visibility::VISIBLE : brls::Visibility::GONE);
-            if (!legacyMode)
-            {
-                pixelFormatSelector->setSelection(0, true);
-                if (persistReset)
-                {
-                    ConfigManager cfg;
-                    cfg.load();
-                    VideoSettings vs = cfg.getVideoSettings();
-                    if (vs.pixel_format_mode != 0)
-                    {
-                        vs.pixel_format_mode = 0;
-                        cfg.setVideoSettings(vs);
-                        cfg.save();
-                    }
-                }
-            }
+            bool showPixelFormat = (legacyMode || modernMode);
+            pixelFormatSelector->setVisibility(showPixelFormat ? brls::Visibility::VISIBLE : brls::Visibility::GONE);
+            brls::Logger::debug("[SettingsTab] pixel_format visibility mode={} show={}", renderMode, showPixelFormat ? 1 : 0);
         }
     };
 
@@ -116,7 +99,7 @@ SettingsTab::SettingsTab()
         initialRenderMode = 0; // clamp if config has unknown value
     // Shared container to keep the mapping from visible selector indices to original vitaResolutions
     auto filteredIndicesPtr = std::make_shared<std::vector<int>>();
-    renderModeSelector->init(brls::getStr("moonlight/settings_tab/render_mode/title"), renderModes, initialRenderMode, [this, updatePixelSelectorVisibility, filteredIndicesPtr, streamConfig](int selected)
+    renderModeSelector->init(brls::getStr("moonlight/settings_tab/render_mode/title"), renderModes, initialRenderMode, [this, updateModeDependentVisibility, filteredIndicesPtr, streamConfig](int selected)
         {
         ConfigManager config;
         config.load();
@@ -128,14 +111,13 @@ SettingsTab::SettingsTab()
         int chosen = selected; // allow modern/ffmpeg
 #endif
         settings.render_mode = chosen; // 0=legacy,1=ffmpeg
-        if (chosen != 0 && settings.pixel_format_mode != 0) {
-            settings.pixel_format_mode = 0;
-        }
         config.setVideoSettings(settings);
         config.save();
         // Update atomic cache without subsequent re-reading
         set_render_mode_cached(chosen);
-        updatePixelSelectorVisibility(chosen, true);
+        updateModeDependentVisibility(chosen, true);
+        extern VideoSettings g_video_settings_snapshot;
+        g_video_settings_snapshot.render_mode = chosen;
         // Also update available resolution options depending on render mode
     // Legacy mode (0) only exposes resolutions <= 1280x720. FFmpeg (modern) exposes all.
     auto updateResOptions = [this, filteredIndicesPtr](int mode, const StreamConfiguration& sc) {
@@ -232,10 +214,13 @@ SettingsTab::SettingsTab()
         settings.pixel_format_mode = selected;
         config.setVideoSettings(settings);
         config.save();
+        extern VideoSettings g_video_settings_snapshot;
+        g_video_settings_snapshot.pixel_format_mode = selected;
         const std::string& label = pixelFormats.at(static_cast<std::size_t>(selected));
         brls::Application::notify(fmt::format(
             brls::getStr("moonlight/settings_tab/pixel_format/notify"), label)); });
-    updatePixelSelectorVisibility(initialRenderMode, false);
+
+    updateModeDependentVisibility(initialRenderMode, false);
 
     // Set resolution selectors with allowed values ​​for PS Vita
     std::vector<std::string> resolutions = {

@@ -331,11 +331,17 @@ extern "C" int vitavideo_setup(int videoFormat, int width, int height, int redra
             // Create new textures at stream resolution
             auto prevTexMemType = vita2d_texture_get_alloc_memblock_type();
             vita2d_texture_set_alloc_memblock_type(SCE_KERNEL_MEMBLOCK_TYPE_USER_CDRAM_RW);
+            uint32_t decoderPixelType         = g_pixelProcessor ? g_pixelProcessor->getDecoderPixelFormat() : SCE_AVCDEC_PIXELFORMAT_RGBA8888;
+            SceGxmTextureFormat textureFormat = SCE_GXM_TEXTURE_FORMAT_A8B8G8R8;
+            if (decoderPixelType == SCE_AVCDEC_PIXELFORMAT_YUV420_RASTER)
+            {
+                textureFormat = SCE_GXM_TEXTURE_FORMAT_YVU420P2_CSC0;
+            }
             for (int i = 0; i < 2; i++)
             {
                 frame_textures[i] = vita2d_create_empty_texture_format(
                     width, height,
-                    SCE_GXM_TEXTURE_FORMAT_A8B8G8R8);
+                    textureFormat);
                 if (!frame_textures[i])
                 {
                     VITA_DEBUG_LOG("[Video][ERR] No se pudo crear textura %d (%dx%d)", i, width, height);
@@ -343,7 +349,7 @@ extern "C" int vitavideo_setup(int videoFormat, int width, int height, int redra
                     goto cleanup;
                 }
             }
-            VITA_DEBUG_LOG("[Video][INIT] Creadas texturas %dx%d (stream resolution)", width, height);
+            VITA_DEBUG_LOG("[Video][INIT] Creadas texturas %dx%d fmt=0x%08X", width, height, (unsigned)textureFormat);
             vita2d_texture_set_alloc_memblock_type(prevTexMemType);
 
             if (!texturesOk)

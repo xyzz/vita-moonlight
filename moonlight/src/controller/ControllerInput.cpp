@@ -120,8 +120,9 @@ void ControllerInputManager::handleInput()
 
     static uint64_t lastInputPollUs = 0;
     const uint64_t nowPollUs        = (uint64_t)duration_cast<microseconds>(high_resolution_clock::now().time_since_epoch()).count();
-    // Limit polling to 250Hz to avoid duplicate expensive touch/controller reads.
-    if (lastInputPollUs != 0 && (nowPollUs - lastInputPollUs) < 4000)
+    // Limit polling to 125Hz to reduce CPU contention with video decode/render.
+    // This still keeps input latency low while freeing cycles for the 60 FPS target.
+    if (lastInputPollUs != 0 && (nowPollUs - lastInputPollUs) < 8000)
     {
         return;
     }
@@ -148,8 +149,8 @@ void ControllerInputManager::handleInput()
     }
 
     static int debug_counter = 0;
-    if (debug_counter++ % 60 == 0)
-    { // Approximately every second
+    if (debug_counter++ % 300 == 0)
+    { // Approximately every 2-3 seconds (depends on poll rate)
         vita_debug_log("[ControllerInput] Botones: 0x%08X (L1:%d R1:%d L2:%d R2:%d START:%d) LT:%d RT:%d",
             ctrlData.buttons,
             (ctrlData.buttons & SCE_CTRL_L1) ? 1 : 0,
@@ -238,7 +239,7 @@ void ControllerInputManager::handleInput()
     auto dur_us                    = duration_cast<microseconds>(t_end - t_start).count();
     uint64_t now_ms                = duration_cast<milliseconds>(t_end.time_since_epoch()).count();
     static uint64_t lastInputLogMs = 0;
-    if (now_ms - lastInputLogMs > 500)
+    if (now_ms - lastInputLogMs > 2000)
     {
         lastInputLogMs = now_ms;
         vita_debug_log("[ControllerInput][PERF] handleInput time=%lld us inputEnabled=%d inputDropped=%d", (long long)dur_us, inputEnabled ? 1 : 0, inputDropped ? 1 : 0);

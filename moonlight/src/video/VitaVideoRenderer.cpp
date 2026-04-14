@@ -1,14 +1,14 @@
-// VitaVideoRenderer.cpp - Minimum version without zero-copy or VideoPlane
+// VitaVideoRenderer.cpp - Unified implementation (shared + NVG + vita2d)
 #include "VitaVideoRenderer.hpp"
 
 #include <borealis/extern/nanovg/nanovg.h>
 #include <borealis/extern/nanovg/nanovg_gxm.h>
+#include <borealis/extern/nanovg/nanovg_gxm_utils.h>
+#include <psp2/gxm.h>
 #include <stdlib.h>
-#include <string.h>
 #include <vita2d.h>
 
 #include <borealis/core/application.hpp>
-#include <borealis/views/label.hpp>
 #include <mutex>
 
 #include "legacy/modules/vita_globals.hpp"
@@ -19,7 +19,333 @@ uint32_t s_presentWindowFrames = 0;
 uint64_t s_cachedStatsStart    = 0;
 uint32_t s_prevDecodedCount    = 0;
 
-void update_present_stats()
+bool is_gpu_yuv_experimental_enabled()
+{
+    static int cached = -1;
+    if (cached == -1)
+    {
+        const char* env      = getenv("MOONLIGHT_FFMPEG_GPU_YUV");
+        bool envEnabled      = (env && env[0] == '1');
+        bool settingsEnabled = (g_video_settings_snapshot.pixel_format_mode == 1);
+        cached               = (envEnabled || settingsEnabled) ? 1 : 0;
+        if (cached)
+        {
+            VITA_DEBUG_LOG("[Video][NVG][EXP] GPU YUV experimental path enabled (env=%d settings_pixel_format_mode=%d)",
+                envEnabled ? 1 : 0,
+                (int)g_video_settings_snapshot.pixel_format_mode);
+        }
+    }
+    return cached == 1;
+}
+
+bool is_yuv_gxm_format(uint32_t fmt)
+{
+    return fmt == (uint32_t)SCE_GXM_TEXTURE_FORMAT_YUV420P3_CSC0 || fmt == (uint32_t)SCE_GXM_TEXTURE_FORMAT_YVU420P2_CSC0;
+}
+}
+
+VitaVideoRenderer& VitaVideoRenderer::instance()
+{
+    static VitaVideoRenderer inst;
+    return inst;
+}
+
+void VitaVideoRenderer::setFullscreenStretch(bool stretch)
+{
+    fullscreenStretch        = stretch;
+    video_fullscreen_stretch = stretch;
+}
+
+void VitaVideoRenderer::draw(struct NVGcontext* vg, float viewportW, float viewportH, float alpha)
+{
+    if (vg)
+    {
+        drawNVG(vg, viewportW, viewportH, alpha);
+    }
+    else
+    {
+        draw(viewportW, viewportH);
+    }
+}
+
+void VitaVideoRenderer::draw(float viewportW, float viewportH)
+{
+    if (!vita2d_inited)
+    {
+        static bool logged = false;
+        if (!logged)
+        {
+            VITA_DEBUG_LOG("[Video][DRAW] vita2d no inicializado");
+            logged = true;
+        }
+        return;
+    }
+    if (g_stats.frames_decoded == 0)
+    {
+        static bool logged = false;
+        if (!logged)
+        {
+            VITA_DEBUG_LOG("[Video][DRAW] primer frame aun no decodificado - skip");
+            logged = true;
+        }
+        return;
+    }
+
+    vita2d_texture* tex = nullptr;
+    int frontIdx        = 0;
+    int backIdx         = 0;
+    {
+        std::lock_guard<std::mutex> slotLock(g_frame_slots_mutex);
+        tex      = FRAME_FRONT();
+        frontIdx = frame_front_idx;
+        backIdx  = frame_back_idx;
+    }
+
+    if (!tex)
+    {
+        static bool logged = false;
+        if (!logged)
+        {
+            VITA_DEBUG_LOG("[Video][DRAW] FRAME_FRONT null");
+            logged = true;
+        }
+        return;
+    }
+
+    const SceGxmTexture* gxmTex = &tex->gxm_tex;
+    uint32_t currentFmt         = (uint32_t)sceGxmTextureGetFormat(const_cast<SceGxmTexture*>(gxmTex));
+    if (currentFmt != (uint32_t)SCE_GXM_TEXTURE_FORMAT_U8U8U8U8_ABGR)
+    {
+        static uint32_t nonRgbaDrawDropCounter = 0;
+        if ((nonRgbaDrawDropCounter++ % 120) == 0)
+        {
+            VITA_DEBUG_LOG("[Video][DRAW][SAFE] skip non-RGBA texture fmt=0x%08X", (unsigned)currentFmt);
+        }
+        return;
+    }
+
+    static uint32_t drawCounter = 0;
+    if (drawCounter < 120 || (drawCounter % 60) == 0)
+    {
+        unsigned stride = vita2d_texture_get_stride(tex);
+        VITA_DEBUG_LOG("[Video][DRAW] frame=%u tex=%p stride=%u frontIdx=%d backIdx=%d", drawCounter, tex, stride, frontIdx, backIdx);
+    }
+    drawCounter++;
+
+    if (!image_scaling.enabled)
+        return;
+    int dw = fullscreenStretch ? (int)viewportW : image_scaling.display_width;
+    int dh = fullscreenStretch ? (int)viewportH : image_scaling.display_height;
+    int ox = fullscreenStretch ? 0 : image_scaling.offset_x;
+    int oy = fullscreenStretch ? 0 : image_scaling.offset_y;
+    if (dw <= 0 || dh <= 0)
+        return;
+    if (image_scaling.region_x2 <= image_scaling.region_x1 || image_scaling.region_y2 <= image_scaling.region_y1)
+        return;
+    if (image_scaling.texture_width == 0 || image_scaling.texture_height == 0)
+        return;
+
+    float scaleX = (float)dw / image_scaling.texture_width;
+    float scaleY = (float)dh / image_scaling.texture_height;
+    if (scaleX <= 0.f || scaleY <= 0.f)
+        return;
+
+    vita2d_draw_texture_tint_part_scale(
+        tex,
+        (float)ox, (float)oy,
+        image_scaling.region_x1, image_scaling.region_y1,
+        image_scaling.region_x2, image_scaling.region_y2,
+        scaleX, scaleY,
+        0xFFFFFFFF);
+
+    g_stats.frames_presented++;
+    onFramePresented();
+}
+
+void VitaVideoRenderer::drawNVG(NVGcontext* vg, float viewportW, float viewportH, float alpha)
+{
+    if (!vg)
+    {
+        draw(viewportW, viewportH);
+        return;
+    }
+    if (g_stats.frames_decoded == 0)
+        return;
+
+    const vita2d_texture* tex = nullptr;
+    {
+        std::lock_guard<std::mutex> slotLock(g_frame_slots_mutex);
+        tex = FRAME_FRONT();
+    }
+    if (!tex)
+        return;
+
+    const SceGxmTexture* gxmTex = &tex->gxm_tex;
+    const void* currentData     = sceGxmTextureGetData(const_cast<SceGxmTexture*>(gxmTex));
+    uint32_t currentFmt         = (uint32_t)sceGxmTextureGetFormat(const_cast<SceGxmTexture*>(gxmTex));
+    bool allowYuvExperimental   = is_gpu_yuv_experimental_enabled() && is_yuv_gxm_format(currentFmt);
+    if (currentFmt != (uint32_t)SCE_GXM_TEXTURE_FORMAT_U8U8U8U8_ABGR && !allowYuvExperimental)
+    {
+        static uint32_t yuvFallbackLogCounter = 0;
+        if ((yuvFallbackLogCounter++ % 180) == 0)
+        {
+            VITA_DEBUG_LOG("[Video][NVG][SAFE] formato 0x%08X no-RGBA; skip frame", (unsigned)currentFmt);
+        }
+        return;
+    }
+
+    if (allowYuvExperimental)
+    {
+        static uint32_t yuvExpLogCounter = 0;
+        if ((yuvExpLogCounter++ % 1200) == 0)
+        {
+            VITA_DEBUG_LOG("[Video][NVG][EXP] rendering YUV texture fmt=0x%08X via NVG/GXM", (unsigned)currentFmt);
+        }
+        NVGXMwindow* win = gxmGetWindow();
+        if (win && win->context)
+        {
+            sceGxmSetYuvProfile(win->context, 0, SCE_GXM_YUV_PROFILE_BT709_STANDARD);
+        }
+    }
+
+    static uint32_t nvgDiagCounter = 0;
+    if ((nvgDiagCounter++ % 1200) == 0)
+    {
+        VITA_DEBUG_LOG("[Video][NVG][DIAG] tex=%p gxm=%p fmt=0x%08X data=%p", tex, gxmTex, (unsigned int)currentFmt, currentData);
+    }
+
+    if (!image_scaling.enabled)
+        return;
+
+    uint32_t texW = image_scaling.texture_width;
+    uint32_t texH = image_scaling.texture_height;
+    if (texW == 0 || texH == 0)
+        return;
+
+    int foundIdx = -1;
+    for (int i = 0; i < imageCacheSize; i++)
+    {
+        if (imageCache[i].tex == tex)
+        {
+            foundIdx = i;
+            break;
+        }
+    }
+
+    int useImageId = -1;
+    if (foundIdx >= 0)
+    {
+        if (imageCache[foundIdx].width != (int)texW || imageCache[foundIdx].height != (int)texH || imageCache[foundIdx].format != currentFmt)
+        {
+            nvgDeleteImage(vg, imageCache[foundIdx].imageId);
+            int newId = nvgxmCreateImageFromHandle(vg, const_cast<SceGxmTexture*>(gxmTex));
+            if (newId > 0)
+            {
+                imageCache[foundIdx].imageId = newId;
+                imageCache[foundIdx].width   = (int)texW;
+                imageCache[foundIdx].height  = (int)texH;
+                imageCache[foundIdx].data    = currentData;
+                imageCache[foundIdx].format  = currentFmt;
+                useImageId                   = newId;
+                VITA_DEBUG_LOG("[Video][NVG] Recreated cached image %d (changed size/format)", newId);
+            }
+        }
+        else
+        {
+            useImageId                = imageCache[foundIdx].imageId;
+            imageCache[foundIdx].data = currentData;
+        }
+    }
+    else
+    {
+        int newId = nvgxmCreateImageFromHandle(vg, const_cast<SceGxmTexture*>(gxmTex));
+        if (newId > 0)
+        {
+            if (imageCacheSize < 4)
+            {
+                int idx                 = imageCacheSize++;
+                imageCache[idx].tex     = tex;
+                imageCache[idx].imageId = newId;
+                imageCache[idx].width   = (int)texW;
+                imageCache[idx].height  = (int)texH;
+                imageCache[idx].data    = currentData;
+                imageCache[idx].format  = currentFmt;
+                useImageId              = newId;
+                VITA_DEBUG_LOG("[Video][NVG] Cached new image %d (slot %d)", newId, idx);
+            }
+            else
+            {
+                VITA_DEBUG_LOG("[Video][NVG] Cache full, evicting slot 0");
+                nvgDeleteImage(vg, imageCache[0].imageId);
+                imageCache[0].tex     = tex;
+                imageCache[0].imageId = newId;
+                imageCache[0].width   = (int)texW;
+                imageCache[0].height  = (int)texH;
+                imageCache[0].data    = currentData;
+                imageCache[0].format  = currentFmt;
+                useImageId            = newId;
+            }
+            nvgImageCreateCount++;
+        }
+    }
+
+    if (useImageId <= 0)
+    {
+        VITA_DEBUG_LOG("[Video][DRAW NVG][ERR] Failed to get/create image for tex=%p", tex);
+        return;
+    }
+
+    int dw = fullscreenStretch ? (int)viewportW : image_scaling.display_width;
+    int dh = fullscreenStretch ? (int)viewportH : image_scaling.display_height;
+    int ox = fullscreenStretch ? 0 : image_scaling.offset_x;
+    int oy = fullscreenStretch ? 0 : image_scaling.offset_y;
+    if (dw <= 0 || dh <= 0)
+        return;
+
+    NVGpaint paint = nvgImagePattern(vg, (float)ox, (float)oy, (float)dw, (float)dh, 0.0f, useImageId, alpha);
+    nvgBeginPath(vg);
+    nvgRect(vg, (float)ox, (float)oy, (float)dw, (float)dh);
+    nvgFillPaint(vg, paint);
+    nvgFill(vg);
+
+    g_stats.frames_presented++;
+    onFramePresented();
+
+    static uint32_t gpuSyncCounter = 0;
+    if (++gpuSyncCounter % 240 == 0)
+    {
+        if (vita2d_inited)
+        {
+            vita2d_wait_rendering_done();
+        }
+    }
+}
+
+void VitaVideoRenderer::destroyImage(NVGcontext* vg)
+{
+    if (!vg)
+    {
+        vg = brls::Application::getNVGContext();
+    }
+
+    if (vg)
+    {
+        if (vita2d_inited)
+        {
+            vita2d_wait_rendering_done();
+        }
+        for (int i = 0; i < imageCacheSize; i++)
+        {
+            if (imageCache[i].imageId >= 0)
+            {
+                nvgDeleteImage(vg, imageCache[i].imageId);
+            }
+        }
+    }
+    imageCacheSize = 0;
+}
+
+void VitaVideoRenderer::onFramePresented()
 {
     uint64_t now = vita_monotonic_ms();
     if (stats_start_ms == 0)
@@ -63,242 +389,4 @@ void update_present_stats()
         last_fps_window_ms    = now;
         s_presentWindowFrames = 0;
     }
-}
-}
-
-// Implementation
-
-VitaVideoRenderer& VitaVideoRenderer::instance()
-{
-    static VitaVideoRenderer inst;
-    return inst;
-}
-
-void VitaVideoRenderer::setFullscreenStretch(bool stretch)
-{
-    fullscreenStretch        = stretch;
-    video_fullscreen_stretch = stretch;
-}
-
-void VitaVideoRenderer::draw(struct NVGcontext* vg, float viewportW, float viewportH, float alpha)
-{
-    (void)vg;
-    (void)alpha;
-    draw(viewportW, viewportH);
-}
-
-void VitaVideoRenderer::draw(float viewportW, float viewportH)
-{
-    if (!vita2d_inited)
-    {
-        static bool logged = false;
-        if (!logged)
-        {
-            VITA_DEBUG_LOG("[Video][DRAW] vita2d no inicializado");
-            logged = true;
-        }
-        return;
-    }
-    if (g_stats.frames_decoded == 0)
-    {
-        static bool logged = false;
-        if (!logged)
-        {
-            VITA_DEBUG_LOG("[Video][DRAW] primer frame aún no decodificado - skip");
-            logged = true;
-        }
-        return;
-    }
-    std::lock_guard<std::mutex> slotLock(g_frame_slots_mutex);
-    vita2d_texture* tex = FRAME_FRONT();
-    if (!tex)
-    {
-        static bool logged = false;
-        if (!logged)
-        {
-            VITA_DEBUG_LOG("[Video][DRAW] FRAME_FRONT null");
-            logged = true;
-        }
-        return;
-    }
-    static uint32_t drawCounter = 0;
-    if (drawCounter < 120 || (drawCounter % 60) == 0)
-    {
-        unsigned stride = vita2d_texture_get_stride(tex);
-        VITA_DEBUG_LOG("[Video][DRAW] frame=%u tex=%p stride=%u frontIdx=%d backIdx=%d", drawCounter, tex, stride, frame_front_idx, frame_back_idx);
-    }
-    drawCounter++;
-    if (!image_scaling.enabled)
-        return;
-    int dw = fullscreenStretch ? (int)viewportW : image_scaling.display_width;
-    int dh = fullscreenStretch ? (int)viewportH : image_scaling.display_height;
-    int ox = fullscreenStretch ? 0 : image_scaling.offset_x;
-    int oy = fullscreenStretch ? 0 : image_scaling.offset_y;
-    if (dw <= 0 || dh <= 0)
-        return;
-    if (image_scaling.region_x2 <= image_scaling.region_x1 || image_scaling.region_y2 <= image_scaling.region_y1)
-        return;
-    if (image_scaling.texture_width == 0 || image_scaling.texture_height == 0)
-        return;
-    float scaleX = (float)dw / image_scaling.texture_width;
-    float scaleY = (float)dh / image_scaling.texture_height;
-    if (scaleX <= 0.f || scaleY <= 0.f)
-        return;
-    vita2d_draw_texture_tint_part_scale(
-        tex,
-        (float)ox, (float)oy,
-        image_scaling.region_x1, image_scaling.region_y1,
-        image_scaling.region_x2, image_scaling.region_y2,
-        scaleX,
-        scaleY,
-        0xFFFFFFFF);
-    g_stats.frames_presented++;
-    update_present_stats();
-}
-
-void VitaVideoRenderer::drawNVG(NVGcontext* vg, float viewportW, float viewportH, float alpha)
-{
-    if (!vg)
-    {
-        draw(viewportW, viewportH);
-        return;
-    }
-    if (g_stats.frames_decoded == 0)
-        return;
-    std::lock_guard<std::mutex> slotLock(g_frame_slots_mutex);
-    const vita2d_texture* tex = FRAME_FRONT();
-    if (!tex)
-        return;
-    const SceGxmTexture* gxmTex = &tex->gxm_tex;
-
-    if (!image_scaling.enabled)
-        return;
-
-    uint32_t texW = image_scaling.texture_width;
-    uint32_t texH = image_scaling.texture_height;
-    if (texW == 0 || texH == 0)
-        return;
-
-    // [OPTIMIZATION] Image Cache Lookup
-    int foundIdx = -1;
-    for (int i = 0; i < imageCacheSize; i++)
-    {
-        if (imageCache[i].tex == tex)
-        {
-            foundIdx = i;
-            break;
-        }
-    }
-
-    int useImageId = -1;
-
-    if (foundIdx >= 0)
-    {
-        // Found in cache, check if valid
-        if (imageCache[foundIdx].width != (int)texW || imageCache[foundIdx].height != (int)texH)
-        {
-            // Dimensions changed, recreate
-            nvgDeleteImage(vg, imageCache[foundIdx].imageId);
-            int newId = nvgxmCreateImageFromHandle(vg, const_cast<SceGxmTexture*>(gxmTex));
-            if (newId > 0)
-            {
-                imageCache[foundIdx].imageId = newId;
-                imageCache[foundIdx].width   = (int)texW;
-                imageCache[foundIdx].height  = (int)texH;
-                useImageId                   = newId;
-                VITA_DEBUG_LOG("[Video][NVG] Recreated cached image %d (size change)", newId);
-            }
-        }
-        else
-        {
-            useImageId = imageCache[foundIdx].imageId;
-        }
-    }
-    else
-    {
-        // Not found, create new
-        int newId = nvgxmCreateImageFromHandle(vg, const_cast<SceGxmTexture*>(gxmTex));
-        if (newId > 0)
-        {
-            if (imageCacheSize < 4)
-            {
-                int idx                 = imageCacheSize++;
-                imageCache[idx].tex     = tex;
-                imageCache[idx].imageId = newId;
-                imageCache[idx].width   = (int)texW;
-                imageCache[idx].height  = (int)texH;
-                useImageId              = newId;
-                VITA_DEBUG_LOG("[Video][NVG] Cached new image %d (slot %d)", newId, idx);
-            }
-            else
-            {
-                // Cache full (unlikely with double buffering), evict slot 0
-                VITA_DEBUG_LOG("[Video][NVG] Cache full, evicting slot 0");
-                nvgDeleteImage(vg, imageCache[0].imageId);
-                imageCache[0].tex     = tex;
-                imageCache[0].imageId = newId;
-                imageCache[0].width   = (int)texW;
-                imageCache[0].height  = (int)texH;
-                useImageId            = newId;
-            }
-            nvgImageCreateCount++;
-        }
-    }
-
-    if (useImageId <= 0)
-    {
-        VITA_DEBUG_LOG("[Video][DRAW NVG][ERR] Failed to get/create image for tex=%p", tex);
-        return;
-    }
-
-    // Draw with persistent NVG image
-    int dw = fullscreenStretch ? (int)viewportW : image_scaling.display_width;
-    int dh = fullscreenStretch ? (int)viewportH : image_scaling.display_height;
-    int ox = fullscreenStretch ? 0 : image_scaling.offset_x;
-    int oy = fullscreenStretch ? 0 : image_scaling.offset_y;
-    if (dw <= 0 || dh <= 0)
-        return;
-
-    NVGpaint paint = nvgImagePattern(vg, (float)ox, (float)oy, (float)dw, (float)dh, 0.0f, useImageId, alpha);
-    nvgBeginPath(vg);
-    nvgRect(vg, (float)ox, (float)oy, (float)dw, (float)dh);
-    nvgFillPaint(vg, paint);
-    nvgFill(vg);
-    g_stats.frames_presented++;
-    update_present_stats();
-
-    // Explicitly synchronize GPU every N frames to avoid backlog
-    static uint32_t gpuSyncCounter = 0;
-    if (++gpuSyncCounter % 30 == 0)
-    { // Cada 30 frames (~500ms a 60fps)
-        if (vita2d_inited)
-        {
-            vita2d_wait_rendering_done();
-        }
-    }
-}
-
-void VitaVideoRenderer::destroyImage(NVGcontext* vg)
-{
-    if (!vg)
-    {
-        vg = brls::Application::getNVGContext();
-    }
-
-    if (vg)
-    {
-        // Ensure any GPU rendering referencing the image is finished.
-        if (vita2d_inited)
-        {
-            vita2d_wait_rendering_done();
-        }
-        for (int i = 0; i < imageCacheSize; i++)
-        {
-            if (imageCache[i].imageId >= 0)
-            {
-                nvgDeleteImage(vg, imageCache[i].imageId);
-            }
-        }
-    }
-    imageCacheSize = 0;
 }

@@ -137,14 +137,7 @@ extern "C" int vitavideo_submit_decode_unit(PDECODE_UNIT decodeUnit)
     picture.size      = sizeof(picture);
     uint32_t alignedW = (decoder_width > 0 ? decoder_width : image_scaling.texture_width);
     uint32_t baseH    = (decoder_height > 0 ? decoder_height : image_scaling.texture_height);
-    bool decodeYuv    = (decoder_output_mode == 1);
-    // YUV mode check (if implemented)
-    if (decodeYuv && (!decoder_yuv_buffer || decoder_yuv_buffer_size == 0))
-    {
-        VITA_DEBUG_LOG("[Video][WARN] Buffer YUV no disponible, volviendo a RGBA");
-        decoder_output_mode = 0;
-        decodeYuv           = false;
-    }
+    bool decodeYuv    = (g_pixelProcessor && g_pixelProcessor->getDecoderPixelFormat() == SCE_AVCDEC_PIXELFORMAT_YUV420_RASTER);
 
     // Staging logic is handled by the modular pixel processor
 
@@ -256,11 +249,7 @@ extern "C" int vitavideo_submit_decode_unit(PDECODE_UNIT decodeUnit)
     picture.frame.frameWidth       = alignedW;
     picture.frame.horizontalSize   = alignedW;
     uint32_t frameHeightForDecoder = baseH;
-    if (decodeYuv)
-    {
-        frameHeightForDecoder = baseH;
-    }
-    else if (decodeUsesFallback)
+    if (decodeUsesFallback)
     {
         frameHeightForDecoder = baseH;
     }
@@ -271,6 +260,7 @@ extern "C" int vitavideo_submit_decode_unit(PDECODE_UNIT decodeUnit)
     uint32_t framePitchPixels = 0;
     if (decodeYuv)
     {
+        // YUV raster decode path uses aligned width in pixels as pitch.
         framePitchPixels = alignedW;
     }
     else if (decodeUsesFallback)

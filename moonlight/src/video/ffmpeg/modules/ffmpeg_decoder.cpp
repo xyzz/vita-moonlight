@@ -92,34 +92,33 @@ int ffmpeg_decoder_init(FFmpegDecoderContext* ctx)
 
     ctx->parser = av_parser_init(codec->id);
 
-    AVDictionary* opts = NULL;
+    AVDictionary* opts                  = NULL;
+    enum AVDiscard targetSkipLoopFilter = AVDISCARD_DEFAULT;
+    enum AVDiscard targetSkipIdct       = AVDISCARD_DEFAULT;
+    enum AVDiscard targetSkipFrame      = AVDISCARD_DEFAULT;
 
 #ifdef BOREALIS_USE_GXM
     if (codec->id == AV_CODEC_ID_H264)
     {
-        // Direct-render with h264_vita has shown runtime instability on some
-        // sessions (GPU crash). Keep it as opt-in via env var while defaulting
-        // to the safer software upload path.
-        bool enableDirectRender = false;
-        const char* drEnv       = getenv("MOONLIGHT_FFMPEG_DIRECT_RENDER");
-        if (drEnv && strcmp(drEnv, "0") != 0 && strcmp(drEnv, "false") != 0 && strcmp(drEnv, "off") != 0)
+        int requestedPixelMode = g_video_settings_snapshot.pixel_format_mode;
+        // Clean performance baseline: force YUV decode path on Vita FFmpeg.
+        enum AVPixelFormat requestedPixFmt = AV_PIX_FMT_YUV420P;
+        ctx->avctx->pix_fmt                = requestedPixFmt;
+        if (requestedPixelMode == 0)
         {
-            enableDirectRender = true;
-        }
-
-        if (enableDirectRender)
-        {
-            av_dict_set(&opts, "vita_h264_dr", "1", 0);
-            ctx->avctx->get_buffer2 = get_buffer2_direct;
-            ctx->use_direct_render  = true;
-            VITA_DEBUG_LOG("[FFMPEG] Direct render ENABLED by MOONLIGHT_FFMPEG_DIRECT_RENDER=%s", drEnv ? drEnv : "1");
+            VITA_DEBUG_LOG("[FFMPEG] Requested pixel format mode=%d but forcing baseline pix_fmt=%d (YUV420P)", requestedPixelMode, (int)requestedPixFmt);
         }
         else
         {
-            ctx->use_direct_render = false;
-            ctx->avctx->pix_fmt    = AV_PIX_FMT_YUV420P;
-            VITA_DEBUG_LOG("[FFMPEG] Direct render DISABLED by default (set MOONLIGHT_FFMPEG_DIRECT_RENDER=1 to enable)");
+            VITA_DEBUG_LOG("[FFMPEG] Requested pixel format mode=%d pix_fmt=%d", requestedPixelMode, (int)requestedPixFmt);
         }
+
+        // Clean baseline: keep FFmpeg on software upload path only.
+        // Direct render will be reintroduced later with a redesigned buffer lifecycle.
+        ctx->use_direct_render = false;
+        // Keep codec/default buffer allocator untouched in software path.
+        // For h264_vita, forcing nullptr here can break first-frame decode.
+        VITA_DEBUG_LOG("[FFMPEG] Direct render disabled; software upload path enabled");
 
         // Mark if this is the hardware assisted vita decoder
         ctx->is_vita_hw = (strcmp(codec->name, "h264_vita") == 0);
@@ -128,13 +127,32 @@ int ffmpeg_decoder_init(FFmpegDecoderContext* ctx)
             VITA_DEBUG_LOG("[FFMPEG] Vita hardware codec detected: %s", codec->name);
         }
         VITA_DEBUG_LOG("[FFMPEG] ffmpeg_decoder_init: H264 on GXM: direct_render=%d", ctx->use_direct_render ? 1 : 0);
-        // Set conservative fixed defaults for the Vita: slice threading and skip loop filter
-        // We default to 1 thread and slice-type threading to avoid oversubscription and high latency.
-        ctx->avctx->thread_count = 1;
+        // We try 2 threads by default for better throughput, with runtime fallback to 1 on init failure.
+        ctx->avctx->thread_count = 2;
         ctx->avctx->thread_type  = FF_THREAD_SLICE;
         av_dict_set(&opts, "refcounted_frames", "1", 0);
-        // Skip loop filter to reduce CPU workload (lower quality but faster)
-        av_dict_set(&opts, "skip_loop_filter", "all", 0);
+        ctx->avctx->skip_loop_filter = AVDISCARD_DEFAULT;
+        ctx->avctx->skip_idct        = AVDISCARD_DEFAULT;
+        ctx->avctx->skip_frame       = AVDISCARD_DEFAULT;
+        targetSkipLoopFilter         = AVDISCARD_NONREF;
+        targetSkipIdct               = AVDISCARD_NONREF;
+        targetSkipFrame              = AVDISCARD_DEFAULT;
+
+        if (requestedPixelMode == 1)
+        {
+            targetSkipLoopFilter = AVDISCARD_ALL;
+            targetSkipIdct       = AVDISCARD_ALL;
+            targetSkipFrame      = AVDISCARD_BIDIR;
+            ctx->avctx->flags2 |= AV_CODEC_FLAG2_FAST;
+            VITA_DEBUG_LOG("[FFMPEG] perf profile: YUV GPU mode -> default skip_loop_filter=ALL skip_idct=ALL skip_frame=BIDIR flags2|=FAST");
+
+            // Keep default slice threading for h264_vita unless overridden via env.
+            if (ctx->is_vita_hw)
+            {
+                ctx->avctx->thread_count = 2;
+                VITA_DEBUG_LOG("[FFMPEG] perf profile: YUV GPU + h264_vita -> default thread_count=2");
+            }
+        }
         int refcounted_frames_val  = 1;
         const char* threadCountEnv = getenv("MOONLIGHT_FFMPEG_THREAD_COUNT");
         if (threadCountEnv)
@@ -155,35 +173,106 @@ int ffmpeg_decoder_init(FFmpegDecoderContext* ctx)
         if (skipLoopEnv)
         {
             if (strcmp(skipLoopEnv, "all") == 0)
-                ctx->avctx->skip_loop_filter = AVDISCARD_ALL;
+                targetSkipLoopFilter = AVDISCARD_ALL;
             else if (strcmp(skipLoopEnv, "nonref") == 0)
-                ctx->avctx->skip_loop_filter = AVDISCARD_NONREF;
+                targetSkipLoopFilter = AVDISCARD_NONREF;
             else if (strcmp(skipLoopEnv, "none") == 0)
-                ctx->avctx->skip_loop_filter = AVDISCARD_DEFAULT;
+                targetSkipLoopFilter = AVDISCARD_DEFAULT;
         }
-        VITA_DEBUG_LOG("[FFMPEG] ffmpeg_decoder_init: thread_count=%d thread_type=%d refcounted=%d skip_loop_filter=%d", ctx->avctx->thread_count, ctx->avctx->thread_type, refcounted_frames_val, ctx->avctx->skip_loop_filter);
+        const char* skipIdctEnv = getenv("MOONLIGHT_FFMPEG_SKIP_IDCT");
+        if (skipIdctEnv)
+        {
+            if (strcmp(skipIdctEnv, "all") == 0)
+                targetSkipIdct = AVDISCARD_ALL;
+            else if (strcmp(skipIdctEnv, "nonref") == 0)
+                targetSkipIdct = AVDISCARD_NONREF;
+            else if (strcmp(skipIdctEnv, "none") == 0)
+                targetSkipIdct = AVDISCARD_DEFAULT;
+        }
+        const char* skipFrameEnv = getenv("MOONLIGHT_FFMPEG_SKIP_FRAME");
+        if (skipFrameEnv)
+        {
+            if (strcmp(skipFrameEnv, "all") == 0)
+                targetSkipFrame = AVDISCARD_ALL;
+            else if (strcmp(skipFrameEnv, "nonref") == 0)
+                targetSkipFrame = AVDISCARD_NONREF;
+            else if (strcmp(skipFrameEnv, "bidir") == 0)
+                targetSkipFrame = AVDISCARD_BIDIR;
+            else if (strcmp(skipFrameEnv, "none") == 0)
+                targetSkipFrame = AVDISCARD_DEFAULT;
+        }
+        VITA_DEBUG_LOG("[FFMPEG] ffmpeg_decoder_init: thread_count=%d thread_type=%d refcounted=%d skip_loop_filter(open)=%d target_skip_loop_filter=%d target_skip_idct=%d target_skip_frame=%d flags2=0x%X", ctx->avctx->thread_count, ctx->avctx->thread_type, refcounted_frames_val, ctx->avctx->skip_loop_filter, targetSkipLoopFilter, targetSkipIdct, targetSkipFrame, (unsigned)ctx->avctx->flags2);
     }
     else
     {
-        // Force output pixel format to YUV420P for other decoders and use
-        // default buffer allocation to keep behavior stable.
-        ctx->avctx->pix_fmt    = AV_PIX_FMT_YUV420P;
         ctx->use_direct_render = false;
     }
 #else
-    ctx->avctx->pix_fmt    = AV_PIX_FMT_YUV420P;
+    ctx->avctx->pix_fmt    = (g_video_settings_snapshot.pixel_format_mode == 0) ? AV_PIX_FMT_RGBA : AV_PIX_FMT_YUV420P;
     ctx->use_direct_render = false;
 #endif
 
-    if (avcodec_open2(ctx->avctx, codec, &opts) < 0)
+    int openRet = avcodec_open2(ctx->avctx, codec, &opts);
+    av_dict_free(&opts);
+    if (openRet < 0)
     {
-        av_dict_free(&opts);
-        ffmpeg_decoder_destroy(ctx);
-        fprintf(stderr, "FFmpeg decoder: failed to open codec %s\n", codec->name);
-        return -1;
+#ifdef BOREALIS_USE_GXM
+        if (ctx->is_vita_hw && ctx->avctx->skip_loop_filter != AVDISCARD_DEFAULT)
+        {
+            VITA_DEBUG_LOG("[FFMPEG] avcodec_open2 failed with skip_loop_filter=%d, retrying with default", ctx->avctx->skip_loop_filter);
+            // Recreate a clean codec context before retry; some Vita builds don't
+            // reliably support reopening after a failed avcodec_open2 on the same avctx.
+            int savedThreadCount           = ctx->avctx->thread_count;
+            int savedThreadType            = ctx->avctx->thread_type;
+            enum AVPixelFormat savedPixFmt = ctx->avctx->pix_fmt;
+
+            avcodec_free_context(&ctx->avctx);
+            ctx->avctx = avcodec_alloc_context3(codec);
+            if (ctx->avctx)
+            {
+                ctx->avctx->pix_fmt          = savedPixFmt;
+                ctx->avctx->thread_count     = savedThreadCount;
+                ctx->avctx->thread_type      = savedThreadType;
+                ctx->avctx->skip_loop_filter = AVDISCARD_DEFAULT;
+
+                AVDictionary* retryOpts = nullptr;
+                av_dict_set(&retryOpts, "refcounted_frames", "1", 0);
+                openRet = avcodec_open2(ctx->avctx, codec, &retryOpts);
+                av_dict_free(&retryOpts);
+            }
+
+            if (openRet < 0 && ctx->avctx && savedThreadCount > 1)
+            {
+                VITA_DEBUG_LOG("[FFMPEG] avcodec_open2 still failing with threads=%d, retrying with threads=1", savedThreadCount);
+                avcodec_free_context(&ctx->avctx);
+                ctx->avctx = avcodec_alloc_context3(codec);
+                if (ctx->avctx)
+                {
+                    ctx->avctx->pix_fmt          = savedPixFmt;
+                    ctx->avctx->thread_count     = 1;
+                    ctx->avctx->thread_type      = savedThreadType;
+                    ctx->avctx->skip_loop_filter = AVDISCARD_DEFAULT;
+
+                    AVDictionary* retrySingleThreadOpts = nullptr;
+                    av_dict_set(&retrySingleThreadOpts, "refcounted_frames", "1", 0);
+                    openRet = avcodec_open2(ctx->avctx, codec, &retrySingleThreadOpts);
+                    av_dict_free(&retrySingleThreadOpts);
+                }
+            }
+        }
+#endif
+        if (openRet < 0)
+        {
+            ffmpeg_decoder_destroy(ctx);
+            fprintf(stderr, "FFmpeg decoder: failed to open codec %s\n", codec->name);
+            return -1;
+        }
     }
 
-    av_dict_free(&opts);
+    ctx->avctx->skip_loop_filter = targetSkipLoopFilter;
+    ctx->avctx->skip_idct        = targetSkipIdct;
+    ctx->avctx->skip_frame       = targetSkipFrame;
+    VITA_DEBUG_LOG("[FFMPEG] ffmpeg_decoder_init: post-open tuning skip_loop_filter=%d skip_idct=%d skip_frame=%d", ctx->avctx->skip_loop_filter, ctx->avctx->skip_idct, ctx->avctx->skip_frame);
 
     ctx->initialized = 1;
     VITA_DEBUG_LOG("[FFMPEG] codec=%s avctx->get_buffer2=%p avctx->hw_device_ctx=%p use_direct_render=%d", codec->name, (void*)ctx->avctx->get_buffer2, (void*)ctx->avctx->hw_device_ctx, ctx->use_direct_render);

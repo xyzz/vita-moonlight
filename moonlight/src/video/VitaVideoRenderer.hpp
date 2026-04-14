@@ -24,7 +24,8 @@ class VitaVideoRenderer final
     void destroyImage(struct NVGcontext* vg);
 
   private:
-    VitaVideoRenderer()    = default;
+    VitaVideoRenderer() = default;
+    void onFramePresented();
     bool fullscreenStretch = true; // synchronized with global video_fullscreen_stretch
     // Resources for NVG image (direct GXM texture)
     struct NvgImageCacheEntry
@@ -33,6 +34,8 @@ class VitaVideoRenderer final
         int imageId               = -1;
         int width                 = 0;
         int height                = 0;
+        const void* data          = nullptr;
+        uint32_t format           = 0;
     };
 
     // Simple cache (max 2-3 entries usually)

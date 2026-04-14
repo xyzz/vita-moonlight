@@ -132,7 +132,7 @@ SessionMainView::SessionMainView(const HostInfo& host, const RemoteAppInfo& app)
     //     // });
     // }
 
-    g_video_settings_snapshot.show_fps = videoSettings.show_fps;
+    g_video_settings_snapshot = videoSettings;
 
     unsigned targetFps = (unsigned)streamCfg.fps;
     if (targetFps == 0)
@@ -168,14 +168,23 @@ void SessionMainView::draw(NVGcontext* vg, float x, float y, float width, float 
         g_controllerInput->handleInput();
     auto t1 = high_resolution_clock::now();
 
-    // New route: use NanoVG if available to paint the frame without touching the vita2d cycle
-    if (vg)
+    bool isFfmpegMode = (g_video_settings_snapshot.render_mode == 1);
+    if (isFfmpegMode)
     {
-        VitaVideoRenderer::instance().drawNVG(vg, width, height, 1.0f);
+        // Fixed route: FFmpeg frames are rendered through NVG.
+        if (vg)
+        {
+            VitaVideoRenderer::instance().drawNVG(vg, width, height, 1.0f);
+        }
+        else
+        {
+            // Fallback only if NVG context is unavailable.
+            VitaVideoRenderer::instance().draw(width, height);
+        }
     }
     else
     {
-        // Fallback (without vg): vita2d direct path (should not happen normally in Borealis)
+        // Fixed route: SCE/legacy decoder path uses vita2d.
         VitaVideoRenderer::instance().draw(width, height);
     }
     auto t2 = high_resolution_clock::now();

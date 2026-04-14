@@ -28,14 +28,22 @@ typedef struct FFmpegVideoContext
 {
     FFmpegDecoderContext decoder;
     FFmpegVideoFrame current_frame;
-    void* dr_textures[2];
+    void* dr_textures[3];
     int dr_front_idx;
     int dr_back_idx;
+    int dr_spare_idx;
     SwsContext* sws_context;
+    int sws_src_w;
+    int sws_src_h;
+    int sws_src_fmt;
+    vita2d_texture* sw_textures[3];
+    int sw_write_idx;
+    int sw_last_present_idx;
     vita2d_texture* sw_texture;
     int sw_texture_width;
     int sw_texture_height;
     int sw_texture_stride;
+    int sw_texture_format;
     int frame_rate;
     int stream_width;
     int stream_height;

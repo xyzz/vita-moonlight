@@ -236,11 +236,11 @@ void VitaPauseOverlay::disconnect()
     std::thread([addr, storedOnClose]() mutable
         {
         try {
-            brls::sync([]() { VitaVideoRenderer::instance().destroyImage(brls::Application::getNVGContext()); });
-        } catch (...) {}
-        try {
             VitaSession* s = VitaSession::active();
             if (s) s->stop(false);
+        } catch (...) {}
+        try {
+            brls::sync([]() { VitaVideoRenderer::instance().destroyImage(brls::Application::getNVGContext()); });
         } catch (...) {}
         GameStreamClient::instance().clearActiveStream(addr);
         std::this_thread::sleep_for(std::chrono::milliseconds(350));
@@ -266,11 +266,11 @@ void VitaPauseOverlay::closeApp()
             GameStreamClient::instance().quitApp(addr);
         } catch (...) {}
         try {
-            brls::sync([]() { VitaVideoRenderer::instance().destroyImage(brls::Application::getNVGContext()); });
-        } catch (...) {}
-        try {
             VitaSession* s = VitaSession::active();
             if (s) s->stop(false);
+        } catch (...) {}
+        try {
+            brls::sync([]() { VitaVideoRenderer::instance().destroyImage(brls::Application::getNVGContext()); });
         } catch (...) {}
         GameStreamClient::instance().clearActiveStream(addr);
         std::this_thread::sleep_for(std::chrono::milliseconds(350));

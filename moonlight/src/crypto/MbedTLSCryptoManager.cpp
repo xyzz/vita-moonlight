@@ -16,22 +16,27 @@
 
 static Data m_cert;
 static Data m_key;
+static std::string m_loadedKeyDir;
 
 static bool _generate_new_cert_key_pair(const std::string& keyDir);
 
 bool MbedTLSCryptoManager::load_cert_key_pair(const std::string& keyDir)
 {
     std::string actualKeyDir = keyDir.empty() ? "." : keyDir;
-    if (m_key.is_empty() || m_cert.is_empty())
+    if (m_key.is_empty() || m_cert.is_empty() || m_loadedKeyDir != actualKeyDir)
     {
         Data cert = Data::read_from_file(actualKeyDir + "/" + CERTIFICATE_FILE_NAME);
         Data key  = Data::read_from_file(actualKeyDir + "/" + KEY_FILE_NAME);
         if (!cert.is_empty() && !key.is_empty())
         {
-            m_cert = cert;
-            m_key  = key;
+            m_cert         = cert;
+            m_key          = key;
+            m_loadedKeyDir = actualKeyDir;
             return true;
         }
+        m_cert = Data();
+        m_key  = Data();
+        m_loadedKeyDir.clear();
         return false;
     }
     return true;
@@ -44,6 +49,7 @@ bool MbedTLSCryptoManager::generate_new_cert_key_pair(const std::string& keyDir)
     {
         if (!m_cert.is_empty() && !m_key.is_empty())
         {
+            m_loadedKeyDir = actualKeyDir;
             return true;
         }
     }
@@ -57,6 +63,7 @@ void MbedTLSCryptoManager::remove_cert_key_pair(const std::string& keyDir)
     remove((actualKeyDir + "/" + KEY_FILE_NAME).c_str());
     m_cert = Data();
     m_key  = Data();
+    m_loadedKeyDir.clear();
 }
 
 Data MbedTLSCryptoManager::cert_data() { return m_cert; }
@@ -176,19 +183,19 @@ Data MbedTLSCryptoManager::sign_data(Data data, Data key)
     mbedtls_pk_init(&pk);
     mbedtls_ctr_drbg_seed(&ctr_drbg, mbedtls_entropy_func, &entropy, NULL, 0);
 
-    mbedtls_pk_parse_key(&pk, key.bytes(), key.size() + 1, NULL, 0, NULL, NULL);
-    mbedtls_md(mbedtls_md_info_from_type(MBEDTLS_MD_SHA256), data.bytes(), data.size(), hash);
-    mbedtls_pk_sign(&pk, MBEDTLS_MD_SHA256, hash, sizeof(hash), buf, sizeof(buf), &sig_len, mbedtls_ctr_drbg_random, &ctr_drbg);
+    int parseRet = mbedtls_pk_parse_key(&pk, key.bytes(), key.size() + 1, NULL, 0, NULL, NULL);
+    int mdRet    = mbedtls_md(mbedtls_md_info_from_type(MBEDTLS_MD_SHA256), data.bytes(), data.size(), hash);
+    int signRet  = mbedtls_pk_sign(&pk, MBEDTLS_MD_SHA256, hash, sizeof(hash), buf, sizeof(buf), &sig_len, mbedtls_ctr_drbg_random, &ctr_drbg);
 
     mbedtls_pk_free(&pk);
     mbedtls_ctr_drbg_free(&ctr_drbg);
     mbedtls_entropy_free(&entropy);
 
-    if (sig_len > 0)
+    if (parseRet == 0 && mdRet == 0 && signRet == 0 && sig_len > 0)
     {
         return Data(buf, sig_len);
     }
-    return data;
+    return Data();
 }
 
 // Cert and key generator

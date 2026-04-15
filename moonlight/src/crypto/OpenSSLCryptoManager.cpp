@@ -14,6 +14,7 @@
 
 static Data m_cert;
 static Data m_key;
+static std::string m_loadedKeyDir;
 
 static const int NUM_BITS  = 2048;
 static const int SERIAL    = 0;
@@ -24,17 +25,21 @@ static bool _generate_new_cert_key_pair(const std::string& keyDir);
 bool OpenSSLCryptoManager::load_cert_key_pair(const std::string& keyDir)
 {
     std::string actualKeyDir = keyDir.empty() ? "." : keyDir;
-    if (m_key.is_empty() || m_cert.is_empty())
+    if (m_key.is_empty() || m_cert.is_empty() || m_loadedKeyDir != actualKeyDir)
     {
         Data cert = Data::read_from_file(actualKeyDir + "/" + CERTIFICATE_FILE_NAME);
         Data key  = Data::read_from_file(actualKeyDir + "/" + KEY_FILE_NAME);
 
         if (!cert.is_empty() && !key.is_empty())
         {
-            m_cert = cert;
-            m_key  = key;
+            m_cert         = cert;
+            m_key          = key;
+            m_loadedKeyDir = actualKeyDir;
             return true;
         }
+        m_cert = Data();
+        m_key  = Data();
+        m_loadedKeyDir.clear();
         return false;
     }
     return true;
@@ -49,6 +54,7 @@ bool OpenSSLCryptoManager::generate_new_cert_key_pair(const std::string& keyDir)
         {
             m_cert.write_to_file(actualKeyDir + "/" + CERTIFICATE_FILE_NAME);
             m_key.write_to_file(actualKeyDir + "/" + KEY_FILE_NAME);
+            m_loadedKeyDir = actualKeyDir;
             return true;
         }
     }
@@ -62,6 +68,7 @@ void OpenSSLCryptoManager::remove_cert_key_pair(const std::string& keyDir)
     remove((actualKeyDir + "/" + KEY_FILE_NAME).c_str());
     m_cert = Data();
     m_key  = Data();
+    m_loadedKeyDir.clear();
 }
 
 Data OpenSSLCryptoManager::cert_data()
@@ -153,6 +160,7 @@ Data OpenSSLCryptoManager::signature(Data cert)
 
     if (!x509)
     {
+        BIO_free(bio);
         return Data();
     }
 
@@ -167,6 +175,7 @@ Data OpenSSLCryptoManager::signature(Data cert)
 #endif
 
     Data sig = Data(asn_signature->data, asn_signature->length);
+    BIO_free(bio);
     X509_free(x509);
     return sig;
 }
@@ -214,7 +223,13 @@ Data OpenSSLCryptoManager::sign_data(Data data, Data key)
     size_t slen;
     EVP_DigestSignFinal(mdctx, NULL, &slen);
     unsigned char* signature = (unsigned char*)malloc(slen);
-    int result               = EVP_DigestSignFinal(mdctx, signature, &slen);
+    if (!signature)
+    {
+        EVP_PKEY_free(pkey);
+        EVP_MD_CTX_destroy(mdctx);
+        return Data();
+    }
+    int result = EVP_DigestSignFinal(mdctx, signature, &slen);
 
     EVP_PKEY_free(pkey);
     EVP_MD_CTX_destroy(mdctx);
@@ -222,7 +237,7 @@ Data OpenSSLCryptoManager::sign_data(Data data, Data key)
     if (result <= 0)
     {
         free(signature);
-        Data();
+        return Data();
     }
 
     Data signed_data = Data(signature, slen);

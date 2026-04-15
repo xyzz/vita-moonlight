@@ -25,10 +25,16 @@
 
 #include <curl/curl.h>
 #include <cstring>
+#include <sys/stat.h>
 
 static bool curlGlobalInit = false;
 static std::string certificateFilePath;
 static std::string keyFilePath;
+
+static bool _file_exists(const std::string& path) {
+    struct stat st {};
+    return stat(path.c_str(), &st) == 0 && S_ISREG(st.st_mode);
+}
 
 CURL* makeCurl();
 void freeCurl(CURL* curl);
@@ -55,6 +61,16 @@ static size_t _write_curl(void* contents, size_t size, size_t nmemb,
 
 int http_init(const std::string& key_directory) {
     std::string actual_key_directory = key_directory.empty() ? "." : key_directory;
+
+    // Always refresh file paths because keyDir can change between hosts/retries.
+    certificateFilePath = actual_key_directory + "/" + CERTIFICATE_FILE_NAME;
+    keyFilePath = actual_key_directory + "/" + KEY_FILE_NAME;
+    brls::Logger::info("Curl: TLS files cert='{}' ({}) key='{}' ({})",
+                       certificateFilePath,
+                       _file_exists(certificateFilePath) ? "ok" : "missing",
+                       keyFilePath,
+                       _file_exists(keyFilePath) ? "ok" : "missing");
+
     if (!curlGlobalInit) {
 #if LIBCURL_VERSION_NUM >= 0x075600
 #ifdef USE_OPENSSL_CRYPTO
@@ -65,14 +81,8 @@ int http_init(const std::string& key_directory) {
 #endif
         curl_global_init(CURL_GLOBAL_ALL);
         brls::Logger::info("Curl: {}", curl_version());
-    } else {
-        return GS_OK;
+        curlGlobalInit = true;
     }
-
-    certificateFilePath = actual_key_directory + "/" + CERTIFICATE_FILE_NAME;
-    keyFilePath = actual_key_directory + "/" + KEY_FILE_NAME;
-
-    curlGlobalInit = true;
     return GS_OK;
 }
 
@@ -106,11 +116,24 @@ int http_request(const std::string& url, Data* data,
     brls::Logger::info("Curl: Request:\n{}", url.c_str());
 
     auto* http_data = (HTTP_DATA*)malloc(sizeof(HTTP_DATA));
+    if (!http_data) {
+        gs_set_error("Out of memory");
+        return GS_OUT_OF_MEMORY;
+    }
     http_data->memory = (char*)malloc(1);
+    if (!http_data->memory) {
+        gs_set_error("Out of memory");
+        free(http_data);
+        return GS_OUT_OF_MEMORY;
+    }
     http_data->size = 0;
 
     auto curl = makeCurl();
-    if (!curl) return GS_FAILED;
+    if (!curl) {
+        free(http_data->memory);
+        free(http_data);
+        return GS_FAILED;
+    }
 
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, http_data);
     curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
@@ -121,11 +144,13 @@ int http_request(const std::string& url, Data* data,
     if (res != CURLE_OK) {
         gs_set_error(curl_easy_strerror(res));
         brls::Logger::error("Curl: error: {}", gs_error().c_str());
+        freeCurl(curl);
         free(http_data->memory);
         free(http_data);
         return GS_FAILED;
     } else if (http_data->memory == nullptr) {
         brls::Logger::error("Curl: memory = NULL");
+        freeCurl(curl);
         free(http_data->memory);
         free(http_data);
         return GS_OUT_OF_MEMORY;
@@ -148,4 +173,7 @@ int http_request(const std::string& url, Data* data,
 
 void http_cleanup() {
     curl_global_cleanup();
+    curlGlobalInit = false;
+    certificateFilePath.clear();
+    keyFilePath.clear();
 }

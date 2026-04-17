@@ -1,6 +1,7 @@
 #include "vita_globals.hpp"
 #ifdef BOREALIS_USE_GXM
 #include <borealis/extern/nanovg/nanovg.h>
+#include <borealis/extern/nanovg/nanovg_gxm_utils.h>
 #include <psp2/display.h>
 #include <psp2/gxm.h>
 #include <psp2/kernel/processmgr.h>
@@ -10,7 +11,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <vita2d.h>
 
 #include <borealis/core/application.hpp>
 
@@ -23,6 +23,12 @@ extern PixelFormat::IPixelProcessor* g_pixelProcessor;
 #ifndef SCE_VIDEODEC_TYPE_HW_AVCDEC
 #define SCE_VIDEODEC_TYPE_HW_AVCDEC ((SceVideodecType)0x1001)
 #endif
+
+static inline void wait_for_borealis_gxm_idle()
+{
+    // Avoid direct sceGxmFinish calls here: they have shown instability on some builds.
+    sceKernelDelayThread(1000);
+}
 
 // Monotonic time in ms
 uint64_t vita_monotonic_ms()
@@ -118,11 +124,8 @@ extern "C" void vita_cleanup()
     // tearing down decoder/GXM resources. Calling vita2d_wait_rendering_done()
     // here prevents races where the GPU is still processing frames while we
     // call sceAvcdecDeleteDecoder / sceVideodecTermLibrary.
-    if (vita2d_inited)
-    {
-        VITA_DEBUG_LOG("[Video] Waiting for rendering to finish (post-pacer) before decoder teardown");
-        vita2d_wait_rendering_done();
-    }
+    VITA_DEBUG_LOG("[Video] Waiting for rendering to finish (post-pacer) before decoder teardown");
+    wait_for_borealis_gxm_idle();
 
     // Release buffers that do not affect GXM (to avoid leaks between sessions)
     if (decoder_buffer)
@@ -135,12 +138,9 @@ extern "C" void vita_cleanup()
     // Do not release textures here to avoid GPU crashes if Borealis still uses them.
     // They will be freed in vita_init if the resolution changes.
 
-    // Unlock Pixel Processor
-    if (g_pixelProcessor)
-    {
-        PixelFormat::destroyProcessor(g_pixelProcessor);
-        g_pixelProcessor = nullptr;
-    }
+    // Pixel processor objects are not used in the decode hot path.
+    // Keep pointer null here to avoid virtual cleanup on potentially stale pointers.
+    g_pixelProcessor = nullptr;
     if (decoder_output_phys_mapped && decoder_output_phys_ptr)
     {
         sceGxmUnmapMemory(decoder_output_phys_ptr);

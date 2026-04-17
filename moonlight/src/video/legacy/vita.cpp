@@ -13,7 +13,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <vita2d.h>
 
 #include <memory> // std::unique_ptr, std::make_unique
 #include <memory>

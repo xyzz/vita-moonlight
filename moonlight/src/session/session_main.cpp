@@ -5,7 +5,6 @@
 #include "session/session_main.hpp"
 
 #include <borealis/extern/nanovg/nanovg.h>
-#include <vita2d.h>
 
 #include <borealis/core/application.hpp>
 #include <borealis/core/frame_context.hpp>
@@ -47,15 +46,6 @@ SessionMainView::SessionMainView(const HostInfo& host, const RemoteAppInfo& app)
     this->setBackgroundColor(nvgRGBA(0, 0, 0, 255));
 
     this->inflateFromXMLRes("xml/views/session_main.xml");
-
-    // Ensure vita2d is ready BEFORE any potential draw (defensive)
-    extern bool vita2d_inited;
-    if (!vita2d_inited)
-    {
-        vita2d_init();
-        vita2d_inited = true;
-        vita2d_set_vblank_wait(0);
-    }
 
     // Inicializar input manager
     g_controllerInput = new ControllerInputManager();
@@ -169,22 +159,19 @@ void SessionMainView::draw(NVGcontext* vg, float x, float y, float width, float 
     auto t1 = high_resolution_clock::now();
 
     bool isFfmpegMode = (g_video_settings_snapshot.render_mode == 1);
-    if (isFfmpegMode)
+    if (vg)
     {
-        // Fixed route: FFmpeg frames are rendered through NVG.
-        if (vg)
-        {
-            VitaVideoRenderer::instance().drawNVG(vg, width, height, 1.0f);
-        }
-        else
-        {
-            // Fallback only if NVG context is unavailable.
-            VitaVideoRenderer::instance().draw(width, height);
-        }
+        // In Borealis draw loop we prefer NVG path for both modes to avoid
+        // mixing direct vita2d draws inside an active NVG frame.
+        VitaVideoRenderer::instance().drawNVG(vg, width, height, 1.0f);
+    }
+    else if (isFfmpegMode)
+    {
+        VitaVideoRenderer::instance().draw(width, height);
     }
     else
     {
-        // Fixed route: SCE/legacy decoder path uses vita2d.
+        // Keep legacy fallback for cases where no NVG context is available.
         VitaVideoRenderer::instance().draw(width, height);
     }
     auto t2 = high_resolution_clock::now();

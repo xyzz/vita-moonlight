@@ -17,13 +17,11 @@ SceAvcdecQueryDecoderInfo* decoder_info = NULL;
 SceVideodecQueryInitInfoHwAvcdec* init  = NULL;
 
 // Double RGBA texture buffer for direct output
-vita2d_texture* frame_textures[2] = { nullptr, nullptr };
-int frame_front_idx               = 0;
-int frame_back_idx                = 1;
+GxmTexture* frame_textures[2] = { nullptr, nullptr };
+int frame_front_idx           = 0;
+int frame_back_idx            = 1;
 std::mutex g_frame_slots_mutex;
 bool single_frame_buffer = false; // default double buffer; can be activated for legacy testing
-// vita2d initialization state
-bool vita2d_inited = false;
 
 int SCREEN_WIDTH  = 960;
 int SCREEN_HEIGHT = 544;

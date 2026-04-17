@@ -8,7 +8,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <vita2d.h>
 
 #include "vita_globals.hpp"
 
@@ -19,9 +18,7 @@
 extern "C" void vitavideo_start()
 {
     VITA_DEBUG_LOG("[Video] vitavideo_start called");
-    const VideoSettings& settings = g_video_settings_snapshot;
-    active_video_thread           = true;
-    vita2d_set_vblank_wait(settings.enable_vita_vblank_wait);
+    active_video_thread = true;
     // Note: external presentation enabled by default; not drawn inside submit
     VITA_DEBUG_LOG("[Video] vitavideo_start completado");
     if (stats_start_ms == 0)
@@ -35,7 +32,6 @@ extern "C" void vitavideo_start()
 extern "C" void vitavideo_stop()
 {
     VITA_DEBUG_LOG("[Video] vitavideo_stop called");
-    vita2d_set_vblank_wait(true);
     active_video_thread = false;
     VITA_DEBUG_LOG("[Video] vitavideo_stop completado");
 }

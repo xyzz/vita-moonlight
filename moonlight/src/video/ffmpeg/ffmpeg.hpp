@@ -13,11 +13,11 @@ struct _APP_LIST;
 typedef struct _APP_LIST APP_LIST, *PAPP_LIST;
 
 struct SwsContext;
-struct vita2d_texture;
+struct GxmTexture;
 
 typedef struct
 {
-    vita2d_texture* texture;
+    GxmTexture* texture;
     int width;
     int height;
     bool has_frame;
@@ -36,10 +36,10 @@ typedef struct FFmpegVideoContext
     int sws_src_w;
     int sws_src_h;
     int sws_src_fmt;
-    vita2d_texture* sw_textures[3];
+    GxmTexture* sw_textures[3];
     int sw_write_idx;
     int sw_last_present_idx;
-    vita2d_texture* sw_texture;
+    GxmTexture* sw_texture;
     int sw_texture_width;
     int sw_texture_height;
     int sw_texture_stride;

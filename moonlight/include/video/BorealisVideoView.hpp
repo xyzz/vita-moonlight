@@ -1,6 +1,4 @@
 #pragma once
-#include <vita2d.h>
-
 #include <atomic>
 #include <borealis/core/frame_context.hpp>
 #include <borealis/core/style.hpp>
@@ -8,6 +6,7 @@
 #include <cstdint>
 
 #include "video/VideoFrameHolder.hpp"
+struct GxmTexture;
 
 // Forward de NanoVG
 struct NVGcontext;
@@ -28,9 +27,9 @@ class BorealisVideoView : public brls::View
 
   private:
     uint32_t storedW = 0, storedH = 0;
-    int nvgImageId                       = -1;
-    bool recreateImage                   = false;
-    const vita2d_texture* currentTexture = nullptr;
+    int nvgImageId                   = -1;
+    bool recreateImage               = false;
+    const GxmTexture* currentTexture = nullptr;
     // Simple metrics
     uint64_t lastStatsMs  = 0;
     uint32_t framesDrawn  = 0;

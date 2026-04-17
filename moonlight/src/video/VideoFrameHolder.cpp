@@ -1,7 +1,6 @@
 #include "video/VideoFrameHolder.hpp"
 
 #include <psp2/gxm.h>
-#include <vita2d.h>
 
 #include <atomic>
 #include <mutex>
@@ -14,7 +13,7 @@ VideoFrameHolder& VideoFrameHolder::instance()
     return inst;
 }
 
-void VideoFrameHolder::pushTexture(const vita2d_texture* texture, uint32_t w, uint32_t h, uint64_t ptsMs)
+void VideoFrameHolder::pushTexture(const GxmTexture* texture, uint32_t w, uint32_t h, uint64_t ptsMs)
 {
     if (!texture || w == 0 || h == 0)
     {

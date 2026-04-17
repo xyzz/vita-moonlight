@@ -1,12 +1,10 @@
-// VitaVideoRenderer.hpp - Simplified centralized renderer (without NVG staging)
+// VitaVideoRenderer.hpp - Simplified centralized renderer (NVG only, no vita2d)
 #pragma once
 
 #include <stdint.h>
-#include <vita2d.h>
-extern bool vita2d_inited; // defined in vita_globals.cpp
-struct NVGcontext; // forward
 
-// We do not depend on NanoVG for rendering (vita2d only)
+#include "video/gxm_texture.hpp"
+struct NVGcontext; // forward
 
 class VitaVideoRenderer final
 {
@@ -15,11 +13,11 @@ class VitaVideoRenderer final
     void draw(float viewportW, float viewportH);
     // Support for old call that included NVGcontext/alpha
     void draw(struct NVGcontext* vg, float viewportW, float viewportH, float alpha = 1.0f);
-    // New path: draw using NanoVG (avoid duplicate begin/end of vita2d)
+    // Draw using NanoVG with Borealis GXM context
     void drawNVG(struct NVGcontext* vg, float viewportW, float viewportH, float alpha = 1.0f);
     void setFullscreenStretch(bool stretch);
     bool isFullscreenStretch() const { return fullscreenStretch; }
-    // Release NVG image that references the current vita2d texture.
+    // Release NVG image that references the current GXM texture.
     // Public so UI code can clear any NVG references before stopping video.
     void destroyImage(struct NVGcontext* vg);
 
@@ -30,12 +28,12 @@ class VitaVideoRenderer final
     // Resources for NVG image (direct GXM texture)
     struct NvgImageCacheEntry
     {
-        const vita2d_texture* tex = nullptr;
-        int imageId               = -1;
-        int width                 = 0;
-        int height                = 0;
-        const void* data          = nullptr;
-        uint32_t format           = 0;
+        const GxmTexture* tex = nullptr;
+        int imageId           = -1;
+        int width             = 0;
+        int height            = 0;
+        const void* data      = nullptr;
+        uint32_t format       = 0;
     };
 
     // Simple cache (max 2-3 entries usually)

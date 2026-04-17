@@ -6,7 +6,6 @@
 #include <borealis/extern/nanovg/nanovg_gxm_utils.h>
 #include <psp2/gxm.h>
 #include <stdlib.h>
-#include <vita2d.h>
 
 #include <borealis/core/application.hpp>
 #include <mutex>
@@ -70,16 +69,15 @@ void VitaVideoRenderer::draw(struct NVGcontext* vg, float viewportW, float viewp
 
 void VitaVideoRenderer::draw(float viewportW, float viewportH)
 {
-    if (!vita2d_inited)
+    // Non-NVG draw path — no longer supported without vita2d
+    // All rendering goes through drawNVG via Borealis
+    static bool logged = false;
+    if (!logged)
     {
-        static bool logged = false;
-        if (!logged)
-        {
-            VITA_DEBUG_LOG("[Video][DRAW] vita2d no inicializado");
-            logged = true;
-        }
-        return;
+        VITA_DEBUG_LOG("[Video][DRAW] Non-NVG draw path called, skipping (vita2d removed)");
+        logged = true;
     }
+    return;
     if (g_stats.frames_decoded == 0)
     {
         static bool logged = false;
@@ -91,9 +89,9 @@ void VitaVideoRenderer::draw(float viewportW, float viewportH)
         return;
     }
 
-    vita2d_texture* tex = nullptr;
-    int frontIdx        = 0;
-    int backIdx         = 0;
+    GxmTexture* tex = nullptr;
+    int frontIdx    = 0;
+    int backIdx     = 0;
     {
         std::lock_guard<std::mutex> slotLock(g_frame_slots_mutex);
         tex      = FRAME_FRONT();
@@ -127,7 +125,7 @@ void VitaVideoRenderer::draw(float viewportW, float viewportH)
     static uint32_t drawCounter = 0;
     if (drawCounter < 120 || (drawCounter % 60) == 0)
     {
-        unsigned stride = vita2d_texture_get_stride(tex);
+        unsigned stride = gxm_texture_get_stride(tex);
         VITA_DEBUG_LOG("[Video][DRAW] frame=%u tex=%p stride=%u frontIdx=%d backIdx=%d", drawCounter, tex, stride, frontIdx, backIdx);
     }
     drawCounter++;
@@ -145,18 +143,42 @@ void VitaVideoRenderer::draw(float viewportW, float viewportH)
     if (image_scaling.texture_width == 0 || image_scaling.texture_height == 0)
         return;
 
+    float srcX = image_scaling.region_x1;
+    float srcY = image_scaling.region_y1;
+    float srcW = image_scaling.region_x2 - image_scaling.region_x1;
+    float srcH = image_scaling.region_y2 - image_scaling.region_y1;
+
+    const float texW = (float)gxm_texture_get_width(tex);
+    const float texH = (float)gxm_texture_get_height(tex);
+    if (texW <= 0.f || texH <= 0.f)
+        return;
+
+    if (srcX < 0.f)
+    {
+        srcW += srcX;
+        srcX = 0.f;
+    }
+    if (srcY < 0.f)
+    {
+        srcH += srcY;
+        srcY = 0.f;
+    }
+    if (srcX >= texW || srcY >= texH)
+        return;
+    if (srcX + srcW > texW)
+        srcW = texW - srcX;
+    if (srcY + srcH > texH)
+        srcH = texH - srcY;
+    if (srcW <= 0.f || srcH <= 0.f)
+        return;
+
     float scaleX = (float)dw / image_scaling.texture_width;
     float scaleY = (float)dh / image_scaling.texture_height;
     if (scaleX <= 0.f || scaleY <= 0.f)
         return;
 
-    vita2d_draw_texture_tint_part_scale(
-        tex,
-        (float)ox, (float)oy,
-        image_scaling.region_x1, image_scaling.region_y1,
-        image_scaling.region_x2, image_scaling.region_y2,
-        scaleX, scaleY,
-        0xFFFFFFFF);
+    // vita2d_draw removed — use NVG path instead
+    // vita2d_draw_texture_tint_part_scale not available
 
     g_stats.frames_presented++;
     onFramePresented();
@@ -172,7 +194,7 @@ void VitaVideoRenderer::drawNVG(NVGcontext* vg, float viewportW, float viewportH
     if (g_stats.frames_decoded == 0)
         return;
 
-    const vita2d_texture* tex = nullptr;
+    const GxmTexture* tex = nullptr;
     {
         std::lock_guard<std::mutex> slotLock(g_frame_slots_mutex);
         tex = FRAME_FRONT();
@@ -310,15 +332,6 @@ void VitaVideoRenderer::drawNVG(NVGcontext* vg, float viewportW, float viewportH
 
     g_stats.frames_presented++;
     onFramePresented();
-
-    static uint32_t gpuSyncCounter = 0;
-    if (++gpuSyncCounter % 240 == 0)
-    {
-        if (vita2d_inited)
-        {
-            vita2d_wait_rendering_done();
-        }
-    }
 }
 
 void VitaVideoRenderer::destroyImage(NVGcontext* vg)
@@ -330,10 +343,6 @@ void VitaVideoRenderer::destroyImage(NVGcontext* vg)
 
     if (vg)
     {
-        if (vita2d_inited)
-        {
-            vita2d_wait_rendering_done();
-        }
         for (int i = 0; i < imageCacheSize; i++)
         {
             if (imageCache[i].imageId >= 0)

@@ -16,6 +16,24 @@
 #include "video/VitaVideoRenderer.hpp"
 #include "video/legacy/modules/vita_globals.hpp"
 #include "video/legacy/vita.hpp" // vitavideo_get_stats, decoder callbacks
+#ifdef BOREALIS_USE_GXM
+#include <borealis/extern/nanovg/nanovg_gxm_utils.h>
+#include <psp2/gxm.h>
+#endif
+
+namespace
+{
+void wait_for_borealis_gxm_idle()
+{
+#ifdef BOREALIS_USE_GXM
+    NVGXMwindow* win = gxmGetWindow();
+    if (win && win->context)
+    {
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+#endif
+}
+}
 
 VitaSession* VitaSession::s_active = nullptr;
 
@@ -92,12 +110,9 @@ void VitaSession::destroyActive(bool terminateApp)
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
 
-        // Ensure any pending vita2d rendering is finished before finalizing.
-        if (vita2d_inited) {
-            brls::Logger::info("[VitaSession] waiting for vita2d rendering to finish before delete");
-            // Best-effort: wait for rendering to drain.
-            vita2d_wait_rendering_done();
-        }
+        // Ensure any pending rendering on Borealis GXM context is finished before finalizing.
+        brls::Logger::info("[VitaSession] waiting for GXM rendering to finish before delete");
+        wait_for_borealis_gxm_idle();
 
         // Small back-off to further reduce race-window.
         std::this_thread::sleep_for(std::chrono::milliseconds(100));

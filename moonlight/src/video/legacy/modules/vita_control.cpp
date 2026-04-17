@@ -3,7 +3,6 @@
 #include <psp2/videodec.h>
 #include <stdlib.h>
 #include <string.h>
-#include <vita2d.h>
 
 #include "vita_globals.hpp"
 
@@ -45,7 +44,7 @@ extern "C" void vitavideo_reset_stats()
 }
 
 // Expose current texture
-extern "C" vita2d_texture* vitavideo_get_current_texture()
+extern "C" GxmTexture* vitavideo_get_current_texture()
 {
     return FRAME_FRONT();
 }

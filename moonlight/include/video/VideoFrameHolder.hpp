@@ -8,12 +8,12 @@
 #include <cstdint>
 #include <mutex>
 
-struct vita2d_texture;
 struct SceGxmTexture;
+struct GxmTexture;
 
 struct GxmFrame
 {
-    const vita2d_texture* texture   = nullptr;
+    const GxmTexture* texture       = nullptr;
     const SceGxmTexture* gxmTexture = nullptr;
     uint32_t w                      = 0;
     uint32_t h                      = 0;
@@ -26,7 +26,7 @@ class VideoFrameHolder
     static VideoFrameHolder& instance();
 
     // Publish a texture already resident in VRAM/GXM
-    void pushTexture(const vita2d_texture* texture, uint32_t w, uint32_t h, uint64_t ptsMs);
+    void pushTexture(const GxmTexture* texture, uint32_t w, uint32_t h, uint64_t ptsMs);
 
     // Returns true if there was a new frame; 'out' receives reference to the texture
     bool popLatest(GxmFrame& out);

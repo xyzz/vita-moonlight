@@ -9,8 +9,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-// Forward declaration to avoid coupling header consumers to vita2d
-struct vita2d_texture;
+// Forward declaration to avoid coupling header consumers to concrete texture backend
+struct GxmTexture;
 
 // Resolution macros for PS Vita (legacy)
 #define ROUND_NEAREST_16(x) (vita_round(((double)(x)) / 16) * 16)
@@ -103,7 +103,7 @@ extern "C" void vitavideo_draw_fps();
 extern "C" void vitavideo_draw_indicators();
 
 // Access to the current texture (front) for future integration with Borealis renderer
-extern "C" struct vita2d_texture* vitavideo_get_current_texture();
+extern "C" struct GxmTexture* vitavideo_get_current_texture();
 
 // Scaling settings
 void vitavideo_update_scaling_settings(int width, int height);

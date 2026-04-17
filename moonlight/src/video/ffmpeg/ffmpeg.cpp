@@ -32,12 +32,12 @@ extern "C"
 #include "video/VitaVideoRenderer.hpp"
 
 #ifdef BOREALIS_USE_GXM
+#include <borealis/extern/nanovg/nanovg_gxm_utils.h>
 #include <psp2/display.h>
 #include <psp2/gxm.h>
 #include <psp2/kernel/processmgr.h>
 #include <psp2/kernel/threadmgr.h>
 #include <psp2/videodec.h>
-#include <vita2d.h>
 #endif
 
 static FFmpegVideoContext* g_ffmpeg_context = nullptr;
@@ -46,6 +46,17 @@ static std::atomic<int> g_active_decodes { 0 };
 static std::atomic<bool> g_ffmpeg_stop_request { false };
 static uint32_t g_ffmpeg_submit_counter = 0;
 static unsigned g_ffmpeg_frame_index    = 0;
+
+static inline void wait_for_borealis_gxm_idle()
+{
+#ifdef BOREALIS_USE_GXM
+    NVGXMwindow* win = gxmGetWindow();
+    if (win && win->context)
+    {
+        sceKernelDelayThread(1000);
+    }
+#endif
+}
 
 static bool is_gpu_yuv_experimental_enabled()
 {
@@ -347,7 +358,7 @@ extern "C" int get_buffer2_direct(AVCodecContext* avctx, AVFrame* pic, int /*fla
 
 struct dr_texture
 {
-    vita2d_texture impl;
+    GxmTexture impl;
     AVFrame frame;
     bool vram_mapped;
 };
@@ -360,6 +371,7 @@ static dr_texture* dr_texture_alloc()
         return nullptr;
     }
     memset(tex, 0, sizeof(*tex));
+    tex->impl.mem_uid = -1;
     av_frame_unref(&tex->frame);
     tex->vram_mapped = false;
     return tex;
@@ -381,10 +393,7 @@ static void dr_texture_detach(dr_texture* tex)
     {
         // Safety first: ensure GPU has finished sampling this texture before unmap.
         // Without this, direct RGBA can crash the GPU on fast buffer recycling.
-        if (vita2d_inited)
-        {
-            vita2d_wait_rendering_done();
-        }
+        wait_for_borealis_gxm_idle();
         sceGxmUnmapMemory(buf->data);
         // adjust mapping count
         SceUID mb = (SceUID)(intptr_t)av_buffer_get_opaque(buf);
@@ -472,6 +481,10 @@ static void dr_texture_attach(dr_texture* tex, AVFrame* frame)
         }
     }
     sceGxmTextureInitLinear(&tex->impl.gxm_tex, buf->data, spec->sce_format, width, height, 0);
+    tex->impl.width     = (uint32_t)width;
+    tex->impl.height    = (uint32_t)height;
+    tex->impl.stride    = (uint32_t)frame->linesize[0];
+    tex->impl.data_size = (uint32_t)buf->size;
     av_frame_unref(&tex->frame);
     // Keep a reference to the frame for DR texture without transferring ownership
     // from the decoder. This avoids freeing the underlying memblock while the
@@ -582,7 +595,7 @@ static int ensure_sw_texture(FFmpegVideoContext* ctx, int width, int height, enu
     {
         if (ctx->sw_textures[i])
         {
-            vita2d_free_texture(ctx->sw_textures[i]);
+            gxm_texture_free(ctx->sw_textures[i]);
             ctx->sw_textures[i] = nullptr;
         }
     }
@@ -590,28 +603,28 @@ static int ensure_sw_texture(FFmpegVideoContext* ctx, int width, int height, enu
 
     for (int i = 0; i < 3; ++i)
     {
-        ctx->sw_textures[i] = vita2d_create_empty_texture_format(width, height, (SceGxmTextureFormat)textureFormat);
+        ctx->sw_textures[i] = gxm_texture_create(width, height, (SceGxmTextureFormat)textureFormat, SCE_KERNEL_MEMBLOCK_TYPE_USER_CDRAM_RW);
         if (!ctx->sw_textures[i])
         {
             for (int j = 0; j <= i; ++j)
             {
                 if (ctx->sw_textures[j])
                 {
-                    vita2d_free_texture(ctx->sw_textures[j]);
+                    gxm_texture_free(ctx->sw_textures[j]);
                     ctx->sw_textures[j] = nullptr;
                 }
             }
             return -1;
         }
 
-        void* initDst = vita2d_texture_get_datap(ctx->sw_textures[i]);
+        void* initDst = gxm_texture_get_datap(ctx->sw_textures[i]);
         if (initDst)
         {
             // For YUV CSC textures on Vita, buffer layout/size can be driver-specific.
             // Clearing with a computed size may overrun and crash; only clear RGBA textures.
             if (textureFormat == (int)SCE_GXM_TEXTURE_FORMAT_U8U8U8U8_ABGR)
             {
-                int initStride = vita2d_texture_get_stride(ctx->sw_textures[i]);
+                int initStride = gxm_texture_get_stride(ctx->sw_textures[i]);
                 memset(initDst, 0, (size_t)initStride * (size_t)height);
             }
         }
@@ -623,13 +636,13 @@ static int ensure_sw_texture(FFmpegVideoContext* ctx, int width, int height, enu
     ctx->sw_write_idx        = 0;
     ctx->sw_last_present_idx = 2;
     ctx->sw_texture          = ctx->sw_textures[ctx->sw_last_present_idx];
-    ctx->sw_texture_stride   = vita2d_texture_get_stride(ctx->sw_textures[ctx->sw_write_idx]);
+    ctx->sw_texture_stride   = gxm_texture_get_stride(ctx->sw_textures[ctx->sw_write_idx]);
     return 0;
 #endif
 }
 
 #ifdef BOREALIS_USE_GXM
-static void rotate_sw_ring_and_publish(FFmpegVideoContext* ctx, vita2d_texture* writeTex, int width, int height, int stride)
+static void rotate_sw_ring_and_publish(FFmpegVideoContext* ctx, GxmTexture* writeTex, int width, int height, int stride)
 {
     ctx->sw_last_present_idx = ctx->sw_write_idx;
     ctx->sw_write_idx        = (ctx->sw_write_idx + 1) % 3;
@@ -648,7 +661,7 @@ static void rotate_sw_ring_and_publish(FFmpegVideoContext* ctx, vita2d_texture* 
     ctx->using_direct_memory         = false;
 }
 
-static bool copy_yuv420p_to_csc_texture(vita2d_texture* writeTex, AVFrame* frame, int* outYStride)
+static bool copy_yuv420p_to_csc_texture(GxmTexture* writeTex, AVFrame* frame, int* outYStride)
 {
 #ifdef BOREALIS_USE_GXM
     if (!writeTex || !frame || !frame->data[0] || !frame->data[1] || !frame->data[2])
@@ -656,7 +669,7 @@ static bool copy_yuv420p_to_csc_texture(vita2d_texture* writeTex, AVFrame* frame
         return false;
     }
 
-    uint8_t* dst = (uint8_t*)vita2d_texture_get_datap(writeTex);
+    uint8_t* dst = (uint8_t*)gxm_texture_get_datap(writeTex);
     if (!dst)
     {
         return false;
@@ -802,18 +815,18 @@ static bool publish_sw_frame(FFmpegVideoContext* ctx, AVFrame* frame)
         return false;
     }
 
-    vita2d_texture* writeTex = ctx->sw_textures[ctx->sw_write_idx];
+    GxmTexture* writeTex = ctx->sw_textures[ctx->sw_write_idx];
     if (!writeTex)
     {
         return false;
     }
 
-    uint8_t* dst = (uint8_t*)vita2d_texture_get_datap(writeTex);
+    uint8_t* dst = (uint8_t*)gxm_texture_get_datap(writeTex);
     if (!dst)
     {
         return false;
     }
-    int dstStride = vita2d_texture_get_stride(writeTex);
+    int dstStride = gxm_texture_get_stride(writeTex);
 
     // YUV420P fast path: keep frame in YUV and let GXM CSC do conversion at sampling time.
     if (k_enable_yuv_csc_fast_path() && srcFmt == AV_PIX_FMT_YUV420P)
@@ -1274,7 +1287,7 @@ static void ffmpeg_release_locked(FFmpegVideoContext* ctx)
     {
         if (ctx->sw_textures[i])
         {
-            vita2d_free_texture(ctx->sw_textures[i]);
+            gxm_texture_free(ctx->sw_textures[i]);
             ctx->sw_textures[i] = nullptr;
         }
     }
@@ -1318,11 +1331,8 @@ extern "C"
         // Ensure renderer isn't holding the texture handle before we free anything
         // Clear any pending frame so the renderer won't use it and wait for GPU to finish.
         VideoFrameHolder::instance().clear();
+        wait_for_borealis_gxm_idle();
 
-        if (vita2d_inited)
-        {
-            vita2d_wait_rendering_done();
-        }
         memset(context, 0, sizeof(*context));
         context->dr_textures[0]      = nullptr;
         context->dr_textures[1]      = nullptr;
@@ -1408,10 +1418,7 @@ extern "C"
         context->current_frame.has_frame     = false;
         context->current_frame.direct_memory = false;
         context->using_direct_memory         = false;
-        if (vita2d_inited)
-        {
-            vita2d_wait_rendering_done();
-        }
+        wait_for_borealis_gxm_idle();
         process_pending_vram_frees_if_safe();
     }
 
@@ -1481,19 +1488,7 @@ extern "C"
         }
 
 #ifdef BOREALIS_USE_GXM
-        if (!vita2d_inited)
-        {
-            if (width > 960 || height > 544)
-            {
-                vita2d_init_advanced(8 * 1024 * 1024);
-            }
-            else
-            {
-                vita2d_init();
-            }
-            vita2d_inited = true;
-            vita2d_set_vblank_wait(0);
-        }
+        wait_for_borealis_gxm_idle();
 #endif
 
         vitavideo_configure_screen_resolution(width);

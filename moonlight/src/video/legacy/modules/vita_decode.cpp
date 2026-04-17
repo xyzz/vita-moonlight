@@ -6,7 +6,6 @@
 #include <psp2/videodec.h>
 #include <stdlib.h>
 #include <string.h>
-#include <vita2d.h>
 
 #include <algorithm>
 
@@ -117,8 +116,8 @@ extern "C" int vitavideo_submit_decode_unit(PDECODE_UNIT decodeUnit)
     static const uint64_t texture_guard_sig_head = 0xDEADBEEFCAFEBABEULL;
     static const uint8_t texture_guard_fill      = 0xD6;
     // Destino actual (single buffer) => FRAME_BACK() == FRAME_FRONT() mientras single_frame_buffer=true
-    uint8_t* texBack         = (uint8_t*)vita2d_texture_get_datap(FRAME_BACK());
-    unsigned int strideBytes = vita2d_texture_get_stride(FRAME_BACK());
+    uint8_t* texBack         = (uint8_t*)gxm_texture_get_datap(FRAME_BACK());
+    unsigned int strideBytes = gxm_texture_get_stride(FRAME_BACK());
     if (!strideBytes)
         strideBytes = image_scaling.texture_width * 4;
     // Force no physical fallback in RGBA mode (stable debugging)
@@ -137,7 +136,7 @@ extern "C" int vitavideo_submit_decode_unit(PDECODE_UNIT decodeUnit)
     picture.size      = sizeof(picture);
     uint32_t alignedW = (decoder_width > 0 ? decoder_width : image_scaling.texture_width);
     uint32_t baseH    = (decoder_height > 0 ? decoder_height : image_scaling.texture_height);
-    bool decodeYuv    = (g_pixelProcessor && g_pixelProcessor->getDecoderPixelFormat() == SCE_AVCDEC_PIXELFORMAT_YUV420_RASTER);
+    bool decodeYuv    = (decoder_output_mode == 1);
 
     // Staging logic is handled by the modular pixel processor
 
@@ -214,36 +213,16 @@ extern "C" int vitavideo_submit_decode_unit(PDECODE_UNIT decodeUnit)
         }
     }
 
-    // === Use modular pixel processor to configure decoder ===
+    // Configure decoder output directly from mode to avoid virtual dispatch in decode thread.
     bool decodeUsesFallback = false;
     uint8_t* decodeTarget   = nullptr;
-    if (g_pixelProcessor)
+    picture.frame.pixelType = decodeYuv ? SCE_AVCDEC_PIXELFORMAT_YUV420_RASTER : SCE_AVCDEC_PIXELFORMAT_RGBA8888;
+    decodeTarget            = texBack;
+
+    if (!decodeTarget)
     {
-        // The processor determines the pixel format
-        picture.frame.pixelType = g_pixelProcessor->getDecoderPixelFormat();
-
-        // The processor determines the destination buffer
-        void* frontTex = frame_textures[frame_front_idx];
-        void* backTex  = frame_textures[frame_back_idx];
-        decodeTarget   = g_pixelProcessor->getDecodeTarget(frontTex, backTex);
-
-        if (!decodeTarget)
-        {
-            VITA_DEBUG_LOG("[Video][ERR] Procesador no pudo proporcionar buffer de destino");
-            return DR_NEED_IDR;
-        }
-    }
-    else
-    {
-        // Fallback if there is no processor: RGBA direct to texture
-        picture.frame.pixelType = SCE_AVCDEC_PIXELFORMAT_RGBA8888;
-        decodeTarget            = texBack;
-
-        if (!decodeTarget)
-        {
-            VITA_DEBUG_LOG("[Video][ERR] No hay destino válido para decodificar (sin procesador)");
-            return DR_NEED_IDR;
-        }
+        VITA_DEBUG_LOG("[Video][ERR] No hay destino válido para decodificar (modo=%d)", decoder_output_mode);
+        return DR_NEED_IDR;
     }
 
     picture.frame.frameWidth       = alignedW;
@@ -277,7 +256,7 @@ extern "C" int vitavideo_submit_decode_unit(PDECODE_UNIT decodeUnit)
     }
     picture.frame.framePitch = framePitchPixels;
 
-    picture.frame.pixelType = g_pixelProcessor ? g_pixelProcessor->getDecoderPixelFormat() : SCE_AVCDEC_PIXELFORMAT_RGBA8888;
+    picture.frame.pixelType = decodeYuv ? SCE_AVCDEC_PIXELFORMAT_YUV420_RASTER : SCE_AVCDEC_PIXELFORMAT_RGBA8888;
 
     const uint8_t* cpuPushPtr  = nullptr;
     uint32_t cpuPushPitchBytes = 0;
@@ -391,22 +370,11 @@ extern "C" int vitavideo_submit_decode_unit(PDECODE_UNIT decodeUnit)
         return DR_OK;
     }
 
-    // ===Modular post-processing===
-    if (g_pixelProcessor)
+    // Direct decode path: decoder writes directly to BACK texture.
+    if (!decodeYuv)
     {
-        // The processor handles any necessary conversion or copy
-        void* outputTex = frame_textures[frame_back_idx];
-
-        // If the decoder wrote to an intermediate buffer (e.g. YUV), the processor processes it here
-        // If you wrote direct (hardware RGBA), this may be no-op or sync
-        g_pixelProcessor->postProcess(decodeTarget, outputTex);
-
-        // Set pointers to debug/dump if necessary
-        if (g_pixelProcessor->getDecoderPixelFormat() == SCE_AVCDEC_PIXELFORMAT_RGBA8888)
-        {
-            cpuPushPtr        = decodeTarget;
-            cpuPushPitchBytes = strideBytes;
-        }
+        cpuPushPtr        = decodeTarget;
+        cpuPushPitchBytes = strideBytes;
     }
 
     static bool loggedFirstOut = false;
@@ -434,9 +402,9 @@ extern "C" int vitavideo_submit_decode_unit(PDECODE_UNIT decodeUnit)
 
     // Publish texture directly (no CPU copies)
     {
-        const vita2d_texture* texFront = FRAME_FRONT();
-        const uint32_t w               = image_scaling.texture_width;
-        const uint32_t h               = image_scaling.texture_height;
+        const GxmTexture* texFront = FRAME_FRONT();
+        const uint32_t w           = image_scaling.texture_width;
+        const uint32_t h           = image_scaling.texture_height;
         if (!texFront)
         {
             VITA_DEBUG_LOG("[Video][DECODE][WARN] FRAME_FRONT null tras swap (front=%d)", frame_front_idx);

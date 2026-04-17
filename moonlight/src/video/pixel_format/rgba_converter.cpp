@@ -1,8 +1,7 @@
-#include <vita2d.h>
-
 #include <cstring>
 
 #include "pixel_format.hpp"
+#include "video/gxm_texture.hpp"
 
 namespace PixelFormat
 {
@@ -52,10 +51,10 @@ class RGBAHardwareProcessor : public IPixelProcessor
     uint8_t* getDecodeTarget(void* frontBuffer, void* backBuffer) override
     {
         // Decode directly into the texture back buffer
-        vita2d_texture* backTex = static_cast<vita2d_texture*>(backBuffer);
+        GxmTexture* backTex = static_cast<GxmTexture*>(backBuffer);
         if (backTex)
         {
-            return static_cast<uint8_t*>(vita2d_texture_get_datap(backTex));
+            return static_cast<uint8_t*>(gxm_texture_get_datap(backTex));
         }
         return nullptr;
     }

@@ -255,8 +255,8 @@ if(PLATFORM_PSV)
         -lSceAudio_stub
         -lSceAudioIn_stub
         -lSceIme_stub
+        -lSceAppUtil_stub
         -lSceMotion_stub
-        -lvita2d
         -lSceGxm_stub
         -lScePgf_stub
         -lfreetype

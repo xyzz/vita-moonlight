@@ -39,7 +39,7 @@ class IPixelProcessor
     /**
      * Post-procesa el frame después de la decodificación
      * @param decodedBuffer Buffer donde el decoder escribió
-     * @param outputTexture Textura de salida (vita2d_texture*)
+     * @param outputTexture Textura de salida (GxmTexture*)
      * @return 0 si exitoso
      */
     virtual int postProcess(uint8_t* decodedBuffer, void* outputTexture) = 0;

@@ -24,6 +24,7 @@
 #include "GameStreamClient.hpp"
 #include "borealis.hpp"
 #include "controller/ControllerInput.hpp"
+#include "controller/keyboard/keyboard_launcher.hpp"
 #include "debug.hpp"
 #include "model/HostStorage.hpp"
 #include "session/hotkey_manager.hpp"
@@ -71,7 +72,16 @@ SessionMainView::SessionMainView(const HostInfo& host, const RemoteAppInfo& app)
         }, this->host);
         auto* activity = new brls::Activity(overlay);
         brls::Application::pushActivity(activity);
-        brls::Application::giveFocus(overlay->getDefaultFocus()); }); // Reset input to avoid residual states of the previous UI
+        brls::Application::giveFocus(overlay->getDefaultFocus()); });
+
+    g_controllerInput->setKeyboardShortcutCallback([]()
+        {
+        if (SessionMainView::pauseOverlayOpen.load()) {
+            return;
+        }
+        open_configured_keyboard(); });
+
+    // Reset input to avoid residual states of the previous UI
     if (g_controllerInput)
         g_controllerInput->dropInput();
 

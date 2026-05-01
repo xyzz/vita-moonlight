@@ -133,6 +133,10 @@
                 id="keyboardConfigureCell"
                 title="@i18n/moonlight/keyboard/configure_title"/>
 
+            <brls:DetailCell
+                id="shortcutsConfigureCell"
+                title="@i18n/moonlight/shortcuts/configure_title"/>
+
             <!-- Opciones del Sistema (originales) -->
             <brls:Header title="@i18n/moonlight/settings_tab/system_header"/>
 

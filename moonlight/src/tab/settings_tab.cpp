@@ -29,6 +29,7 @@
 #include "tab/keyboard_settings_tab.hpp" // NUEVO
 #include "tab/microphone_settings_tab.hpp"
 #include "tab/rear_touch_settings_tab.hpp"
+#include "tab/shortcuts_settings_tab.hpp"
 #include "tab/trackpad_settings_tab.hpp"
 #ifndef _WIN32
 #include <sys/stat.h>
@@ -644,6 +645,19 @@ SettingsTab::SettingsTab()
             auto* keyboardView = new KeyboardSettingsTab();
             auto* frame = new brls::AppletFrame(keyboardView);
             frame->setTitle(brls::getStr("moonlight/keyboard/title"));
+            auto* act = new brls::Activity(frame);
+            brls::Application::pushActivity(act);
+            return true; });
+    }
+
+    if (shortcutsConfigureCell)
+    {
+        shortcutsConfigureCell->setDetailText(brls::getStr("moonlight/shortcuts/configure_detail"));
+        shortcutsConfigureCell->registerClickAction([](brls::View*)
+            {
+            auto* shortcutsView = new ShortcutsSettingsTab();
+            auto* frame = new brls::AppletFrame(shortcutsView);
+            frame->setTitle(brls::getStr("moonlight/shortcuts/title"));
             auto* act = new brls::Activity(frame);
             brls::Application::pushActivity(act);
             return true; });

@@ -8,7 +8,15 @@
     paddingBottom="20"
     paddingLeft="40">
 
-    <!-- Keyboard Layout -->
+    <!-- Keyboard Mode -->
+    <brls:Header
+        title="@i18n/moonlight/keyboard/header_mode"
+        marginBottom="10"/>
+
+    <brls:SelectorCell
+        id="keyboard_mode_selector"
+        marginBottom="20"/>
+
     <!-- Keyboard Layout -->
     <brls:Header
         title="@i18n/moonlight/keyboard/header_layout"

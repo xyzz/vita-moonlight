@@ -10,7 +10,7 @@
 #include "controller/GamepadState.hpp"
 #include "controller/RearTouchInput.hpp"
 #include "controller/TouchInput.hpp"
-#include "controller/keyboard/keyboard.hpp"
+#include "controller/keyboard/IKeyboard.hpp"
 #include "debug.hpp"
 
 struct VitaMouseState
@@ -45,18 +45,15 @@ class ControllerInputManager
     void sendGamepadState(const GamepadState& state);
 
     void setPauseCallback(const std::function<void()>& cb);
+    void setKeyboardShortcutCallback(const std::function<void()>& cb);
 
     void applyRearTouchSettings(const RearTouchSettings& settings);
     void setRearTouchEnabled(bool enabled);
 
     void setGamepadType(GamepadType type);
 
-    void setActiveKeyboard(KeyboardOverlay* kb)
-    {
-        vita_debug_log("[ControllerInput] setActiveKeyboard: %p", kb);
-        activeKeyboard = kb;
-    }
-    KeyboardOverlay* getActiveKeyboard() const { return activeKeyboard; }
+    void setActiveKeyboard(IKeyboard* kb);
+    IKeyboard* getActiveKeyboard() const { return activeKeyboard; }
 
   private:
     bool inputEnabled;
@@ -73,7 +70,8 @@ class ControllerInputManager
 
     std::function<void()> pauseCallback;
 
-    KeyboardOverlay* activeKeyboard = nullptr;
+    IKeyboard* activeKeyboard   = nullptr;
+    bool activeKeyboardSeenOpen = false;
 
     GamepadType currentGamepadType = GAMEPAD_TYPE_XBOX;
 

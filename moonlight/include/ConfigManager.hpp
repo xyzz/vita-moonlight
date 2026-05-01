@@ -81,6 +81,7 @@ struct VideoSettings
     float motion_controls_scalar_y     = 0.8f;
     int mouse_acceleration             = 150;
     int keyboard_layout                = 0; // 0=EN_US, 1=ES_ES, 2=ES_LATAM
+    int keyboard_mode                  = 0; // 0=Legacy (SCE IME), 1=Modern (Borealis overlay)
 
     int trackpad_pointer_speed           = 100; // 0-200
     int trackpad_dead_zone               = 50; // 0-200px
@@ -122,7 +123,9 @@ class ConfigManager
     std::string getKeysDir() const;
     void setKeysDir(const std::string& dir);
 
-    // Create key directories as needed (mkdir -p). Return false on failure.
+    // Secure helpers to create/secure key-related directories
+    // Ensure that the route exists (mkdir -p behavior). Returns true if
+    // the route exists after the call or false on error.
     bool ensureDirExists(const std::string& path) const;
     bool ensureKeysDirExists() const;
     bool ensureKeyDirExists(const std::string& safeId) const;

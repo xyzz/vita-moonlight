@@ -6,11 +6,10 @@
 #include <chrono>
 #include <thread>
 
-#include "ConfigManager.hpp"
 #include "GameStreamClient.hpp"
 #include "activity/main_activity.hpp"
 #include "controller/ControllerInput.hpp"
-#include "controller/keyboard/keyboard.hpp"
+#include "controller/keyboard/keyboard_launcher.hpp"
 #include "debug.hpp"
 #include "session/session_app_select.hpp"
 #include "session/session_main.hpp"
@@ -148,17 +147,7 @@ VitaPauseOverlay::VitaPauseOverlay(std::function<void()> onClose, const HostInfo
                         } catch(...) {}
                     }
 
-                    // Construir la ruta al CSS en data/moonlight/keyboard/style.css
-                    std::string cfgPath = ConfigManager::getConfigPath();
-                    size_t p = cfgPath.find_last_of("/\\");
-                    std::string cfgDir = (p != std::string::npos) ? cfgPath.substr(0, p) : std::string(".");
-                    std::string cssPath = cfgDir + "/keyboard/style.css";
-
-                    // Create and display the keyboard overlay
-                    KeyboardOverlay* kb = new KeyboardOverlay(cssPath);
-                    auto* activity = new brls::Activity(kb);
-                    brls::Application::pushActivity(activity);
-                    brls::Application::giveFocus(kb->getDefaultFocus());
+                    open_configured_keyboard();
                 }
                 break;
             case 3: // Disconnect

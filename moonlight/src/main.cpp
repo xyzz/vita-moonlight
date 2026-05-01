@@ -261,7 +261,8 @@ int main(int argc, char* argv[])
     brls::Application::pushActivity(new MainActivity());
 
     while (brls::Application::mainLoop())
-        ;
+    {
+    }
 
     return EXIT_SUCCESS;
 }

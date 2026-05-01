@@ -13,6 +13,7 @@ class KeyboardSettingsTab : public brls::Box
 
   private:
     // UI Elements
+    BRLS_BIND(brls::SelectorCell, keyboardModeSelector, "keyboard_mode_selector");
     BRLS_BIND(brls::SelectorCell, keyboardLayoutSelector, "keyboard_layout_selector");
     BRLS_BIND(brls::DetailCell, themePreviewCell, "theme_preview");
     BRLS_BIND(brls::DetailCell, themeEditorCell, "theme_editor");

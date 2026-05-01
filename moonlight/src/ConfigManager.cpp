@@ -297,6 +297,7 @@ VideoSettings ConfigManager::getVideoSettings() const
     settings.motion_controls_scalar_y     = std::stof(get("video", "motion_controls_scalar_y", "0.8"));
     settings.mouse_acceleration           = std::stoi(get("video", "mouse_acceleration", "150"));
     settings.keyboard_layout              = std::stoi(get("video", "keyboard_layout", "0"));
+    settings.keyboard_mode                = std::stoi(get("video", "keyboard_mode", "0"));
     settings.render_mode                  = std::stoi(get("video", "render_mode", "0"));
     settings.pixel_format_mode            = std::stoi(get("video", "pixel_format_mode", "0"));
     settings.gamepad_type                 = static_cast<GamepadType>(std::stoi(get("video", "gamepad_type", "0")));
@@ -390,6 +391,7 @@ void ConfigManager::setVideoSettings(const VideoSettings& settings)
     set("video", "motion_controls_scalar_y", std::to_string(settings.motion_controls_scalar_y));
     set("video", "mouse_acceleration", std::to_string(settings.mouse_acceleration));
     set("video", "keyboard_layout", std::to_string(settings.keyboard_layout));
+    set("video", "keyboard_mode", std::to_string(settings.keyboard_mode));
     set("video", "render_mode", std::to_string(settings.render_mode));
     set("video", "pixel_format_mode", std::to_string(settings.pixel_format_mode));
     set("video", "gamepad_type", std::to_string(static_cast<int>(settings.gamepad_type)));

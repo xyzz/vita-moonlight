@@ -30,14 +30,13 @@ KeyboardOverlay::KeyboardOverlay(const std::string& cssPath)
     // Neutral default values; `willAppear()` wraps the panel
     // to width/screen and position at appearance time.
     panelW = 0.0f;
-    panelH = 240.0f;
+    panelH = 260.0f;
     panelX = 0.0f;
     panelY = 0.0f;
     loadCss(cssPath);
     initDefaultLayout();
 
     // Register recognizer for taps that maps to the key grid
-    // Tap gesture to detect keys in grid
     this->addGestureRecognizer(new brls::TapGestureRecognizer([this](brls::TapGestureStatus status, brls::Sound* sound)
         {
         if (status.state == brls::GestureState::END) {
@@ -45,29 +44,39 @@ KeyboardOverlay::KeyboardOverlay(const std::string& cssPath)
             float tapY = status.position.y;
 
             brls::Logger::info("[KeyboardOverlay] Tap detected at X={}, Y={}", tapX, tapY);
-            brls::Logger::info("[KeyboardOverlay] Panel rect: X={}, Y={}, W={}, H={}", panelX, panelY, panelW, panelH);
 
-            // Calculate base Y
+            // Calculate base key width from the widest row
+            size_t maxCols = 0;
+            for (auto &r : keyRows) if (r.size() > maxCols) maxCols = r.size();
+            float baseKeyW = this->btnW;
+
             float startY = this->panelY + this->btnYStart;
             for (size_t row = 0; row < keyRows.size(); ++row) {
                 float rowY = startY + row * (this->btnH + this->btnMargin);
                 if (tapY >= rowY && tapY <= rowY + this->btnH) {
-                    // Columna
                     const auto &cols = keyRows[row];
-                    size_t colsCount = cols.size();
-                    if (colsCount == 0) continue; // Skip empty rows
+                    if (cols.empty()) continue;
 
-                    float totalW = colsCount * this->btnW + (colsCount - 1) * this->btnMargin;
+                    // Calculate total row width with variable key widths
+                    float totalW = calcRowWidth(cols, baseKeyW);
                     float startX = this->panelX + (this->panelW - totalW) * 0.5f;
 
-                    for (size_t c = 0; c < colsCount; ++c) {
-                        float keyX = startX + c * (this->btnW + this->btnMargin);
-                        if (tapX >= keyX && tapX <= keyX + this->btnW) {
+                    float keyX = startX;
+                    for (size_t c = 0; c < cols.size(); ++c) {
+                        float kw = baseKeyW * cols[c].widthMult;
+                        if (tapX >= keyX && tapX <= keyX + kw) {
                             // Activate key
-                            brls::Logger::info("[KeyboardOverlay] Hit key: {}", cols[c]);
-                            this->sendKeyByLabel(cols[c]);
+                            brls::Logger::info("[KeyboardOverlay] Hit key: {}", cols[c].action);
+
+                            // Visual feedback
+                            highlightRow = (int)row;
+                            highlightCol = (int)c;
+                            highlightFrames = 6; // ~100ms at 60fps
+
+                            this->sendKeyByLabel(cols[c].action);
                             return;
                         }
+                        keyX += kw + this->btnMargin;
                     }
                 }
             }
@@ -79,6 +88,8 @@ KeyboardOverlay::KeyboardOverlay(const std::string& cssPath)
     {
         g_controllerInput->setActiveKeyboard(this);
     }
+
+    visible = true;
 }
 
 KeyboardOverlay::~KeyboardOverlay()
@@ -88,6 +99,34 @@ KeyboardOverlay::~KeyboardOverlay()
     {
         g_controllerInput->setActiveKeyboard(nullptr);
     }
+    visible = false;
+}
+
+// IKeyboard interface
+void KeyboardOverlay::open()
+{
+    show();
+    visible = true;
+}
+
+void KeyboardOverlay::close()
+{
+    hide();
+    visible = false;
+    // Pop activity to properly close
+    brls::Application::popActivity();
+}
+
+bool KeyboardOverlay::isOpen() const
+{
+    return visible;
+}
+
+KeyboardState KeyboardOverlay::getKeyboardState() const
+{
+    KeyboardState state;
+    memcpy(state.keys, keyStates, sizeof(keyStates));
+    return state;
 }
 
 bool KeyboardOverlay::loadCss(const std::string& path)
@@ -158,7 +197,9 @@ void KeyboardOverlay::willAppear(bool resetState)
 {
     BaseOverlay::willAppear(resetState);
     if (!loaded)
-        return;
+    {
+        // Still work without CSS - just use defaults
+    }
     auto it = properties.find("transparent");
     if (it != properties.end())
     {
@@ -211,7 +252,6 @@ void KeyboardOverlay::willAppear(bool resetState)
     if (it != properties.end() && !it->second.empty())
     {
         // Not implemented: load background image for keyboard overlay.
-        // Placeholder: simply log in.
         brls::Logger::info("[KeyboardOverlay] background-image specified: {}", it->second);
     }
 
@@ -238,36 +278,104 @@ void KeyboardOverlay::willAppear(bool resetState)
         panelY = std::max(0.0f, screenH - panelH);
 
         // Recalculate btnW so that keys fill available width
-        size_t maxCols = 0;
+        // Find the row with the most "units" (sum of widthMult)
+        float maxUnits = 0;
         for (auto& r : keyRows)
-            if (r.size() > maxCols)
-                maxCols = r.size();
-        if (maxCols > 0)
         {
-            float usable       = panelW - 2.0f * btnXOffset;
-            float computedBtnW = (usable - (float)(maxCols - 1) * btnMargin) / (float)maxCols;
+            float units = 0;
+            for (auto& k : r)
+                units += k.widthMult;
+            if (units > maxUnits)
+                maxUnits = units;
+        }
+        if (maxUnits > 0)
+        {
+            float usable   = panelW - 2.0f * btnXOffset;
+            size_t maxCols = 0;
+            for (auto& r : keyRows)
+                if (r.size() > maxCols)
+                    maxCols = r.size();
+            float margins      = (maxCols > 0) ? (float)(maxCols - 1) * btnMargin : 0;
+            float computedBtnW = (usable - margins) / maxUnits;
             if (computedBtnW > 8.0f)
                 btnW = computedBtnW;
         }
 
         // Set btnYStart to start some padding inside the panel
-        btnYStart = 12.0f;
+        btnYStart = 10.0f;
     }
     catch (...)
     {
     }
 }
 
-// Inicializa un layout QWERTY simple
 void KeyboardOverlay::initDefaultLayout()
 {
     keyRows.clear();
-    // Lowercase QWERTY layout, second row with 'n tilde'
-    keyRows.push_back({ "q", "w", "e", "r", "t", "y", "u", "i", "o", "p" });
-    keyRows.push_back({ "a", "s", "d", "f", "g", "h", "j", "k", "l", "ñ" });
-    keyRows.push_back({ "z", "x", "c", "v", "b", "n", "m" });
-    // Function row (Shift, space, enter, delete, close)
-    keyRows.push_back({ "Shift", "Space", "Enter", "Backspace", "Close" });
+    layoutPage = 0;
+
+    // Row 0: Numbers
+    keyRows.push_back({ KeyDef("1"), KeyDef("2"), KeyDef("3"), KeyDef("4"), KeyDef("5"),
+        KeyDef("6"), KeyDef("7"), KeyDef("8"), KeyDef("9"), KeyDef("0") });
+    // Row 1: QWERTY top row
+    keyRows.push_back({ KeyDef("q"), KeyDef("w"), KeyDef("e"), KeyDef("r"), KeyDef("t"),
+        KeyDef("y"), KeyDef("u"), KeyDef("i"), KeyDef("o"), KeyDef("p") });
+    // Row 2: Home row
+    keyRows.push_back({ KeyDef("a"), KeyDef("s"), KeyDef("d"), KeyDef("f"), KeyDef("g"),
+        KeyDef("h"), KeyDef("j"), KeyDef("k"), KeyDef("l") });
+    // Row 3: Bottom row with Shift and Backspace
+    keyRows.push_back({ KeyDef("Shift", 1.5f),
+        KeyDef("z"), KeyDef("x"), KeyDef("c"), KeyDef("v"),
+        KeyDef("b"), KeyDef("n"), KeyDef("m"),
+        KeyDef("Bksp", "Backspace", 1.5f) });
+    // Row 4: Function row
+    keyRows.push_back({ KeyDef("?123", "SymPage", 1.3f),
+        KeyDef("Ctrl", "Ctrl", 1.0f),
+        KeyDef("Space", "Space", 4.0f),
+        KeyDef("Enter", "Enter", 1.5f),
+        KeyDef("X", "Close", 1.2f) });
+}
+
+// Symbol/number layout page
+void KeyboardOverlay::initSymbolLayout()
+{
+    keyRows.clear();
+    layoutPage = 1;
+
+    // Row 0: Shifted numbers (symbols)
+    keyRows.push_back({ KeyDef("!"), KeyDef("@"), KeyDef("#"), KeyDef("$"), KeyDef("%"),
+        KeyDef("^"), KeyDef("&"), KeyDef("*"), KeyDef("("), KeyDef(")") });
+    // Row 1: Common symbols
+    keyRows.push_back({ KeyDef("-"), KeyDef("_"), KeyDef("="), KeyDef("+"), KeyDef("["),
+        KeyDef("]"), KeyDef("{"), KeyDef("}"), KeyDef("|"), KeyDef("\\") });
+    // Row 2: More symbols
+    keyRows.push_back({ KeyDef(";"), KeyDef(":"), KeyDef("'"), KeyDef("\""), KeyDef(","),
+        KeyDef("."), KeyDef("<"), KeyDef(">"), KeyDef("/") });
+    // Row 3: Special keys
+    keyRows.push_back({ KeyDef("Tab", "Tab", 1.5f),
+        KeyDef("~"), KeyDef("`"), KeyDef("?"),
+        KeyDef("Esc", "Escape", 1.0f),
+        KeyDef("Bksp", "Backspace", 1.5f) });
+    // Row 4: Function row
+    keyRows.push_back({ KeyDef("ABC", "LetterPage", 1.3f),
+        KeyDef("Ctrl", "Ctrl", 1.0f),
+        KeyDef("Space", "Space", 4.0f),
+        KeyDef("Enter", "Enter", 1.5f),
+        KeyDef("X", "Close", 1.2f) });
+}
+
+float KeyboardOverlay::calcRowWidth(const std::vector<KeyDef>& row, float baseW) const
+{
+    if (row.empty())
+        return 0;
+    float total = 0;
+    for (size_t i = 0; i < row.size(); ++i)
+    {
+        total += baseW * row[i].widthMult;
+        if (i < row.size() - 1)
+            total += btnMargin;
+    }
+    return total;
 }
 
 void KeyboardOverlay::sendKeyByLabel(const std::string& label)
@@ -275,7 +383,22 @@ void KeyboardOverlay::sendKeyByLabel(const std::string& label)
     if (label == "Close")
     {
         // Pop activity to close the keyboard overlay properly
+        visible = false;
         brls::Application::popActivity();
+        return;
+    }
+
+    if (label == "SymPage")
+    {
+        // Switch to symbols layout
+        initSymbolLayout();
+        return;
+    }
+
+    if (label == "LetterPage")
+    {
+        // Switch back to letters layout
+        initDefaultLayout();
         return;
     }
 
@@ -286,6 +409,33 @@ void KeyboardOverlay::sendKeyByLabel(const std::string& label)
         // Update Shift VK state for polling
         keyStates[0x10] = this->shiftActive;
         // Shift acts as a toggle, so we don't auto-release it
+        return;
+    }
+
+    if (label == "Ctrl")
+    {
+        // Ctrl = VK 0x11
+        keyStates[0x11] = true;
+        brls::delay(50, [this]()
+            { keyStates[0x11] = false; });
+        return;
+    }
+
+    if (label == "Tab")
+    {
+        // Tab = VK 0x09
+        keyStates[0x09] = true;
+        brls::delay(50, [this]()
+            { keyStates[0x09] = false; });
+        return;
+    }
+
+    if (label == "Escape")
+    {
+        // Escape = VK 0x1B
+        keyStates[0x1B] = true;
+        brls::delay(50, [this]()
+            { keyStates[0x1B] = false; });
         return;
     }
 
@@ -376,8 +526,6 @@ void KeyboardOverlay::sendKeyByLabel(const std::string& label)
 
         if (found)
         {
-            // Update state for polling
-
             // Handle shift requirement for this char
             if (found->needs_shift && !this->shiftActive)
             {
@@ -407,73 +555,95 @@ void KeyboardOverlay::sendKeyByLabel(const std::string& label)
 // Custom drawn: key grid
 void KeyboardOverlay::draw(NVGcontext* vg, float x, float y, float width, float height, brls::Style style, brls::FrameContext* ctx)
 {
-    // Prevent BaseOverlay from drawing buttons (we don't use buttonLabels)
     BaseOverlay::draw(vg, x, y, width, height, style, ctx);
 
     if (keyRows.empty())
         return;
 
-    nvgFontSize(vg, 20.0f);
+    if (highlightFrames > 0)
+        highlightFrames--;
+    if (highlightFrames == 0)
+    {
+        highlightRow = -1;
+        highlightCol = -1;
+    }
+
+    float baseKeyW = this->btnW;
+
+    nvgFontSize(vg, 18.0f);
     nvgFontFaceId(vg, 0);
     float startY = this->panelY + this->btnYStart;
+
     for (size_t row = 0; row < keyRows.size(); ++row)
     {
         const auto& cols = keyRows[row];
-        size_t colsCount = cols.size();
-        if (colsCount == 0)
+        if (cols.empty())
             continue;
-        float totalW = colsCount * this->btnW + (colsCount - 1) * this->btnMargin;
+
+        float totalW = calcRowWidth(cols, baseKeyW);
         float startX = this->panelX + (this->panelW - totalW) * 0.5f;
         float rowY   = startY + row * (this->btnH + this->btnMargin);
-        for (size_t c = 0; c < colsCount; ++c)
+        float keyX   = startX;
+
+        for (size_t c = 0; c < cols.size(); ++c)
         {
-            float keyX = startX + c * (this->btnW + this->btnMargin);
-            // Fondo
+            float kw = baseKeyW * cols[c].widthMult;
+
+            // Determine if this key is highlighted
+            bool isHighlighted = (highlightRow == (int)row && highlightCol == (int)c && highlightFrames > 0);
+
+            // Key background
             nvgBeginPath(vg);
-            nvgRoundedRect(vg, keyX, rowY, this->btnW, this->btnH, 6.0f);
-            NVGcolor bg = nvgRGBA(40, 44, 52, (int)(this->localPanelAlpha * 255));
+            nvgRoundedRect(vg, keyX, rowY, kw, this->btnH, 5.0f);
+
+            NVGcolor bg;
+            if (isHighlighted)
+            {
+                bg = nvgRGBA(100, 180, 255, (int)(this->localPanelAlpha * 255));
+            }
+            else if (cols[c].action == "Shift" && this->shiftActive)
+            {
+                bg = nvgRGBA(100, 140, 220, (int)(this->localPanelAlpha * 255));
+            }
+            else if (cols[c].action == "Close")
+            {
+                bg = nvgRGBA(180, 50, 50, (int)(this->localPanelAlpha * 255));
+            }
+            else
+            {
+                bg = nvgRGBA(40, 44, 52, (int)(this->localPanelAlpha * 255));
+            }
             nvgFillColor(vg, bg);
             nvgFill(vg);
-            // Borde
-            nvgStrokeColor(vg, nvgRGBA(80, 80, 80, 255));
-            nvgStrokeWidth(vg, 1.0f);
+
+            // Border
+            nvgStrokeColor(vg, isHighlighted ? nvgRGBA(255, 255, 255, 255) : nvgRGBA(70, 74, 82, 255));
+            nvgStrokeWidth(vg, isHighlighted ? 2.0f : 1.0f);
             nvgStroke(vg);
-            // Centered text
-            nvgFillColor(vg, nvgRGBA(220, 220, 220, 255));
-            const std::string& label = cols[c];
+
+            // Determine display text
+            const std::string& label = cols[c].label;
             std::string display      = label;
             // If it is a 1 character key and Shift is active, show uppercase
-            if (label.size() == 1 && this->shiftActive)
+            if (label.size() == 1 && this->shiftActive && isalpha((unsigned char)label[0]))
             {
-                unsigned char ch = (unsigned char)label[0];
-                display[0]       = (char)std::toupper(ch);
+                display[0] = (char)std::toupper((unsigned char)label[0]);
             }
 
-            // Special color for Shift when active
-            if (label == "Shift")
-            {
-                NVGcolor sbg = this->shiftActive ? nvgRGBA(100, 140, 220, (int)(this->localPanelAlpha * 255)) : nvgRGBA(40, 44, 52, (int)(this->localPanelAlpha * 255));
-                nvgFillColor(vg, sbg);
-                nvgFill(vg);
-                // Borde
-                nvgStrokeColor(vg, nvgRGBA(120, 120, 160, 255));
-                nvgStrokeWidth(vg, 1.0f);
-                nvgStroke(vg);
-                // Texto
-                nvgFillColor(vg, nvgRGBA(255, 255, 255, 255));
-            }
+            // Center text in key using nvgTextBounds
+            float textBounds[4];
+            float fontSz = (cols[c].widthMult >= 1.3f) ? 15.0f : 18.0f;
+            nvgFontSize(vg, fontSz);
+            float textW = nvgTextBounds(vg, 0, 0, display.c_str(), nullptr, textBounds);
+            float textH = textBounds[3] - textBounds[1]; // approximate height
 
-            float tx = keyX + 12.0f;
-            float ty = rowY + this->btnH * 0.5f + 6.0f;
+            float tx = keyX + (kw - textW) * 0.5f;
+            float ty = rowY + (this->btnH + textH) * 0.5f;
+
+            nvgFillColor(vg, nvgRGBA(220, 220, 220, 255));
             nvgText(vg, tx, ty, display.c_str(), nullptr);
+
+            keyX += kw + this->btnMargin;
         }
     }
-}
-
-// Get current keyboard state for polling
-KeyboardState KeyboardOverlay::getKeyboardState() const
-{
-    KeyboardState state;
-    memcpy(state.keys, keyStates, sizeof(keyStates));
-    return state;
 }

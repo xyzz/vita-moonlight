@@ -13,6 +13,27 @@ KeyboardSettingsTab::KeyboardSettingsTab()
     config.load();
     VideoSettings videoSettings = config.getVideoSettings();
 
+    // Keyboard Mode Selector (Legacy / Modern)
+    std::vector<std::string> keyboardModes = {
+        brls::getStr("moonlight/keyboard/mode_legacy"),
+        brls::getStr("moonlight/keyboard/mode_modern")
+    };
+    keyboardModeSelector->init(
+        brls::getStr("moonlight/keyboard/mode_title"),
+        keyboardModes,
+        videoSettings.keyboard_mode,
+        [this](int selected)
+        {
+            ConfigManager cfg;
+            cfg.load();
+            VideoSettings settings = cfg.getVideoSettings();
+            settings.keyboard_mode = selected;
+            cfg.setVideoSettings(settings);
+            cfg.save();
+            brls::Application::notify(
+                brls::getStr("moonlight/keyboard/mode_saved"));
+        });
+
     // Keyboard Layout Selector
     std::vector<std::string> keyboardLayouts = { "EN-US", "ES-ES", "ES-LATAM" };
     keyboardLayoutSelector->init(

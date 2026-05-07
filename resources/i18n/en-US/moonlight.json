@@ -139,8 +139,18 @@
             "show_fps_title": "Show FPS",
             "save_debug_log_title": "Save debug log",
             "ref_frame_title": "Reference frame invalidation",
-            "vblank_wait_title": "Wait for Vita VBlank",
-            "motion_controls_title": "Motion controls",
+            "swap_interval": {
+                "title": "V-Sync (Swap Interval)",
+                "options": {
+                    "0": "V-Sync OFF (Unlimited)",
+                    "1": "V-Sync ON (60 FPS)",
+                    "2": "V-Sync 2x (30 FPS)",
+                    "3": "V-Sync 3x (20 FPS)",
+                    "4": "V-Sync 4x (15 FPS)"
+                },
+                "saved": "V-Sync saved"
+            },
+            "motion_controls_title": "Gyroscope",
             "double_tap_sprint_title": "Double tap to sprint",
             "touchscreen_mode": {
                 "title": "Touchscreen mode",
@@ -215,11 +225,14 @@
             "configure_detail": "Layout, themes, and customization",
             "header_mode": "Keyboard Mode",
             "header_layout": "Keyboard Layout",
+            "header_modern": "Modern Options",
             "header_theme": "Appearance (Coming Soon)",
             "mode_title": "Keyboard type",
             "mode_legacy": "Legacy (System IME)",
             "mode_modern": "Modern (Custom Overlay)",
             "mode_saved": "Keyboard mode saved",
+            "numbers_row_title": "Show number row",
+            "arrows_title": "Show arrow keys",
             "theme_preview_title": "Current Theme",
             "theme_editor_title": "Theme Editor",
             "theme_info": "Custom keyboard themes will be available in a future update. You will be able to create and share your own keyboard designs!"

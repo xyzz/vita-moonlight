@@ -20,35 +20,37 @@
             paddingBottom="@style/brls/sidebar/padding_bottom"
             paddingLeft="@style/brls/sidebar/padding_left">
 
-            <!-- Sección de Configuración de Streaming -->
+            <!-- STREAMING SETTINGS -->
             <brls:Header title="@i18n/moonlight/settings_tab/header"/>
 
-            <!-- Modo de renderizado -->
             <brls:SelectorCell
                 id="renderModeSelector"
                 title="@i18n/moonlight/settings_tab/render_mode/title"/>
 
-            <!-- Formato de Pixel -->
             <brls:SelectorCell
                 id="pixelFormatSelector"
                 title="@i18n/moonlight/settings_tab/pixel_format/title"/>
 
-            <!-- Resolución -->
             <brls:SelectorCell
                 id="resolutionSelector"
                 title="@i18n/moonlight/settings_tab/resolution/title"/>
 
-            <!-- FPS -->
             <brls:SelectorCell
                 id="fpsSelector"
                 title="@i18n/moonlight/settings_tab/fps/title"/>
 
-            <!-- Bitrate -->
             <brls:SelectorCell
                 id="bitrateSelector"
                 title="@i18n/moonlight/settings_tab/bitrate/title"/>
 
-            <!-- Opciones de Video -->
+            <brls:SelectorCell
+                id="swapInterval"
+                title="@i18n/moonlight/settings_tab/swap_interval/title"/>
+
+            <brls:BooleanCell
+                id="fullscreenToggle"
+                title="@i18n/moonlight/settings_tab/fullscreen_title"/>
+
             <brls:BooleanCell
                 id="sopsToggle"
                 title="@i18n/moonlight/settings_tab/sops_title"/>
@@ -61,22 +63,6 @@
                 id="localAudioToggle"
                 title="@i18n/moonlight/settings_tab/local_audio_title"/>
 
-            <!-- Microphone Settings -->
-            <brls:BooleanCell
-                id="microphoneToggle"
-                title="@i18n/moonlight/settings_tab/microphone_enabled_title"/>
-
-            <brls:DetailCell
-                id="microphoneConfigureCell"
-                title="@i18n/moonlight/settings_tab/microphone_configure_title"/>
-
-            <brls:BooleanCell
-                id="fullscreenToggle"
-                title="@i18n/moonlight/settings_tab/fullscreen_title"/>
-
-
-            <!-- Low Latency eliminado -->
-
             <brls:BooleanCell
                 id="framePacerToggle"
                 title="@i18n/moonlight/settings_tab/frame_pacer_title"/>
@@ -86,6 +72,20 @@
                 title="@i18n/moonlight/settings_tab/center_region_title"/>
 
             <brls:BooleanCell
+                id="refFrameInvalidationToggle"
+                title="@i18n/moonlight/settings_tab/ref_frame_title"/>
+
+            <!-- MICROPHONE SETTINGS -->
+            <brls:BooleanCell
+                id="microphoneToggle"
+                title="@i18n/moonlight/settings_tab/microphone_enabled_title"/>
+
+            <brls:DetailCell
+                id="microphoneConfigureCell"
+                title="@i18n/moonlight/settings_tab/microphone_configure_title"/>
+
+            <!-- PERFORMANCE & DEBUG -->
+            <brls:BooleanCell
                 id="showFpsToggle"
                 title="@i18n/moonlight/settings_tab/show_fps_title"/>
 
@@ -93,15 +93,7 @@
                 id="debugLogToggle"
                 title="@i18n/moonlight/settings_tab/save_debug_log_title"/>
 
-            <brls:BooleanCell
-                id="refFrameInvalidationToggle"
-                title="@i18n/moonlight/settings_tab/ref_frame_title"/>
-
-            <brls:BooleanCell
-                id="vblankWaitToggle"
-                title="@i18n/moonlight/settings_tab/vblank_wait_title"/>
-
-            <!-- Opciones de Control -->
+            <!-- CONTROLS -->
             <brls:Header title="@i18n/moonlight/settings_tab/controls_header"/>
 
             <brls:DetailCell
@@ -137,60 +129,67 @@
                 id="shortcutsConfigureCell"
                 title="@i18n/moonlight/shortcuts/configure_title"/>
 
-            <!-- Opciones del Sistema (originales) -->
+            <!-- SYSTEM -->
             <brls:Header title="@i18n/moonlight/settings_tab/system_header"/>
-
-            <brls:RadioCell
-                id="radio"/>
-
-            <brls:BooleanCell
-                id="boolean"/>
-
-            <brls:SelectorCell
-                id="selector"/>
-
-            <brls:InputCell
-                id="input"/>
-
-            <brls:InputNumericCell
-                id="inputNumeric"/>
 
             <brls:DetailCell
                 title="@i18n/moonlight/settings/ip"
                 id="ipAddress"/>
 
+            <brls:SelectorCell
+                id="languageSelector"
+                title="@i18n/moonlight/settings/language"/>
+
+            <brls:RadioCell
+                id="radio"
+                visibility="gone"/>
+
+            <brls:BooleanCell
+                id="boolean"
+                visibility="gone"/>
+
+            <brls:SelectorCell
+                id="selector"
+                visibility="gone"/>
+
+            <brls:InputCell
+                id="input"
+                visibility="gone"/>
+
+            <brls:InputNumericCell
+                id="inputNumeric"
+                visibility="gone"/>
+
             <brls:DetailCell
                 title="@i18n/moonlight/settings/dns"
-                id="dnsServer"/>
+                id="dnsServer"
+                visibility="gone"/>
 
             <brls:BooleanCell
-                id="debug"/>
+                id="debug"
+                visibility="gone"/>
 
             <brls:BooleanCell
-                id="bottomBar"/>
+                id="bottomBar"
+                visibility="gone"/>
 
             <brls:BooleanCell
-                id="alwaysOnTop"/>
+                id="alwaysOnTop"
+                visibility="gone"/>
 
             <brls:BooleanCell
                 id="fps"/>
-
-            <brls:SelectorCell
-                    id="swapInterval"/>
 
             <brls:SliderCell
                     id="slider"/>
 
             <brls:DetailCell
                     title="@i18n/moonlight/settings/notify"
-                    id="notify"/>
+                    id="notify"
+                    visibility="gone"/>
 
-            <brls:RadioCell id="radio2"/>
-            <brls:RadioCell id="radio3"/>
-
-            <brls:SelectorCell
-                id="languageSelector"
-                title="@i18n/moonlight/settings/language"/>
+            <brls:RadioCell id="radio2" visibility="gone"/>
+            <brls:RadioCell id="radio3" visibility="gone"/>
 
         </brls:Box>
 

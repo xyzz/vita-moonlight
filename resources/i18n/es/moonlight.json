@@ -56,7 +56,6 @@
         "dns": "DNS",
         "notify": "Mostrar notificación",
         "language": "Idioma",
-        "moonlight/settings/language": "Idioma",
         "add_host_connection_type": "Tipo de conexión",
         "add_host_lan": "LAN (local)",
         "add_host_online": "Online (externo)",
@@ -139,8 +138,18 @@
         "show_fps_title": "Mostrar FPS",
         "save_debug_log_title": "Guardar log de depuración",
         "ref_frame_title": "Invalidación de frame de referencia",
-        "vblank_wait_title": "Esperar VBlank Vita",
-        "motion_controls_title": "Controles de movimiento",
+        "swap_interval": {
+            "title": "V-Sync (Swap Interval)",
+            "options": {
+                "0": "Sin V-Sync (Sin límite)",
+                "1": "V-Sync ON (60 FPS)",
+                "2": "V-Sync 2x (30 FPS)",
+                "3": "V-Sync 3x (20 FPS)",
+                "4": "V-Sync 4x (15 FPS)"
+            },
+            "saved": "V-Sync guardado"
+        },
+        "motion_controls_title": "Giroscopio",
         "double_tap_sprint_title": "Doble tap para correr",
         "touchscreen_mode": {
             "title": "Modo touchscreen",
@@ -214,11 +223,14 @@
             "configure_detail": "Distribución, temas y personalización",
             "header_mode": "Modo de Teclado",
             "header_layout": "Distribución del Teclado",
+            "header_modern": "Opciones Modernas",
             "header_theme": "Apariencia (Próximamente)",
             "mode_title": "Tipo de teclado",
             "mode_legacy": "Legacy (IME del Sistema)",
             "mode_modern": "Moderno (Overlay Personalizado)",
             "mode_saved": "Modo de teclado guardado",
+            "numbers_row_title": "Mostrar fila numérica",
+            "arrows_title": "Mostrar flechas",
             "theme_preview_title": "Tema Actual",
             "theme_editor_title": "Editor de Temas",
             "theme_info": "Los temas personalizados de teclado estarán disponibles en una actualización futura. ¡Podrás crear y compartir tus propios diseños de teclado!"

@@ -58,6 +58,9 @@ class ControllerInputManager
   private:
     bool inputEnabled;
     bool inputDropped;
+    bool touchSuppressed          = false;
+    uint64_t touchSuppressUntilUs = 0;
+    bool lastKeyboardOpen         = false;
 
     GamepadState lastGamepadState;
     VitaMouseState lastMouseState;

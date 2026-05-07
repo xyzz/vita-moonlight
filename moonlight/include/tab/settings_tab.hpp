@@ -57,7 +57,6 @@ class SettingsTab : public brls::Box
     BRLS_BIND(brls::BooleanCell, showFpsToggle, "showFpsToggle");
     BRLS_BIND(brls::BooleanCell, debugLogToggle, "debugLogToggle");
     BRLS_BIND(brls::BooleanCell, refFrameInvalidationToggle, "refFrameInvalidationToggle");
-    BRLS_BIND(brls::BooleanCell, vblankWaitToggle, "vblankWaitToggle");
     BRLS_BIND(brls::BooleanCell, motionControlsToggle, "motionControlsToggle");
     BRLS_BIND(brls::BooleanCell, doubleTapSprintToggle, "doubleTapSprintToggle");
     BRLS_BIND(brls::SelectorCell, touchscreenModeSelector, "touchscreenModeSelector");

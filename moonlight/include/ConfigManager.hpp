@@ -82,6 +82,8 @@ struct VideoSettings
     int mouse_acceleration             = 150;
     int keyboard_layout                = 0; // 0=EN_US, 1=ES_ES, 2=ES_LATAM
     int keyboard_mode                  = 0; // 0=Legacy (SCE IME), 1=Modern (Borealis overlay)
+    bool keyboard_numbers_row          = true; // Modern: show numeric row
+    bool keyboard_show_arrows          = true; // Modern: show arrow keys
 
     int trackpad_pointer_speed           = 100; // 0-200
     int trackpad_dead_zone               = 50; // 0-200px

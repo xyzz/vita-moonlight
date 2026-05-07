@@ -13,6 +13,47 @@ KeyboardSettingsTab::KeyboardSettingsTab()
     config.load();
     VideoSettings videoSettings = config.getVideoSettings();
 
+    auto updateLayoutVisibility = [this](int mode)
+    {
+        const bool modernMode = (mode != 0);
+        if (keyboardLayoutHeader)
+        {
+            keyboardLayoutHeader->setVisibility(modernMode ? brls::Visibility::VISIBLE : brls::Visibility::GONE);
+        }
+        if (keyboardLayoutSelector)
+        {
+            keyboardLayoutSelector->setVisibility(modernMode ? brls::Visibility::VISIBLE : brls::Visibility::GONE);
+        }
+        if (keyboardModernHeader)
+        {
+            keyboardModernHeader->setVisibility(modernMode ? brls::Visibility::VISIBLE : brls::Visibility::GONE);
+        }
+        if (keyboardNumbersToggle)
+        {
+            keyboardNumbersToggle->setVisibility(modernMode ? brls::Visibility::VISIBLE : brls::Visibility::GONE);
+        }
+        if (keyboardArrowsToggle)
+        {
+            keyboardArrowsToggle->setVisibility(modernMode ? brls::Visibility::VISIBLE : brls::Visibility::GONE);
+        }
+        if (keyboardThemeHeader)
+        {
+            keyboardThemeHeader->setVisibility(modernMode ? brls::Visibility::VISIBLE : brls::Visibility::GONE);
+        }
+        if (themePreviewCell)
+        {
+            themePreviewCell->setVisibility(modernMode ? brls::Visibility::VISIBLE : brls::Visibility::GONE);
+        }
+        if (themeEditorCell)
+        {
+            themeEditorCell->setVisibility(modernMode ? brls::Visibility::VISIBLE : brls::Visibility::GONE);
+        }
+        if (keyboardThemeInfo)
+        {
+            keyboardThemeInfo->setVisibility(modernMode ? brls::Visibility::VISIBLE : brls::Visibility::GONE);
+        }
+    };
+
     // Keyboard Mode Selector (Legacy / Modern)
     std::vector<std::string> keyboardModes = {
         brls::getStr("moonlight/keyboard/mode_legacy"),
@@ -22,7 +63,7 @@ KeyboardSettingsTab::KeyboardSettingsTab()
         brls::getStr("moonlight/keyboard/mode_title"),
         keyboardModes,
         videoSettings.keyboard_mode,
-        [this](int selected)
+        [this, updateLayoutVisibility](int selected)
         {
             ConfigManager cfg;
             cfg.load();
@@ -32,6 +73,7 @@ KeyboardSettingsTab::KeyboardSettingsTab()
             cfg.save();
             brls::Application::notify(
                 brls::getStr("moonlight/keyboard/mode_saved"));
+            updateLayoutVisibility(selected);
         });
 
     // Keyboard Layout Selector
@@ -51,6 +93,35 @@ KeyboardSettingsTab::KeyboardSettingsTab()
             brls::Application::notify(
                 brls::getStr("moonlight/settings_tab/keyboard_layout/saved"));
         });
+
+    // Modern Keyboard Options
+    keyboardNumbersToggle->init(
+        brls::getStr("moonlight/keyboard/numbers_row_title"),
+        videoSettings.keyboard_numbers_row,
+        [](bool value)
+        {
+            ConfigManager cfg;
+            cfg.load();
+            VideoSettings settings        = cfg.getVideoSettings();
+            settings.keyboard_numbers_row = value;
+            cfg.setVideoSettings(settings);
+            cfg.save();
+        });
+
+    keyboardArrowsToggle->init(
+        brls::getStr("moonlight/keyboard/arrows_title"),
+        videoSettings.keyboard_show_arrows,
+        [](bool value)
+        {
+            ConfigManager cfg;
+            cfg.load();
+            VideoSettings settings        = cfg.getVideoSettings();
+            settings.keyboard_show_arrows = value;
+            cfg.setVideoSettings(settings);
+            cfg.save();
+        });
+
+    updateLayoutVisibility(videoSettings.keyboard_mode);
 
     // Theme Preview (placeholder - implementation future)
     themePreviewCell->setDetailText("Default");

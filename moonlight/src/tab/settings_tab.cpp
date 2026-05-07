@@ -198,9 +198,8 @@ SettingsTab::SettingsTab()
         else {
             modeNameKey = "moonlight/settings_tab/render_mode/unknown_name";
         }
-        brls::Application::notify(fmt::format(
-            brls::getStr("moonlight/settings_tab/render_mode/notify"),
-            brls::getStr(modeNameKey))); });
+        brls::Application::notify(
+            brls::getStr("moonlight/settings_tab/render_mode/notify", brls::getStr(modeNameKey))); });
 
     // Pixel format selector (for RGBA vs YUV tests)
     std::vector<std::string> pixelFormats = {
@@ -218,8 +217,8 @@ SettingsTab::SettingsTab()
         extern VideoSettings g_video_settings_snapshot;
         g_video_settings_snapshot.pixel_format_mode = selected;
         const std::string& label = pixelFormats.at(static_cast<std::size_t>(selected));
-        brls::Application::notify(fmt::format(
-            brls::getStr("moonlight/settings_tab/pixel_format/notify"), label)); });
+        brls::Application::notify(
+            brls::getStr("moonlight/settings_tab/pixel_format/notify", label)); });
 
     updateModeDependentVisibility(initialRenderMode, false);
 
@@ -528,15 +527,6 @@ SettingsTab::SettingsTab()
         config.setVideoSettings(settings);
         config.save(); });
 
-    vblankWaitToggle->init(brls::getStr("moonlight/settings_tab/vblank_wait_title"), videoSettings.enable_vita_vblank_wait, [this](bool value)
-        {
-        ConfigManager config;
-        config.load();
-        VideoSettings settings = config.getVideoSettings();
-        settings.enable_vita_vblank_wait = value;
-        config.setVideoSettings(settings);
-        config.save(); });
-
     motionControlsToggle->init(brls::getStr("moonlight/settings_tab/motion_controls_title"), videoSettings.enable_motion_controls, [this](bool value)
         {
         ConfigManager config;
@@ -730,9 +720,6 @@ SettingsTab::SettingsTab()
     fps->init("FPS", brls::Application::getFPSStatus(), [](bool value)
         { brls::Application::setFPSStatus(value); });
 
-    swapInterval->init("Swap Interval", { "0", "1", "2", "3", "4" }, 1, [](int selected) {}, [](int selected)
-        { brls::Application::setSwapInterval(selected); });
-
     alwaysOnTop->init("Always On Top", false, [](bool value)
         { brls::Application::getPlatform()->setWindowAlwaysOnTop(value); });
 
@@ -770,6 +757,22 @@ SettingsTab::SettingsTab()
         brls::Application::getPlatform()->setBacklightBrightness(value);
         slider->setDetailText(fmt::format("{:.2f}", value)); });
     slider->setDetailText("...");
+
+    // Configure Swap Interval (V-Sync)
+    std::vector<std::string> swapIntervalOptions = {
+        brls::getStr("moonlight/settings_tab/swap_interval/options/0"),
+        brls::getStr("moonlight/settings_tab/swap_interval/options/1"),
+        brls::getStr("moonlight/settings_tab/swap_interval/options/2"),
+        brls::getStr("moonlight/settings_tab/swap_interval/options/3"),
+        brls::getStr("moonlight/settings_tab/swap_interval/options/4")
+    };
+    int currentSwapInterval = 1; // Default: V-Sync ON (60 FPS)
+    swapInterval->init(brls::getStr("moonlight/settings_tab/swap_interval/title"), swapIntervalOptions, currentSwapInterval, [](int selected)
+        {
+        if (selected >= 0 && selected <= 4) {
+            brls::Application::setSwapInterval(selected);
+            brls::Application::notify(brls::getStr("moonlight/settings_tab/swap_interval/saved"));
+        } });
 
     // Start background loading
     this->initAsync();

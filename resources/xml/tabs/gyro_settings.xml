@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="utf-8"?>
+<brls:Box
+    width="auto"
+    height="auto">
+
+    <brls:ScrollingFrame
+        width="auto"
+        height="auto"
+        axis="column"
+        alignItems="stretch"
+        scrollingBehavior="centered"
+        grow="1.0">
+
+        <brls:Box
+            width="10000"
+            height="auto"
+            axis="column"
+            alignItems="stretch"
+            paddingTop="@style/brls/sidebar/padding_top"
+            paddingRight="@style/brls/sidebar/padding_right"
+            paddingBottom="@style/brls/sidebar/padding_bottom"
+            paddingLeft="@style/brls/sidebar/padding_left">
+
+            <brls:Header
+                width="auto"
+                height="auto"
+                title="@i18n/moonlight/gyro/header"
+                marginBottom="0px"/>
+
+            <brls:BooleanCell
+                id="motionToggle"
+                title="@i18n/moonlight/gyro/toggle"/>
+
+            <brls:Header
+                width="auto"
+                height="auto"
+                title="@i18n/moonlight/gyro/scalars_header"
+                marginTop="16"
+                marginBottom="0px"/>
+
+            <brls:Label
+                width="auto"
+                height="auto"
+                text="@i18n/moonlight/gyro/scalars_description"
+                fontSize="18"
+                marginBottom="8"/>
+
+            <brls:Label
+                id="scalarXLabel"
+                width="auto"
+                height="auto"
+                text="X: 1.0"
+                fontSize="20"
+                marginBottom="4"/>
+
+            <brls:Slider
+                id="scalarXSlider"
+                width="auto"
+                height="40"
+                marginBottom="12"/>
+
+            <brls:Label
+                id="scalarYLabel"
+                width="auto"
+                height="auto"
+                text="Y: 1.0"
+                fontSize="20"
+                marginBottom="4"/>
+
+            <brls:Slider
+                id="scalarYSlider"
+                width="auto"
+                height="40"
+                marginBottom="12"/>
+
+            <brls:Header
+                width="auto"
+                height="auto"
+                title="@i18n/moonlight/gyro/test_header"
+                marginTop="16"
+                marginBottom="0px"/>
+
+            <brls:Label
+                width="auto"
+                height="auto"
+                text="@i18n/moonlight/gyro/test_description"
+                fontSize="18"
+                marginBottom="8"/>
+
+            <brls:DetailCell
+                id="testCell"
+                title="@i18n/moonlight/gyro/test_button"/>
+
+        </brls:Box>
+
+    </brls:ScrollingFrame>
+
+</brls:Box>

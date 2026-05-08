@@ -13,6 +13,8 @@
 #include "controller/keyboard/IKeyboard.hpp"
 #include "debug.hpp"
 
+class GyroManager;
+
 struct VitaMouseState
 {
     uint16_t buttonFlags;
@@ -54,6 +56,8 @@ class ControllerInputManager
 
     void setActiveKeyboard(IKeyboard* kb);
     IKeyboard* getActiveKeyboard() const { return activeKeyboard; }
+
+    GyroManager* getGyroManager() const { return gyroManager; }
 
   private:
     bool inputEnabled;
@@ -104,6 +108,7 @@ class ControllerInputManager
 
     ButtonMapping mapping;
     bool isPstvModel;
+    GyroManager* gyroManager = nullptr;
 
     void initMapping();
     GamepadState buildGamepadState(const SceCtrlData& ctrlData) const;

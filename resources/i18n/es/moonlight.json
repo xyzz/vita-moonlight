@@ -381,6 +381,23 @@
             "detail": "Umbral mínimo de movimiento antes de registrar como deslizamiento"
         }
     },
+    "gyro": {
+        "title": "Configuración de Giroscopio",
+        "header": "Giroscopio",
+        "toggle": "Activar giroscopio",
+        "settings_entry": "Configuración de giroscopio",
+        "settings_detail": "Ajustar escalares y probar",
+        "scalars_header": "Escalares de sensibilidad",
+        "scalars_description": "Ajusta la sensibilidad de cada eje (0.1x - 3.0x). Valores más altos = más sensible.",
+        "scalar_suffix": "Escala",
+        "test_header": "Prueba y calibración",
+        "test_description": "Abre una vista con una silueta de PS Vita que se mueve según los sensores.",
+        "test_button": "Probar sensores",
+        "test_detail": "Abrir prueba visual",
+        "test_title": "Prueba de sensores",
+        "notify_enabled": "Giroscopio activado",
+        "notify_disabled": "Giroscopio desactivado"
+    },
     "session": {
         "pause": {
             "title": "Menú de pausa",

@@ -26,6 +26,7 @@
 
 #include "ConfigManager.hpp"
 #include "controller/ControllerInput.hpp"
+#include "tab/gyro_settings_tab.hpp"
 #include "tab/keyboard_settings_tab.hpp" // NUEVO
 #include "tab/microphone_settings_tab.hpp"
 #include "tab/rear_touch_settings_tab.hpp"
@@ -527,14 +528,18 @@ SettingsTab::SettingsTab()
         config.setVideoSettings(settings);
         config.save(); });
 
-    motionControlsToggle->init(brls::getStr("moonlight/settings_tab/motion_controls_title"), videoSettings.enable_motion_controls, [this](bool value)
-        {
-        ConfigManager config;
-        config.load();
-        VideoSettings settings = config.getVideoSettings();
-        settings.enable_motion_controls = value;
-        config.setVideoSettings(settings);
-        config.save(); });
+    if (gyroSettingsEntry)
+    {
+        gyroSettingsEntry->setDetailText(brls::getStr("moonlight/gyro/settings_detail"));
+        gyroSettingsEntry->registerClickAction([](brls::View*)
+            {
+            auto* gyroView = new GyroSettingsTab();
+            auto* frame = new brls::AppletFrame(gyroView);
+            frame->setTitle(brls::getStr("moonlight/gyro/title"));
+            auto* act = new brls::Activity(frame);
+            brls::Application::pushActivity(act);
+            return true; });
+    }
 
     doubleTapSprintToggle->init(brls::getStr("moonlight/settings_tab/double_tap_sprint_title"), videoSettings.enable_double_tap_sprint, [this](bool value)
         {

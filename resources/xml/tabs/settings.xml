@@ -104,9 +104,9 @@
                 id="trackpadSettingsEntry"
                 title="@i18n/moonlight/trackpad/header"/>
 
-            <brls:BooleanCell
-                id="motionControlsToggle"
-                title="@i18n/moonlight/settings_tab/motion_controls_title"/>
+            <brls:DetailCell
+                id="gyroSettingsEntry"
+                title="@i18n/moonlight/gyro/settings_entry"/>
 
             <brls:BooleanCell
                 id="doubleTapSprintToggle"

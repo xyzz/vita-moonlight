@@ -14,6 +14,7 @@
 
 #include "ConfigManager.hpp"
 #include "Limelight.h"
+#include "controller/Gyro.hpp"
 #include "controller/input_types.hpp"
 #include "controller/shortcuts.hpp"
 #include "debug.hpp"
@@ -92,6 +93,8 @@ ControllerInputManager::ControllerInputManager()
     isPstvModel = (sceKernelGetModel() == SCE_KERNEL_MODEL_VITATV);
     initMapping();
 
+    gyroManager = new GyroManager();
+
     vita_debug_log("[ControllerInput] Initialized (gamepad_type=%d)", (int)currentGamepadType);
 }
 
@@ -110,6 +113,11 @@ ControllerInputManager::~ControllerInputManager()
     {
         delete rearTouchManager;
         rearTouchManager = nullptr;
+    }
+    if (gyroManager)
+    {
+        delete gyroManager;
+        gyroManager = nullptr;
     }
 }
 
@@ -212,6 +220,11 @@ void ControllerInputManager::handleInput()
     }
 
     lastCtrlData = ctrlData;
+
+    if (gyroManager)
+    {
+        gyroManager->update();
+    }
 
     if (touchManager)
     {

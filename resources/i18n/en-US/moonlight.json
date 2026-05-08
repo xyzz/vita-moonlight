@@ -381,6 +381,23 @@
                 "detail": "Minimum movement threshold before registering as a swipe"
             }
         },
+        "gyro": {
+            "title": "Gyroscope Settings",
+            "header": "Gyroscope",
+            "toggle": "Enable gyroscope",
+            "settings_entry": "Gyroscope settings",
+            "settings_detail": "Adjust scalars and test",
+            "scalars_header": "Sensitivity scalars",
+            "scalars_description": "Adjust per-axis sensitivity (0.1x - 3.0x). Higher = more sensitive.",
+            "scalar_suffix": "Scale",
+            "test_header": "Test & Calibration",
+            "test_description": "Opens a view with a PS Vita silhouette that moves according to sensors.",
+            "test_button": "Test sensors",
+            "test_detail": "Open visual test",
+            "test_title": "Sensor test",
+            "notify_enabled": "Gyroscope enabled",
+            "notify_disabled": "Gyroscope disabled"
+        },
         "session": {
             "pause": {
                 "title": "Pause Menu",

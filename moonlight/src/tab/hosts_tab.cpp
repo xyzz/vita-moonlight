@@ -146,8 +146,8 @@ void HostsTab::refreshHostsList()
             VITALOG("[PCCard] Click en card de host: %s (%s)\n", host.name.c_str(), host.ip.c_str());
             auto* dialog = new brls::Dialog(brls::getStr("host_dialog/dialog/title"));
 
-            // Prevents the dialog from closing automatically when a button is pressed
-            dialog->setCancelable(false);
+            // Allow closing the dialog with the back button (Circle on Vita)
+            dialog->setCancelable(true);
 
             dialog->addButton(brls::getStr("host_dialog/dialog/connect"), [this, host](/*dialog*/) {
                 sceClibPrintf("[PCCard] Conectar a %s (%s)\n", host.name.c_str(), host.ip.c_str());
@@ -155,7 +155,7 @@ void HostsTab::refreshHostsList()
                     this->present(new SessionAppSelect(host.name));
                 });
             });
-            dialog->addButton(brls::getStr("host_dialog/dialog/info"), [dialog, host]() {
+            dialog->addButton(brls::getStr("host_dialog/dialog/info"), [host]() {
                 sceClibPrintf("[PCCard] Info para %s (%s)\n", host.name.c_str(), host.ip.c_str());
 
                 // Create host information dialog using dialog_utils
@@ -196,12 +196,10 @@ void HostsTab::refreshHostsList()
                 infoDialog->addButton(brls::getStr("host_dialog/dialog/ok"), []() {
                     // Close automatically
                 });
-                infoDialog->open();
 
-                // FORCE FOCUS FIX: The selector disappears because labels aren't focusable.
-                // We need to kick the focus manager to find the OK button.
+                // Open info dialog on the next UI frame after parent dismiss completes
                 brls::sync([infoDialog]() {
-                    brls::Application::giveFocus(infoDialog);
+                    infoDialog->open();
                 });
             });
             dialog->addButton(brls::getStr("host_dialog/dialog/settings"), [this, host](/*dialog*/) {

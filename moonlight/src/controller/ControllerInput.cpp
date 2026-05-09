@@ -2,6 +2,7 @@
 
 #include <psp2/ctrl.h>
 #include <psp2/kernel/sysmem.h>
+#include <psp2/shellutil.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -160,7 +161,7 @@ void ControllerInputManager::handleInput()
     static int debug_counter = 0;
     if (debug_counter++ % 300 == 0)
     { // Approximately every 2-3 seconds (depends on poll rate)
-        vita_debug_log("[ControllerInput] Botones: 0x%08X (L1:%d R1:%d L2:%d R2:%d START:%d) LT:%d RT:%d",
+        vita_debug_log("[ControllerInput] Botones: 0x%08X (L1:%d R1:%d L2:%d R2:%d START:%d) LT:%d RT:%d LX:%d LY:%d RX:%d RY:%d",
             ctrlData.buttons,
             (ctrlData.buttons & SCE_CTRL_L1) ? 1 : 0,
             (ctrlData.buttons & SCE_CTRL_R1) ? 1 : 0,
@@ -168,7 +169,11 @@ void ControllerInputManager::handleInput()
             (ctrlData.buttons & SCE_CTRL_R2) ? 1 : 0,
             (ctrlData.buttons & SCE_CTRL_START) ? 1 : 0,
             ctrlData.lt,
-            ctrlData.rt);
+            ctrlData.rt,
+            ctrlData.lx,
+            ctrlData.ly,
+            ctrlData.rx,
+            ctrlData.ry);
     }
 
     if (process_physical_shortcuts(&ctrlData, &lastCtrlData))
@@ -179,6 +184,66 @@ void ControllerInputManager::handleInput()
     }
 
     GamepadState gamepadState = buildGamepadState(ctrlData);
+
+    if (streamingActive)
+    {
+        constexpr uint64_t PSBTN_DOUBLETAP_DELAY_US = 500000; // 500ms
+        const bool psButtonPressed                  = (ctrlData.buttons & SCE_CTRL_PSBUTTON) != 0;
+        const bool psButtonWasPressed               = (lastCtrlData.buttons & SCE_CTRL_PSBUTTON) != 0;
+
+        if (psButtonPressed)
+        {
+            if (!psButtonWasPressed)
+            {
+                if ((nowPollUs - psButtonPressedTimeUs) < PSBTN_DOUBLETAP_DELAY_US)
+                {
+                    vita_debug_log("[PSBTN] Double-tap detected -> unlock");
+                    unlockPSButton();
+                    psButtonSpecialActive = false;
+                }
+                else
+                {
+                    vita_debug_log("[PSBTN] Single tap -> SPECIAL active");
+                    psButtonSpecialActive = true;
+                }
+            }
+            else
+            {
+                if (psButtonLocked)
+                {
+                    psButtonSpecialActive = true; // locked: keep SPECIAL active
+                }
+                else
+                {
+                    psButtonSpecialActive = false; // unlocked: let Vita OS handle it
+                }
+            }
+            psButtonPressedTimeUs = nowPollUs; // update EVERY frame while pressed
+        }
+        else
+        {
+            if (psButtonWasPressed)
+            {
+                vita_debug_log("[PSBTN] Released -> SPECIAL inactive");
+                psButtonSpecialActive = false;
+            }
+
+            if (!psButtonLocked && (nowPollUs - psButtonPressedTimeUs) > PSBTN_DOUBLETAP_DELAY_US)
+            {
+                vita_debug_log("[PSBTN] Auto re-lock after delay");
+                lockPSButton(); // re-lock after delay since last release
+            }
+        }
+
+        if (psButtonSpecialActive)
+        {
+            gamepadState.buttonFlags |= SPECIAL_FLAG;
+        }
+    }
+    else
+    {
+        psButtonSpecialActive = false;
+    }
     if (rearTouchManager)
     {
         rearTouchManager->process(gamepadState, isPstvModel);
@@ -664,4 +729,39 @@ bool ControllerInputManager::setTouchscreenModeRuntime(int newMode)
     config.save();
 
     return true;
+}
+
+void ControllerInputManager::lockPSButton()
+{
+#if defined(__PSV__)
+    if (!psButtonLocked)
+    {
+        sceShellUtilLock((SceShellUtilLockType)(SCE_SHELL_UTIL_LOCK_TYPE_PS_BTN | SCE_SHELL_UTIL_LOCK_TYPE_PS_BTN_2));
+        psButtonLocked = true;
+    }
+#endif
+}
+
+void ControllerInputManager::unlockPSButton()
+{
+#if defined(__PSV__)
+    if (psButtonLocked)
+    {
+        sceShellUtilUnlock((SceShellUtilLockType)(SCE_SHELL_UTIL_LOCK_TYPE_PS_BTN | SCE_SHELL_UTIL_LOCK_TYPE_PS_BTN_2));
+        psButtonLocked = false;
+    }
+#endif
+}
+
+void ControllerInputManager::setStreamingActive(bool active)
+{
+    streamingActive = active;
+    if (!active)
+    {
+        psButtonSpecialActive = false;
+        if (psButtonLocked)
+        {
+            unlockPSButton();
+        }
+    }
 }

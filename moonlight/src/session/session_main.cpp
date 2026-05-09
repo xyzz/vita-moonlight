@@ -51,6 +51,13 @@ SessionMainView::SessionMainView(const HostInfo& host, const RemoteAppInfo& app)
     // Inicializar input manager
     g_controllerInput = new ControllerInputManager();
 
+    // Enable PS button capture for streaming (sends Guide/Special button to host)
+    if (g_controllerInput)
+    {
+        g_controllerInput->setStreamingActive(true);
+        g_controllerInput->lockPSButton();
+    }
+
     // Notify server of gamepad type saved in config
     VitaSession::notifyGamepadType();
 

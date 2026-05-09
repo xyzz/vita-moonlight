@@ -212,6 +212,11 @@ void VitaSession::stop(bool terminateApp)
 {
     if (!m_is_active && !m_is_terminated)
         return;
+
+    // Disable PS button capture so Vita OS handles it normally again
+    if (g_controllerInput)
+        g_controllerInput->setStreamingActive(false);
+
     VideoManager::instance()->stopVideo();
     if (terminateApp)
         GameStreamClient::instance().quitApp(m_address);

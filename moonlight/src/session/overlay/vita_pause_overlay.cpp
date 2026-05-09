@@ -49,6 +49,7 @@ bool dismissSessionAppSelectIfPresent()
 }
 
 // Schedules the removal of the SessionMain and SessionAppSelect activities once the overlay is gone.
+// Iterates the activity stack and pops session-related activities (overlay, then SessionMain).
 void returnToMainMenuAsync(int retries = 8)
 {
     brls::delay(30, [retries]() mutable
@@ -66,29 +67,61 @@ void returnToMainMenuAsync(int retries = 8)
         }
 
         auto stack = brls::Application::getActivitiesStack();
-        if (!stack.empty()) {
-            brls::Activity* top = stack.back();
-            if (top && dynamic_cast<SessionMainView*>(top->getContentView())) {
-                // Pop SessionMain first
-                brls::Application::popActivity(brls::TransitionAnimation::NONE, []() {
-                    vita_debug_log("[VitaPauseOverlay] SessionMain popped, dismissing SessionAppSelect");
-                    // SessionAppSelect is not an activity, it's a view inside MainActivity
-                    // We need to dismiss it programmatically with a small delay
-                    brls::delay(50, []() {
-                        if (dismissSessionAppSelectIfPresent()) {
-                            vita_debug_log("[VitaPauseOverlay] SessionAppSelect dismissed successfully");
-                            HostsTab::requestGlobalRefresh();
-                        } else {
-                            vita_debug_log("[VitaPauseOverlay] SessionAppSelect not found, refreshing hosts anyway");
-                            HostsTab::requestGlobalRefresh();
-                        }
-                    });
-                });
-                return;
-            }
+        if (stack.empty()) {
+            HostsTab::requestGlobalRefresh();
+            return;
         }
 
-        // Fallback: try to dismiss SessionAppSelect if we didn't find SessionMain
+        brls::Activity* top = stack.back();
+        if (!top) {
+            HostsTab::requestGlobalRefresh();
+            return;
+        }
+
+        // 1) If the pause overlay is on top, pop it first.
+        //    (The overlay is wrapped in an Activity; SessionMainView is a Box view.)
+        brls::View* topContent = top->getContentView();
+        auto* topOverlay = dynamic_cast<VitaPauseOverlay*>(topContent);
+        if (!topOverlay) {
+            // Also try unwrapping from an AppletFrame or similar wrapper
+            auto* applet = dynamic_cast<brls::AppletFrame*>(topContent);
+            if (applet) topContent = applet->getContentView();
+            topOverlay = dynamic_cast<VitaPauseOverlay*>(topContent);
+        }
+        if (topOverlay) {
+            vita_debug_log("[VitaPauseOverlay] Popping overlay activity first");
+            brls::Application::popActivity(brls::TransitionAnimation::NONE, []() {
+                // After popping overlay, recurse to pop SessionMainView
+                returnToMainMenuAsync(4);
+            });
+            return;
+        }
+
+        // 2) If SessionMainView is on top now, pop it.
+        auto* sessionMain = dynamic_cast<SessionMainView*>(topContent);
+        if (!sessionMain) {
+            auto* applet = dynamic_cast<brls::AppletFrame*>(topContent);
+            if (applet) topContent = applet->getContentView();
+            sessionMain = dynamic_cast<SessionMainView*>(topContent);
+        }
+        if (sessionMain) {
+            vita_debug_log("[VitaPauseOverlay] Popping SessionMain activity");
+            brls::Application::popActivity(brls::TransitionAnimation::NONE, []() {
+                vita_debug_log("[VitaPauseOverlay] SessionMain popped, dismissing SessionAppSelect");
+                brls::delay(50, []() {
+                    if (dismissSessionAppSelectIfPresent()) {
+                        vita_debug_log("[VitaPauseOverlay] SessionAppSelect dismissed successfully");
+                        return; // Old MainActivity now shows HostsTab, no need to push a new one
+                    }
+                    vita_debug_log("[VitaPauseOverlay] SessionAppSelect not found, falling back to refresh");
+                    HostsTab::requestGlobalRefresh();
+                });
+            });
+            return;
+        }
+
+        // 3) Fallback: neither overlay nor session main found on top.
+        //    Just dismiss SessionAppSelect if present and refresh.
         if (dismissSessionAppSelectIfPresent()) {
             vita_debug_log("[VitaPauseOverlay] Dismissed SessionAppSelect via fallback");
             return;

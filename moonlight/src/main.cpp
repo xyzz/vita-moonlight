@@ -45,6 +45,7 @@
 
 #if defined(__PSV__)
 #include <psp2/kernel/threadmgr.h>
+#include <psp2/shellutil.h>
 #include <psp2/vshbridge.h>
 #endif
 
@@ -161,6 +162,11 @@ int main(int argc, char* argv[])
             brls::Application::enableDebuggingView(true);
         }
     }
+
+    // Init shell util events (for PS button capture)
+#if defined(__PSV__)
+    sceShellUtilInitEvents(0);
+#endif
 
     // Init the app and i18n. This also initializes the platform.
     brls::Logger::info("main: init app");

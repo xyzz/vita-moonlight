@@ -193,7 +193,17 @@ if (WIN32)
     endif ()
 elseif (PLATFORM_PSV)
     set(VITA_MKSFOEX_FLAGS "${VITA_MKSFOEX_FLAGS} -d ATTRIBUTE2=12") # max heap size mode
-    vita_create_self(${PROJECT_NAME}.self ${PROJECT_NAME} UNSAFE)
+    add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}.velf
+        COMMAND vita-elf-create ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME} ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}.velf
+        DEPENDS ${PROJECT_NAME}
+        COMMENT "Creating ${PROJECT_NAME}.velf"
+    )
+    add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}.self
+        COMMAND vita-make-fself -a 0x2800000000000001 -at 0x0E -c ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}.velf ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}.self
+        DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}.velf
+        COMMENT "Creating ${PROJECT_NAME}.self"
+    )
+    add_custom_target(${PROJECT_NAME}.self ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}.self)
     set(PSV_ASSETS_FILES ${CMAKE_SOURCE_DIR}/psv/sce_sys sce_sys)
     if (NOT USE_LIBROMFS)
         list(APPEND PSV_ASSETS_FILES ${CMAKE_SOURCE_DIR}/resources resources)
@@ -257,6 +267,7 @@ if(PLATFORM_PSV)
         -lSceIme_stub
         -lSceAppUtil_stub
         -lSceMotion_stub
+        -lSceShellSvc_stub
         -lSceGxm_stub
         -lScePgf_stub
         -lfreetype

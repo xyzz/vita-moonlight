@@ -67,11 +67,16 @@ void HostsTab::requestGlobalRefresh()
     // still handling its input/event (prevents reentrancy crashes on Vita).
     brls::delay(50, []()
         {
-        brls::Logger::info("[HostsTab::requestGlobalRefresh] Pushing new MainActivity (safe reload)");
-        // Push a fresh MainActivity on top. We avoid clearing the whole stack because
-        // Application::clear() is private. This may leave the old MainActivity below,
-        // but pushing a fresh one provides a clean UI state without in-place mutations
-        // that previously caused crashes on PSVita.
+        brls::Logger::info("[HostsTab::requestGlobalRefresh] Clearing stack and pushing new MainActivity");
+        // Pop all existing activities to prevent duplicates in the stack.
+        // Application::clear() is private, so we pop one by one.
+        auto stack = brls::Application::getActivitiesStack();
+        size_t initialCount = stack.size();
+        for (size_t i = 0; i < initialCount; ++i) {
+            brls::Application::popActivity(brls::TransitionAnimation::NONE);
+        }
+        vita_debug_log("[HostsTab::requestGlobalRefresh] Popped %zu activities", initialCount);
+        // Push a fresh MainActivity
         brls::Application::pushActivity(new MainActivity(), brls::TransitionAnimation::NONE);
         vita_debug_log("[HostsTab::requestGlobalRefresh] New MainActivity pushed");
         auto activities = brls::Application::getActivitiesStack();

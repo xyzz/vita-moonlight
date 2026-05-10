@@ -26,6 +26,7 @@
 
 #include "ConfigManager.hpp"
 #include "controller/ControllerInput.hpp"
+#include "tab/front_touch_settings_tab.hpp"
 #include "tab/gyro_settings_tab.hpp"
 #include "tab/keyboard_settings_tab.hpp" // NUEVO
 #include "tab/microphone_settings_tab.hpp"
@@ -566,6 +567,19 @@ SettingsTab::SettingsTab()
             return true; });
     }
 
+    if (frontTouchSettingsEntry)
+    {
+        frontTouchSettingsEntry->setDetailText(brls::getStr("moonlight/settings/front_touch_detail"));
+        frontTouchSettingsEntry->registerClickAction([](brls::View*)
+            {
+            auto* frontTouchView = new FrontTouchSettingsTab();
+            auto* frame = new brls::AppletFrame(frontTouchView);
+            frame->setTitle(brls::getStr("moonlight/front_touch/title"));
+            auto* act = new brls::Activity(frame);
+            brls::Application::pushActivity(act);
+            return true; });
+    }
+
     // Trackpad Settings Entry
     if (trackpadSettingsEntry)
     {
@@ -630,6 +644,22 @@ SettingsTab::SettingsTab()
                                   gamepadTypes.at(selected);
             brls::Application::notify(message);
         } });
+
+    // Configure swap shoulder buttons toggle
+    swapShoulderButtonsToggle->init(brls::getStr("moonlight/settings_tab/swap_shoulder_buttons/title"), videoSettings.swap_shoulder_buttons, [this](bool value)
+        {
+        ConfigManager config;
+        config.load();
+        VideoSettings settings = config.getVideoSettings();
+        settings.swap_shoulder_buttons = value;
+        config.setVideoSettings(settings);
+        config.save();
+        if (g_controllerInput) {
+            g_controllerInput->setSwapShoulderButtons(value);
+        }
+        brls::Application::notify(brls::getStr(value
+            ? "moonlight/settings_tab/swap_shoulder_buttons/notify_enabled"
+            : "moonlight/settings_tab/swap_shoulder_buttons/notify_disabled")); });
 
     // NUEVO: Configure Keyboard button
     if (keyboardConfigureCell)

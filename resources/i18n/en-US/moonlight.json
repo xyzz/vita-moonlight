@@ -63,6 +63,7 @@
             "hosts_list_title": "Saved PCs",
             "hosts_list_empty": "No saved PCs",
             "rear_touch_detail": "Configure rear touch zones and actions",
+            "front_touch_detail": "Configure front touch corner zones",
             "add_host_connect_question_dialog": "Connect to $(name) at $(ip)?",
             "add_host_connect": "Connect",
             "add_host_cancel": "Cancel"
@@ -172,6 +173,11 @@
                 },
                 "notify_prefix": "Controller type changed to: "
             },
+            "swap_shoulder_buttons": {
+                "title": "Swap R1/L1 <-> R2/L2",
+                "notify_enabled": "Swap shoulder buttons enabled",
+                "notify_disabled": "Swap shoulder buttons disabled"
+            },
             "mouse_accel": {
                 "title": "Mouse acceleration"
             },
@@ -276,6 +282,7 @@
             "calibration_zone_title": "Active zone",
             "calibration_zone_detail": "Adjust the margins with calibration",
             "actions_header": "Corner actions",
+            "swap_warning": "Swap R1/L1 <-> R2/L2 is active. NW/NE -> L1/R1, SW/SE -> L3/R3. Custom corner actions are disabled.",
             "action_nw": "North-west corner action",
             "action_ne": "North-east corner action",
             "action_sw": "South-west corner action",
@@ -326,6 +333,25 @@
                     "reset": "Reset"
                 }
             }
+        },
+        "front_touch": {
+            "title": "Front touch zones",
+            "toggle": "Front touch zones",
+            "offset": "Zone offset",
+            "offset_detail": "Distance from screen edge",
+            "size": "Zone size",
+            "size_detail": "Square zone width/height",
+            "preview": "Preview zones",
+            "preview_detail": "Visualize and test corner zones",
+            "zones_description": "Tap screen corners to trigger actions during streaming",
+            "actions_header": "Corner actions",
+            "action_nw": "North-west corner action",
+            "action_ne": "North-east corner action",
+            "action_sw": "South-west corner action",
+            "action_se": "South-east corner action",
+            "notify_enabled": "Front touch zones enabled",
+            "notify_disabled": "Front touch zones disabled",
+            "notify_action_saved": "Front touch action saved"
         },
         "hints": {
             "cancel": "Cancel"

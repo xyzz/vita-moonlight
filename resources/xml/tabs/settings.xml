@@ -101,6 +101,10 @@
                 title="@i18n/moonlight/rear_touch/title"/>
 
             <brls:DetailCell
+                id="frontTouchSettingsEntry"
+                title="@i18n/moonlight/front_touch/title"/>
+
+            <brls:DetailCell
                 id="trackpadSettingsEntry"
                 title="@i18n/moonlight/trackpad/header"/>
 
@@ -119,6 +123,10 @@
             <brls:SelectorCell
                 id="gamepadTypeSelector"
                 title="@i18n/moonlight/settings_tab/gamepad_type/title"/>
+
+            <brls:BooleanCell
+                id="swapShoulderButtonsToggle"
+                title="@i18n/moonlight/settings_tab/swap_shoulder_buttons/title"/>
 
             <!-- Configurar Teclado -->
             <brls:DetailCell

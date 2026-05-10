@@ -75,7 +75,7 @@ struct VideoSettings
     bool enable_double_tap_sprint      = false;
     bool absolute_mouse                = false;
     bool enable_network_optimizations  = true; // Network optimizations (IDR smart, pacing, etc.)
-    int touchscreen_mode               = 0; // 0=Off, 1=DS4 Touchpad, 2=Mouse Absoluto, 3=Tableta Multitouch
+    int touchscreen_mode               = 1; // 0=Off, 1=Trackpad relativo, 2=DS4 Touchpad, 3=Mouse Absoluto, 4=Tableta Multitouch
     int double_tap_sprint_step_time    = 200;
     float motion_controls_scalar_x     = 1.2f;
     float motion_controls_scalar_y     = 0.8f;
@@ -99,14 +99,24 @@ struct VideoSettings
 
     GamepadType gamepad_type = GAMEPAD_TYPE_XBOX; // 0=Xbox, 1=PS4 (to emulate controller)
 
-    bool enable_microphone             = false; // Enable/disable microphone transmission
-    bool enable_microphone_compression = false; // true=Opus, false=RAW PCM (controlled by UI toggle)
-    std::string microphone_host_ip     = ""; // Host IP (empty = use stream host)
-    int microphone_port                = MOONMIC_DEFAULT_PORT; // UDP port for mic transmission
-    int microphone_sample_rate         = MOONMIC_DEFAULT_SAMPLE_RATE; // Sample rate (Hz) - Vita hardware native
-    int microphone_channels            = MOONMIC_DEFAULT_CHANNELS; // 1=mono, 2=stereo
-    int microphone_bitrate             = MOONMIC_DEFAULT_BITRATE; // Opus bitrate (bps) - optimal for 16kHz mono VOIP
-    float microphone_gain              = 10.0f; // Gain multiplier (1.0 - 100.0, default 10.0)
+    bool swap_shoulder_buttons = false;
+
+    bool enable_front_touchzones         = true;
+    int front_touch_offset               = 0; // px from screen edge
+    int front_touch_size                 = 150; // px square zone size
+    std::uint32_t front_action_northwest = controller::INPUT_TYPE_SPECIAL | controller::INPUT_SPECIAL_KEY_PAUSE;
+    std::uint32_t front_action_northeast = 0; // None by default
+    std::uint32_t front_action_southwest = controller::INPUT_TYPE_GAMEPAD | controller::GAMEPAD_FLAG_SPECIAL;
+    std::uint32_t front_action_southeast = 0; // None by default
+
+    bool enable_microphone             = false;
+    bool enable_microphone_compression = false;
+    std::string microphone_host_ip     = "";
+    int microphone_port                = MOONMIC_DEFAULT_PORT;
+    int microphone_sample_rate         = MOONMIC_DEFAULT_SAMPLE_RATE;
+    int microphone_channels            = MOONMIC_DEFAULT_CHANNELS;
+    int microphone_bitrate             = MOONMIC_DEFAULT_BITRATE;
+    float microphone_gain              = 10.0f;
 
     RearTouchSettings rear_touch;
 };

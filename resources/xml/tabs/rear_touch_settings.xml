@@ -56,6 +56,18 @@
                 title="@i18n/moonlight/rear_touch/actions_header"
                 marginBottom="0px"/>
 
+            <brls:Label
+                id="rearTouchSwapWarning"
+                width="auto"
+                height="auto"
+                horizontalAlign="left"
+                text="@i18n/moonlight/rear_touch/swap_warning"
+                marginTop="8"
+                marginBottom="12"
+                fontSize="18"
+                visibility="gone"
+                textColor="#FF8C00"/>
+
             <brls:SelectorCell
                 id="rearTouchNWSelector"
                 title="@i18n/moonlight/rear_touch/action_nw"/>

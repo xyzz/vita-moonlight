@@ -61,9 +61,11 @@ class SettingsTab : public brls::Box
     BRLS_BIND(brls::BooleanCell, doubleTapSprintToggle, "doubleTapSprintToggle");
     BRLS_BIND(brls::SelectorCell, touchscreenModeSelector, "touchscreenModeSelector");
     BRLS_BIND(brls::SelectorCell, gamepadTypeSelector, "gamepadTypeSelector");
+    BRLS_BIND(brls::BooleanCell, swapShoulderButtonsToggle, "swapShoulderButtonsToggle");
     BRLS_BIND(brls::DetailCell, keyboardConfigureCell, "keyboardConfigureCell");
     BRLS_BIND(brls::DetailCell, shortcutsConfigureCell, "shortcutsConfigureCell");
     BRLS_BIND(brls::DetailCell, rearTouchSettingsEntry, "rearTouchSettingsEntry");
+    BRLS_BIND(brls::DetailCell, frontTouchSettingsEntry, "frontTouchSettingsEntry");
     BRLS_BIND(brls::DetailCell, trackpadSettingsEntry, "trackpadSettingsEntry");
 
     // Microphone settings

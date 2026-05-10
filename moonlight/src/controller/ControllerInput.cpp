@@ -79,17 +79,20 @@ ControllerInputManager::ControllerInputManager()
 
     sceCtrlSetSamplingMode(SCE_CTRL_MODE_ANALOG_WIDE);
 
-    touchManager     = new TouchInputManager();
-    g_touchInput     = touchManager;
-    rearTouchManager = new RearTouchInputManager();
+    touchManager      = new TouchInputManager();
+    g_touchInput      = touchManager;
+    rearTouchManager  = new RearTouchInputManager();
+    frontTouchManager = new FrontTouchInputManager();
 
     ConfigManager config;
     config.load();
     VideoSettings initialSettings = config.getVideoSettings();
     rearTouchManager->updateSettings(initialSettings.rear_touch);
+    rearTouchManager->setSwapShoulderButtons(initialSettings.swap_shoulder_buttons);
+    frontTouchManager->updateSettings(initialSettings);
 
-    // Load gamepad type from config
-    currentGamepadType = initialSettings.gamepad_type;
+    currentGamepadType  = initialSettings.gamepad_type;
+    swapShoulderButtons = initialSettings.swap_shoulder_buttons;
 
     isPstvModel = (sceKernelGetModel() == SCE_KERNEL_MODEL_VITATV);
     initMapping();
@@ -114,6 +117,11 @@ ControllerInputManager::~ControllerInputManager()
     {
         delete rearTouchManager;
         rearTouchManager = nullptr;
+    }
+    if (frontTouchManager)
+    {
+        delete frontTouchManager;
+        frontTouchManager = nullptr;
     }
     if (gyroManager)
     {
@@ -249,6 +257,13 @@ void ControllerInputManager::handleInput()
         rearTouchManager->process(gamepadState, isPstvModel);
     }
 
+    bool inFrontTouchZone = false;
+    bool keyboardOpen     = (activeKeyboard && activeKeyboard->isOpen());
+    if (frontTouchManager && !keyboardOpen)
+    {
+        inFrontTouchZone = frontTouchManager->process(gamepadState, isPstvModel);
+    }
+
     // Send if changed. Button/trigger changes go out immediately; analog-only
     // changes are rate-limited to avoid CPU/network spikes from stick jitter.
     const bool stateChanged          = (memcmp(&gamepadState, &lastGamepadState, sizeof(GamepadState)) != 0);
@@ -317,10 +332,16 @@ void ControllerInputManager::handleInput()
             if (touchSuppressed && nowUs < touchSuppressUntilUs)
             {
             }
-            else
+            else if (!inFrontTouchZone)
             {
                 touchSuppressed = false;
                 touchManager->handleTouch(touchscreenMode);
+            }
+            else
+            {
+                touchSuppressed = true;
+                touchManager->dropTouch(touchscreenMode);
+                touchSuppressUntilUs = nowUs + kTouchReleaseDelayUs;
             }
         }
 
@@ -405,6 +426,10 @@ void ControllerInputManager::dropInput()
     if (rearTouchManager)
     {
         rearTouchManager->dropState();
+    }
+    if (frontTouchManager)
+    {
+        frontTouchManager->dropState();
     }
 
     inputDropped = true;
@@ -514,13 +539,32 @@ GamepadState ControllerInputManager::buildGamepadState(const SceCtrlData& ctrlDa
     if (isPressed(mapping.btnSelect, ctrlData))
         state.buttonFlags |= BACK_FLAG;
 
-    // L1/R1 maps to LB/RB (Xbox consistent)
-    if (isPressed(mapping.btnL1, ctrlData))
-        state.buttonFlags |= LB_FLAG;
-    if (isPressed(mapping.btnR1, ctrlData))
-        state.buttonFlags |= RB_FLAG;
-    state.leftTrigger  = readTrigger(mapping.btnL2, ctrlData);
-    state.rightTrigger = readTrigger(mapping.btnR2, ctrlData);
+    if (swapShoulderButtons)
+    {
+        if (ctrlData.buttons & SCE_CTRL_L1)
+            state.leftTrigger = 0xFF;
+        if (ctrlData.buttons & SCE_CTRL_R1)
+            state.rightTrigger = 0xFF;
+        // On PSTV, physical L2/R2 act as L1/R1 (digital).
+        // On Vita normal, SCE_CTRL_L2/LR2 alias LTRIGGER/RTRIGGER (same physical buttons),
+        // so L1/R1 digital must come from rear touch only (handled by RearTouchInputManager).
+        if (isPstvModel)
+        {
+            if (ctrlData.buttons & SCE_CTRL_L2)
+                state.buttonFlags |= LB_FLAG;
+            if (ctrlData.buttons & SCE_CTRL_R2)
+                state.buttonFlags |= RB_FLAG;
+        }
+    }
+    else
+    {
+        if (isPressed(mapping.btnL1, ctrlData))
+            state.buttonFlags |= LB_FLAG;
+        if (isPressed(mapping.btnR1, ctrlData))
+            state.buttonFlags |= RB_FLAG;
+        state.leftTrigger  = readTrigger(mapping.btnL2, ctrlData);
+        state.rightTrigger = readTrigger(mapping.btnR2, ctrlData);
+    }
 
     if (isPressed(mapping.btnL3, ctrlData))
         state.buttonFlags |= LS_CLK_FLAG;
@@ -672,6 +716,32 @@ void ControllerInputManager::setRearTouchEnabled(bool enabled)
     if (rearTouchManager)
     {
         rearTouchManager->setEnabled(enabled);
+    }
+}
+
+void ControllerInputManager::setSwapShoulderButtons(bool enabled)
+{
+    swapShoulderButtons = enabled;
+    vita_debug_log("[ControllerInput] Swap shoulder buttons -> %d", enabled ? 1 : 0);
+    if (rearTouchManager)
+    {
+        rearTouchManager->setSwapShoulderButtons(enabled);
+    }
+}
+
+void ControllerInputManager::applyFrontTouchSettings(const VideoSettings& settings)
+{
+    if (frontTouchManager)
+    {
+        frontTouchManager->updateSettings(settings);
+    }
+}
+
+void ControllerInputManager::setFrontTouchEnabled(bool enabled)
+{
+    if (frontTouchManager)
+    {
+        frontTouchManager->setEnabled(enabled);
     }
 }
 

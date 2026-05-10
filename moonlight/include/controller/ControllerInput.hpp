@@ -7,6 +7,7 @@
 #include <functional>
 
 #include "ConfigManager.hpp"
+#include "controller/FrontTouchInput.hpp"
 #include "controller/GamepadState.hpp"
 #include "controller/RearTouchInput.hpp"
 #include "controller/TouchInput.hpp"
@@ -52,6 +53,12 @@ class ControllerInputManager
     void applyRearTouchSettings(const RearTouchSettings& settings);
     void setRearTouchEnabled(bool enabled);
 
+    void applyFrontTouchSettings(const VideoSettings& settings);
+    void setFrontTouchEnabled(bool enabled);
+
+    void setSwapShoulderButtons(bool enabled);
+    bool getSwapShoulderButtons() const { return swapShoulderButtons; }
+
     void setGamepadType(GamepadType type);
 
     void setActiveKeyboard(IKeyboard* kb);
@@ -79,6 +86,7 @@ class ControllerInputManager
 
     TouchInputManager* touchManager;
     RearTouchInputManager* rearTouchManager;
+    FrontTouchInputManager* frontTouchManager;
 
     std::function<void()> pauseCallback;
 
@@ -86,6 +94,8 @@ class ControllerInputManager
     bool activeKeyboardSeenOpen = false;
 
     GamepadType currentGamepadType = GAMEPAD_TYPE_XBOX;
+
+    bool swapShoulderButtons = false;
 
     struct ButtonMapping
     {

@@ -1,0 +1,80 @@
+<brls:Box
+    width="auto"
+    height="auto">
+
+    <brls:ScrollingFrame
+        width="auto"
+        height="auto"
+        axis="column"
+        alignItems="stretch"
+        scrollingBehavior="centered"
+        grow="1.0" >
+
+        <brls:Box
+            width="10000"
+            height="auto"
+            axis="column"
+            alignItems="stretch"
+            paddingTop="@style/brls/sidebar/padding_top"
+            paddingRight="@style/brls/sidebar/padding_right"
+            paddingBottom="@style/brls/sidebar/padding_bottom"
+            paddingLeft="@style/brls/sidebar/padding_left">
+
+            <brls:Header
+                width="auto"
+                height="auto"
+                title="@i18n/moonlight/front_touch/title"
+                marginBottom="0px"/>
+
+            <brls:BooleanCell
+                id="frontTouchToggle"
+                title="@i18n/moonlight/front_touch/toggle"/>
+
+            <brls:SliderCell
+                id="frontTouchOffsetSlider"
+                title="@i18n/moonlight/front_touch/offset"/>
+
+            <brls:SliderCell
+                id="frontTouchSizeSlider"
+                title="@i18n/moonlight/front_touch/size"/>
+
+            <brls:DetailCell
+                id="frontTouchPreviewCell"
+                title="@i18n/moonlight/front_touch/preview"/>
+
+            <brls:Label
+                width="auto"
+                height="auto"
+                horizontalAlign="left"
+                text="@i18n/moonlight/front_touch/zones_description"
+                marginTop="8"
+                marginBottom="12"
+                fontSize="18"/>
+
+            <brls:Header
+                width="auto"
+                height="auto"
+                title="@i18n/moonlight/front_touch/actions_header"
+                marginBottom="0px"/>
+
+            <brls:SelectorCell
+                id="frontTouchNWSelector"
+                title="@i18n/moonlight/front_touch/action_nw"/>
+
+            <brls:SelectorCell
+                id="frontTouchNESelector"
+                title="@i18n/moonlight/front_touch/action_ne"/>
+
+            <brls:SelectorCell
+                id="frontTouchSWSelector"
+                title="@i18n/moonlight/front_touch/action_sw"/>
+
+            <brls:SelectorCell
+                id="frontTouchSESelector"
+                title="@i18n/moonlight/front_touch/action_se"/>
+
+        </brls:Box>
+
+    </brls:ScrollingFrame>
+
+</brls:Box>

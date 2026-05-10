@@ -16,15 +16,17 @@ class RearTouchInputManager
     void setEnabled(bool enabled);
     bool isEnabled() const { return enabled; }
 
-    void process(GamepadState& state, bool isPstvModel);
+    void setSwapShoulderButtons(bool enabled);
 
+    void process(GamepadState& state, bool isPstvModel);
     void dropState();
 
     const RearTouchSettings& getSettings() const { return currentSettings; }
 
   private:
     RearTouchSettings currentSettings {};
-    bool enabled = true;
+    bool enabled             = true;
+    bool swapShoulderButtons = false;
 
     std::array<bool, 4> lastZoneActive { false, false, false, false };
 

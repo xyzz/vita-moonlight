@@ -25,6 +25,26 @@ RearTouchSettingsTab::RearTouchSettingsTab()
         specialOptionNames.push_back(option.name);
     }
 
+    auto updateSwapWarning = [this](bool swapActive)
+    {
+        if (rearTouchSwapWarning)
+        {
+            rearTouchSwapWarning->setVisibility(swapActive ? brls::Visibility::VISIBLE : brls::Visibility::GONE);
+        }
+        auto setSelectorFocusable = [](brls::SelectorCell* selector, bool focusable)
+        {
+            if (selector)
+            {
+                selector->setFocusable(focusable);
+                selector->setAlpha(focusable ? 1.0f : 0.4f);
+            }
+        };
+        setSelectorFocusable(rearTouchNWSelector, !swapActive);
+        setSelectorFocusable(rearTouchNESelector, !swapActive);
+        setSelectorFocusable(rearTouchSWSelector, !swapActive);
+        setSelectorFocusable(rearTouchSESelector, !swapActive);
+    };
+
     auto updateRearTouchDetail = [this](const RearTouchSettings& rtSettings)
     {
         if (!rearTouchCalibrationCell)
@@ -114,6 +134,7 @@ RearTouchSettingsTab::RearTouchSettingsTab()
 
     applyRearTouchActions(videoSettings.rear_touch);
     updateRearTouchDetail(videoSettings.rear_touch);
+    updateSwapWarning(videoSettings.swap_shoulder_buttons);
 
     rearTouchCalibrationCell->registerClickAction([this, updateRearTouchDetail, applyRearTouchActions](brls::View*)
         {

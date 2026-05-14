@@ -36,5 +36,7 @@ class IKeyboard
 
     virtual bool sendsDirectly() const { return false; }
 
+    virtual bool usesNonNormalizedVk() const { return false; }
+
     virtual bool selfDestructs() const { return false; }
 };

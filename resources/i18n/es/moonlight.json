@@ -239,7 +239,14 @@
             "arrows_title": "Mostrar flechas",
             "theme_preview_title": "Tema Actual",
             "theme_editor_title": "Editor de Temas",
-            "theme_info": "Los temas personalizados de teclado estarán disponibles en una actualización futura. ¡Podrás crear y compartir tus propios diseños de teclado!"
+            "theme_info": "Los temas personalizados de teclado estarán disponibles en una actualización futura. ¡Podrás crear y compartir tus propios diseños de teclado!",
+            "input_mode_title": "Modo de entrada de teclado (UTF-8)",
+            "input_mode_utf8": "Entrada UTF-8 activada",
+            "input_mode_vk": "Entrada VK activada (predeterminado)",
+            "theme_default": "Predeterminado",
+            "theme_selection_future": "La selección de temas llegará en una actualización futura",
+            "theme_not_available": "No disponible",
+            "theme_editor_future": "El editor de temas llegará en una actualización futura"
         },
         "shortcuts": {
             "title": "Configuración de Atajos",

@@ -1,4 +1,4 @@
-#include "keyboard.hpp"
+#include "controller/keyboard/keyboard.hpp"
 
 #include <sys/stat.h>
 
@@ -6,6 +6,9 @@
 #include <functional>
 #include <iostream>
 #include <sstream>
+
+#include "controller/keyboard/keyboard_utf8.hpp"
+#include "controller/keyboard/keyboardloader.hpp"
 // Limelight API for keyboard submission
 #include "Limelight.h"
 
@@ -84,130 +87,6 @@ class KeyTouchRecognizer : public brls::GestureRecognizer
     Callback callback;
 };
 
-bool decode_single_utf8(const std::string& text, std::uint32_t& outCodepoint)
-{
-    if (text.empty())
-    {
-        return false;
-    }
-
-    const unsigned char* bytes = reinterpret_cast<const unsigned char*>(text.data());
-    const std::size_t len      = text.size();
-
-    if (bytes[0] <= 0x7F)
-    {
-        if (len != 1)
-        {
-            return false;
-        }
-        outCodepoint = bytes[0];
-        return true;
-    }
-
-    if ((bytes[0] & 0xE0) == 0xC0)
-    {
-        if (len != 2 || (bytes[1] & 0xC0) != 0x80)
-        {
-            return false;
-        }
-        outCodepoint = ((bytes[0] & 0x1F) << 6) | (bytes[1] & 0x3F);
-        return true;
-    }
-
-    if ((bytes[0] & 0xF0) == 0xE0)
-    {
-        if (len != 3 || (bytes[1] & 0xC0) != 0x80 || (bytes[2] & 0xC0) != 0x80)
-        {
-            return false;
-        }
-        outCodepoint = ((bytes[0] & 0x0F) << 12) | ((bytes[1] & 0x3F) << 6) | (bytes[2] & 0x3F);
-        return true;
-    }
-
-    if ((bytes[0] & 0xF8) == 0xF0)
-    {
-        if (len != 4 || (bytes[1] & 0xC0) != 0x80 || (bytes[2] & 0xC0) != 0x80 || (bytes[3] & 0xC0) != 0x80)
-        {
-            return false;
-        }
-        outCodepoint = ((bytes[0] & 0x07) << 18) | ((bytes[1] & 0x3F) << 12) | ((bytes[2] & 0x3F) << 6) | (bytes[3] & 0x3F);
-        return true;
-    }
-
-    return false;
-}
-
-bool encode_utf8_codepoint(std::uint32_t codepoint, char out[4], int& outLen)
-{
-    outLen = 0;
-    if (codepoint <= 0x7F)
-    {
-        out[0] = static_cast<char>(codepoint);
-        outLen = 1;
-        return true;
-    }
-    if (codepoint <= 0x7FF)
-    {
-        out[0] = static_cast<char>(0xC0 | (codepoint >> 6));
-        out[1] = static_cast<char>(0x80 | (codepoint & 0x3F));
-        outLen = 2;
-        return true;
-    }
-    if (codepoint <= 0xFFFF)
-    {
-        out[0] = static_cast<char>(0xE0 | (codepoint >> 12));
-        out[1] = static_cast<char>(0x80 | ((codepoint >> 6) & 0x3F));
-        out[2] = static_cast<char>(0x80 | (codepoint & 0x3F));
-        outLen = 3;
-        return true;
-    }
-    if (codepoint <= 0x10FFFF)
-    {
-        out[0] = static_cast<char>(0xF0 | (codepoint >> 18));
-        out[1] = static_cast<char>(0x80 | ((codepoint >> 12) & 0x3F));
-        out[2] = static_cast<char>(0x80 | ((codepoint >> 6) & 0x3F));
-        out[3] = static_cast<char>(0x80 | (codepoint & 0x3F));
-        outLen = 4;
-        return true;
-    }
-    return false;
-}
-
-bool send_utf8_codepoint(std::uint32_t codepoint)
-{
-    char buf[4] = { 0 };
-    int len     = 0;
-    if (!encode_utf8_codepoint(codepoint, buf, len))
-    {
-        return false;
-    }
-    return LiSendUtf8TextEvent(buf, static_cast<unsigned int>(len)) == 0;
-}
-
-std::uint32_t apply_shift_to_codepoint(std::uint32_t codepoint)
-{
-    if (codepoint >= 'a' && codepoint <= 'z')
-    {
-        return codepoint - 'a' + 'A';
-    }
-    if (codepoint == 0x00F1)
-    {
-        return 0x00D1;
-    }
-    return codepoint;
-}
-
-std::string utf8_from_codepoint(std::uint32_t codepoint)
-{
-    char buf[4] = { 0 };
-    int len     = 0;
-    if (!encode_utf8_codepoint(codepoint, buf, len))
-    {
-        return std::string();
-    }
-    return std::string(buf, static_cast<std::size_t>(len));
-}
-
 } // namespace
 
 static bool file_exists(const std::string& path)
@@ -219,6 +98,9 @@ static bool file_exists(const std::string& path)
 KeyboardOverlay::KeyboardOverlay(const std::string& cssPath)
     : cssPath(cssPath)
 {
+    // Auto-load keyboard layouts from XML
+    auto_load_keyboard_layouts();
+
     memset(keyStates, 0, sizeof(keyStates));
 
     // Neutral default values; `willAppear()` wraps the panel
@@ -234,6 +116,7 @@ KeyboardOverlay::KeyboardOverlay(const std::string& cssPath)
         config.load();
         VideoSettings settings = config.getVideoSettings();
         currentLayout          = settings.keyboard_layout;
+        forceUtf8Input         = settings.keyboard_input_mode;
         showNumbersRow         = settings.keyboard_numbers_row;
         showArrowKeys          = settings.keyboard_show_arrows;
     }
@@ -270,13 +153,13 @@ KeyboardOverlay::KeyboardOverlay(const std::string& cssPath)
                     if (comboMods & COMBO_MOD_WIN) mods.push_back(0x5B);
 
                     for (int vk : mods) {
-                        LiSendKeyboardEvent((short)vk, KEY_ACTION_DOWN, 0);
+                        LiSendKeyboardEvent2((short)vk, KEY_ACTION_DOWN, 0, SS_KBE_FLAG_NON_NORMALIZED);
                     }
-                    LiSendKeyboardEvent((short)comboKeyVk, KEY_ACTION_DOWN, 0);
+                    LiSendKeyboardEvent2((short)comboKeyVk, KEY_ACTION_DOWN, 0, SS_KBE_FLAG_NON_NORMALIZED);
                     brls::delay(20, [mods, key = comboKeyVk]() {
-                        LiSendKeyboardEvent((short)key, KEY_ACTION_UP, 0);
+                        LiSendKeyboardEvent2((short)key, KEY_ACTION_UP, 0, SS_KBE_FLAG_NON_NORMALIZED);
                         for (auto it = mods.rbegin(); it != mods.rend(); ++it) {
-                            LiSendKeyboardEvent((short)*it, KEY_ACTION_UP, 0);
+                            LiSendKeyboardEvent2((short)*it, KEY_ACTION_UP, 0, SS_KBE_FLAG_NON_NORMALIZED);
                         }
                     });
                 }
@@ -1537,6 +1420,45 @@ void KeyboardOverlay::sendKeyByLabel(const std::string& label)
         codepoint = apply_shift_to_codepoint(codepoint);
     }
 
+    // Try VK code mapping first for better Linux compatibility
+    // (Sunshine on Linux uses an unreliable Ctrl+Shift+U hack for UTF-8 text)
+    // If forceUtf8Input is enabled (for Windows hosts), skip VK and go straight to UTF-8
+    if (!forceUtf8Input)
+    {
+        VkMapping mapping;
+        if (lookup_vk_mapping(static_cast<KeyboardLayout>(currentLayout), codepoint, mapping))
+        {
+            short vk                = mapping.vk;
+            bool shiftAlreadyActive = keyStates[0x10];
+            bool needShift          = mapping.needs_shift;
+            bool needAltGr          = mapping.needs_altgr;
+            bool ctrlAlreadyActive  = keyStates[0x11];
+            bool altAlreadyActive   = keyStates[0x12];
+            if (needShift && !shiftAlreadyActive)
+            {
+                keyStates[0x10] = true;
+            }
+            if (needAltGr)
+            {
+                keyStates[0x11] = true; // VK_CONTROL
+                keyStates[0x12] = true; // VK_MENU (Alt)
+            }
+            keyStates[vk] = true;
+            brls::delay(50, [this, vk, needShift, shiftAlreadyActive, needAltGr, ctrlAlreadyActive, altAlreadyActive]()
+                {
+                this->keyStates[vk] = false;
+                if (needShift && !shiftAlreadyActive) {
+                    this->keyStates[0x10] = false;
+                }
+                if (needAltGr) {
+                    if (!ctrlAlreadyActive) this->keyStates[0x11] = false;
+                    if (!altAlreadyActive) this->keyStates[0x12] = false;
+                } });
+            return;
+        }
+    }
+
+    // Fall back to UTF-8 text input (works well on Windows Sunshine)
     if (!send_utf8_codepoint(codepoint))
     {
         brls::Logger::info("[KeyboardOverlay] UTF-8 send failed for key: {}", label);

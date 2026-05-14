@@ -377,16 +377,18 @@ void ControllerInputManager::handleInput()
     {
         static KeyboardState oldKeyboardState;
         KeyboardState keyboardState = activeKeyboard->getKeyboardState();
+        const char kbFlags          = activeKeyboard->usesNonNormalizedVk() ? SS_KBE_FLAG_NON_NORMALIZED : 0;
 
         for (int i = 0; i < 256; ++i)
         {
             if (keyboardState.keys[i] != oldKeyboardState.keys[i])
             {
                 oldKeyboardState.keys[i] = keyboardState.keys[i];
-                LiSendKeyboardEvent(
+                LiSendKeyboardEvent2(
                     (short)i,
                     keyboardState.keys[i] ? KEY_ACTION_DOWN : KEY_ACTION_UP,
-                    0);
+                    0,
+                    kbFlags);
                 vita_debug_log("[ControllerInput] Keyboard VK 0x%02X -> %s",
                     i, keyboardState.keys[i] ? "DOWN" : "UP");
             }

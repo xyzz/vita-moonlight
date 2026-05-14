@@ -10,18 +10,19 @@
 #endif
 
 #include <string.h>
-#include <wchar.h>
 
 #include <cstdint>
 
 #include "ConfigManager.hpp"
 #include "Limelight.h"
-#include "controller/keyboard/keyboardkeys.hpp"
+#include "controller/keyboard/keyboard_utf8.hpp"
+#include "controller/keyboard/keyboardloader.hpp"
 #include "debug.hpp"
 
 #if defined(__PSV__) || defined(__psp2__) || defined(__PSP2__)
 
 static KeyboardLayout g_legacy_keyboard_layout = KB_LAYOUT_EN_US;
+static bool g_legacy_force_utf8                = false;
 
 static constexpr int IME_VIRTUAL_TEXT_LEN = 4;
 static uint8_t g_ime_work[SCE_IME_WORK_BUFFER_SIZE] __attribute__((aligned(16)));
@@ -43,41 +44,9 @@ enum PendingImeEvent : std::uint32_t
     PendingEventRight            = 1u << 4,
 };
 
-static bool send_utf8_text_char(wchar_t ch)
+static void send_vk_event(short keyCode, char action)
 {
-    if (ch <= 0)
-    {
-        return false;
-    }
-
-    char buf[4]        = { 0 };
-    int len            = 0;
-    std::uint32_t code = static_cast<std::uint32_t>(ch);
-
-    if (code <= 0x7F)
-    {
-        buf[0] = static_cast<char>(code);
-        len    = 1;
-    }
-    else if (code <= 0x7FF)
-    {
-        buf[0] = static_cast<char>(0xC0 | (code >> 6));
-        buf[1] = static_cast<char>(0x80 | (code & 0x3F));
-        len    = 2;
-    }
-    else if (code <= 0xFFFF)
-    {
-        buf[0] = static_cast<char>(0xE0 | (code >> 12));
-        buf[1] = static_cast<char>(0x80 | ((code >> 6) & 0x3F));
-        buf[2] = static_cast<char>(0x80 | (code & 0x3F));
-        len    = 3;
-    }
-    else
-    {
-        return false;
-    }
-
-    return LiSendUtf8TextEvent(buf, static_cast<unsigned int>(len)) == 0;
+    LiSendKeyboardEvent2(keyCode, action, 0, SS_KBE_FLAG_NON_NORMALIZED);
 }
 
 static void send_char_as_keypress(wchar_t ch)
@@ -89,25 +58,57 @@ static void send_char_as_keypress(wchar_t ch)
 
     if (ch == '\n' || ch == '\r')
     {
-        LiSendKeyboardEvent(0x0D, KEY_ACTION_DOWN, 0);
-        LiSendKeyboardEvent(0x0D, KEY_ACTION_UP, 0);
+        send_vk_event(0x0D, KEY_ACTION_DOWN);
+        send_vk_event(0x0D, KEY_ACTION_UP);
         return;
     }
     if (ch == '\t')
     {
-        LiSendKeyboardEvent(0x09, KEY_ACTION_DOWN, 0);
-        LiSendKeyboardEvent(0x09, KEY_ACTION_UP, 0);
+        send_vk_event(0x09, KEY_ACTION_DOWN);
+        send_vk_event(0x09, KEY_ACTION_UP);
         return;
     }
     if (ch == ' ')
     {
-        LiSendKeyboardEvent(0x20, KEY_ACTION_DOWN, 0);
-        LiSendKeyboardEvent(0x20, KEY_ACTION_UP, 0);
+        send_vk_event(0x20, KEY_ACTION_DOWN);
+        send_vk_event(0x20, KEY_ACTION_UP);
         return;
     }
 
-    // Prefer UTF-8 text input so host layout does not remap characters.
-    if (!send_utf8_text_char(ch))
+    // Try VK code mapping first for better Linux compatibility
+    // (Sunshine on Linux uses an unreliable Ctrl+Shift+U hack for UTF-8 text)
+    // If force UTF-8 is enabled (for Windows hosts), skip VK mapping
+    if (!g_legacy_force_utf8)
+    {
+        VkMapping mapping;
+        if (lookup_vk_mapping(g_legacy_keyboard_layout, static_cast<std::uint32_t>(ch), mapping))
+        {
+            if (mapping.needs_shift)
+            {
+                send_vk_event(0x10, KEY_ACTION_DOWN);
+            }
+            if (mapping.needs_altgr)
+            {
+                send_vk_event(0x11, KEY_ACTION_DOWN); // Ctrl
+                send_vk_event(0x12, KEY_ACTION_DOWN); // Alt
+            }
+            send_vk_event(mapping.vk, KEY_ACTION_DOWN);
+            send_vk_event(mapping.vk, KEY_ACTION_UP);
+            if (mapping.needs_altgr)
+            {
+                send_vk_event(0x12, KEY_ACTION_UP); // Alt
+                send_vk_event(0x11, KEY_ACTION_UP); // Ctrl
+            }
+            if (mapping.needs_shift)
+            {
+                send_vk_event(0x10, KEY_ACTION_UP);
+            }
+            return;
+        }
+    }
+
+    // Fall back to UTF-8 text input (works well on Windows Sunshine)
+    if (!send_utf8_codepoint(static_cast<std::uint32_t>(ch)))
     {
         vita_debug_log("[LegacyKB] UTF-8 text send failed for U+%04X", (unsigned)ch);
     }
@@ -115,8 +116,8 @@ static void send_char_as_keypress(wchar_t ch)
 
 static void send_backspace_keypress()
 {
-    LiSendKeyboardEvent(0x08, KEY_ACTION_DOWN, 0);
-    LiSendKeyboardEvent(0x08, KEY_ACTION_UP, 0);
+    send_vk_event(0x08, KEY_ACTION_DOWN);
+    send_vk_event(0x08, KEY_ACTION_UP);
 }
 
 static void reset_ime_virtual_text()
@@ -249,6 +250,7 @@ void LegacyKeyboard::open()
         config.load();
         VideoSettings vs         = config.getVideoSettings();
         g_legacy_keyboard_layout = static_cast<KeyboardLayout>(vs.keyboard_layout);
+        g_legacy_force_utf8      = vs.keyboard_input_mode;
     }
 
     g_ime_close_requested.store(false, std::memory_order_release);
@@ -345,20 +347,20 @@ void LegacyKeyboard::update()
 
     if ((pendingEvents & PendingEventEnter) != 0u)
     {
-        LiSendKeyboardEvent(0x0D, KEY_ACTION_DOWN, 0);
-        LiSendKeyboardEvent(0x0D, KEY_ACTION_UP, 0);
+        send_vk_event(0x0D, KEY_ACTION_DOWN);
+        send_vk_event(0x0D, KEY_ACTION_UP);
     }
 
     if ((pendingEvents & PendingEventLeft) != 0u)
     {
-        LiSendKeyboardEvent(0x25, KEY_ACTION_DOWN, 0);
-        LiSendKeyboardEvent(0x25, KEY_ACTION_UP, 0);
+        send_vk_event(0x25, KEY_ACTION_DOWN);
+        send_vk_event(0x25, KEY_ACTION_UP);
     }
 
     if ((pendingEvents & PendingEventRight) != 0u)
     {
-        LiSendKeyboardEvent(0x27, KEY_ACTION_DOWN, 0);
-        LiSendKeyboardEvent(0x27, KEY_ACTION_UP, 0);
+        send_vk_event(0x27, KEY_ACTION_DOWN);
+        send_vk_event(0x27, KEY_ACTION_UP);
     }
 
     if (pendingChar != 0u)

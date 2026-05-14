@@ -241,7 +241,14 @@
             "arrows_title": "Show arrow keys",
             "theme_preview_title": "Current Theme",
             "theme_editor_title": "Theme Editor",
-            "theme_info": "Custom keyboard themes will be available in a future update. You will be able to create and share your own keyboard designs!"
+            "theme_info": "Custom keyboard themes will be available in a future update. You will be able to create and share your own keyboard designs!",
+            "input_mode_title": "Keyboard input mode (UTF-8)",
+            "input_mode_utf8": "UTF-8 input enabled",
+            "input_mode_vk": "VK input enabled (default)",
+            "theme_default": "Default",
+            "theme_selection_future": "Theme selection coming in future update",
+            "theme_not_available": "Not available",
+            "theme_editor_future": "Theme editor coming in future update"
         },
         "shortcuts": {
             "title": "Shortcut Settings",

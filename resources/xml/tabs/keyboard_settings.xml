@@ -40,6 +40,12 @@
                 id="keyboard_layout_selector"
                 marginBottom="20"/>
 
+            <!-- Input Mode Toggle (VK vs UTF-8) -->
+            <brls:BooleanCell
+                id="keyboard_input_mode_toggle"
+                title="Force UTF-8 Text Input"
+                marginBottom="20"/>
+
             <!-- Modern Keyboard Options -->
             <brls:Header
                 id="keyboard_modern_header"

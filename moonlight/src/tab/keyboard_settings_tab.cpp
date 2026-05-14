@@ -76,8 +76,8 @@ KeyboardSettingsTab::KeyboardSettingsTab()
             updateLayoutVisibility(selected);
         });
 
-    // Keyboard Layout Selector
-    std::vector<std::string> keyboardLayouts = { "EN-US", "ES-ES", "ES-LATAM" };
+    // Keyboard Layout Selector (client on-screen keyboard display)
+    std::vector<std::string> keyboardLayouts = { "EN-US", "ES-ES", "ES-MX" };
     keyboardLayoutSelector->init(
         brls::getStr("moonlight/settings_tab/keyboard_layout/title"),
         keyboardLayouts,
@@ -92,6 +92,21 @@ KeyboardSettingsTab::KeyboardSettingsTab()
             cfg.save();
             brls::Application::notify(
                 brls::getStr("moonlight/settings_tab/keyboard_layout/saved"));
+        });
+
+    // Input Mode Toggle (force UTF-8 text input instead of VK codes)
+    keyboardInputModeToggle->init(
+        brls::getStr("moonlight/keyboard/input_mode_title"),
+        videoSettings.keyboard_input_mode,
+        [](bool value)
+        {
+            ConfigManager cfg;
+            cfg.load();
+            VideoSettings settings       = cfg.getVideoSettings();
+            settings.keyboard_input_mode = value;
+            cfg.setVideoSettings(settings);
+            cfg.save();
+            brls::Application::notify(value ? brls::getStr("moonlight/keyboard/input_mode_utf8") : brls::getStr("moonlight/keyboard/input_mode_vk"));
         });
 
     // Modern Keyboard Options
@@ -124,17 +139,17 @@ KeyboardSettingsTab::KeyboardSettingsTab()
     updateLayoutVisibility(videoSettings.keyboard_mode);
 
     // Theme Preview (placeholder - implementation future)
-    themePreviewCell->setDetailText("Default");
+    themePreviewCell->setDetailText(brls::getStr("moonlight/keyboard/theme_default"));
     themePreviewCell->registerClickAction([](brls::View* view)
         {
-        brls::Application::notify("Theme selection coming in future update");
+        brls::Application::notify(brls::getStr("moonlight/keyboard/theme_selection_future"));
         return true; });
 
     // Theme Editor (placeholder - implementation future)
-    themeEditorCell->setDetailText("Not available");
+    themeEditorCell->setDetailText(brls::getStr("moonlight/keyboard/theme_not_available"));
     themeEditorCell->registerClickAction([](brls::View* view)
         {
-        brls::Application::notify("Theme editor coming in future update");
+        brls::Application::notify(brls::getStr("moonlight/keyboard/theme_editor_future"));
         return true; });
 }
 

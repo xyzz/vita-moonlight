@@ -5,6 +5,8 @@
 */
 #pragma once
 
+#include <memory>
+
 #include "GameStreamClient.hpp" // Para RemoteAppInfo
 #include "borealis.hpp"
 #include "model/HostStorage.hpp"
@@ -44,5 +46,9 @@ class SessionAppSelect : public brls::Box
     bool moonmicNotified       = false;
     bool moonmicLastStatus     = false;
     // Resolution prompt (displayed when entering the host, not when launching the app)
+    // Resolution prompt (displayed when entering the host, not when launching the app)
     bool resolutionPromptShown = false;
+
+    // Track if view is still alive to prevent async callbacks from accessing destroyed 'this'
+    std::shared_ptr<bool> isAlive;
 };

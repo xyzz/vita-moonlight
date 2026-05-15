@@ -124,6 +124,7 @@ SessionAppSelect::SessionAppSelect(const std::string& hostName)
     : brls::Box(brls::Axis::COLUMN)
     , host()
 {
+    this->isAlive = std::make_shared<bool>(true);
     brls::Logger::info("View: SessionAppSelect para host: %s", hostName.c_str());
 
     // Find the real host by name
@@ -163,12 +164,14 @@ SessionAppSelect::SessionAppSelect(const std::string& hostName)
 
     // Check if an active session exists — delegating logic to GameStreamClient
     HostInfo hostCopy = this->host;
-    brls::async([this, hostCopy]() mutable
+    auto isAliveCopy  = this->isAlive;
+    brls::async([this, hostCopy, isAliveCopy]() mutable
         {
         RemoteAppInfo running;
         bool active = GameStreamClient::instance().probeActiveSession(hostCopy, running);
         if (active) {
-            brls::sync([this, running, hostCopy]() {
+            brls::sync([this, running, hostCopy, isAliveCopy]() {
+                if (!*isAliveCopy) return;
                 // If the view has already decided to suppress the dialog (for example the
                 // user pressed Resume before this check finished),
                 // we avoid showing it again.
@@ -266,18 +269,19 @@ SessionAppSelect::SessionAppSelect(const std::string& hostName)
 
                 // repairBtn removed: pairing via this dialog no longer exposed here.
 
-                newBtn->registerClickAction([this, running, dialog, hostCopy](brls::View*) -> bool {
+                newBtn->registerClickAction([this, running, dialog, hostCopy, isAliveCopy](brls::View*) -> bool {
                     dialog->dismiss();
                     // Prevent the active session dialog from reappearing
                     this->suppressActiveDialog = true;
                     auto* waitDlg = createLoadingDialog(brls::getStr("moonlight/session/app_select/ending_session"));
-                    std::thread([hostCopy, this, waitDlg]() mutable {
+                    std::thread([hostCopy, this, waitDlg, isAliveCopy]() mutable {
                         brls::Logger::info("[SessionAppSelect] Enviando quitApp para {} antes de mostrar apps", hostCopy.ip);
                         if (!GameStreamClient::instance().isConnected(hostCopy.ip)) {
                             GameStreamClient::instance().connect(hostCopy);
                         }
                         bool ok = GameStreamClient::instance().quitApp(hostCopy.ip);
-                        brls::sync([this, ok, waitDlg]() {
+                        brls::sync([this, ok, waitDlg, isAliveCopy]() {
+                            if (!*isAliveCopy) return;
                             if (waitDlg) waitDlg->close();
                             if (!ok) {
                                 brls::Application::notify(brls::getStr("moonlight/session/app_select/error_end_session"));
@@ -290,7 +294,8 @@ SessionAppSelect::SessionAppSelect(const std::string& hostName)
             });
         } else {
             // If probeActiveSession returned false, we do not show mismatch dialog here.
-            brls::sync([this]() {
+            brls::sync([this, isAliveCopy]() {
+                if (!*isAliveCopy) return;
                 this->populateAppList();
             });
         } });
@@ -298,6 +303,7 @@ SessionAppSelect::SessionAppSelect(const std::string& hostName)
 
 SessionAppSelect::~SessionAppSelect()
 {
+    *this->isAlive = false;
     // The view destructor is responsible for freeing the children (gridView, spinner, etc.)
     // Clear the global flag so that the next entry to the host can show the dialog again.
     try
@@ -338,9 +344,12 @@ void SessionAppSelect::populateAppList()
         VideoSettings vs       = cfg.getVideoSettings();
         StreamConfiguration sc = cfg.getStreamConfig();
 
+        auto isAliveCopy = this->isAlive;
         moonmic::PrepCallbacks callbacks;
-        callbacks.onStart = [this]()
+        callbacks.onStart = [this, isAliveCopy]()
         {
+            if (!*isAliveCopy)
+                return;
             sunshineCheckInFlight = true;
             if (spinner)
                 spinner->setVisibility(brls::Visibility::VISIBLE);
@@ -350,8 +359,10 @@ void SessionAppSelect::populateAppList()
                 app_select_empty->setVisibility(brls::Visibility::GONE);
         };
 
-        callbacks.onDone = [this](bool ok)
+        callbacks.onDone = [this, isAliveCopy](bool ok)
         {
+            if (!*isAliveCopy)
+                return;
             sunshineCheckInFlight = false;
             if (!ok)
             {
@@ -385,8 +396,10 @@ void SessionAppSelect::populateAppList()
             this->populateAppList();
         };
 
-        callbacks.onCancel = [this]()
+        callbacks.onCancel = [this, isAliveCopy]()
         {
+            if (!*isAliveCopy)
+                return;
             sunshineCheckInFlight = false;
             brls::Application::notify(brls::getStr("moonlight/session/app_select/error_start_app"));
             brls::Application::popActivity();
@@ -416,7 +429,8 @@ void SessionAppSelect::populateAppList()
         return;
     }
 
-    brls::async([this]()
+    auto isAliveCopy = this->isAlive;
+    brls::async([this, isAliveCopy]()
         {
     brls::Logger::info("[SessionAppSelect] Llamando a GameStreamClient::getAppList para host: {} (ip: {})", host.name, host.ip);
     std::vector<RemoteAppInfo> apps;
@@ -425,7 +439,8 @@ void SessionAppSelect::populateAppList()
         for (const auto& app : apps) {
             brls::Logger::info("[SessionAppSelect] App recibida: id='{}', name='{}', iconUrl='{}'", app.id, app.name, app.iconUrl);
         }
-        brls::sync([this, apps]() {
+        brls::sync([this, apps, isAliveCopy]() {
+            if (!*isAliveCopy) return;
             if (spinner) spinner->setVisibility(brls::Visibility::GONE);
             if (apps.empty()) {
                 brls::Logger::info("[SessionAppSelect] No se encontraron aplicaciones en este host.");
@@ -453,8 +468,9 @@ void SessionAppSelect::populateAppList()
                 gridView->setVisibility(brls::Visibility::VISIBLE);
 
                 // Give focus to the first element after a short delay
-                brls::async([this]() {
-                    brls::sync([this]() {
+                brls::async([this, isAliveCopy]() {
+                    brls::sync([this, isAliveCopy]() {
+                        if (!*isAliveCopy) return;
                         // Try to give focus to the GridView first
                         if (gridView) {
                             brls::Application::giveFocus(gridView);
@@ -576,12 +592,17 @@ void SessionAppSelect::AppSelected(const RemoteAppInfo& app, bool forceStart)
         HostInfo hostCopy            = this->host;
         RemoteAppInfo appCopy        = app;
         STREAM_CONFIGURATION cfgCopy = streamConfig;
-        std::thread([hostCopy, appCopy, cfgCopy, loadingDialog, this, prevGridVis, forceStart]() mutable
+        auto isAliveCopy             = this->isAlive;
+        std::thread([hostCopy, appCopy, cfgCopy, loadingDialog, this, prevGridVis, forceStart, isAliveCopy]() mutable
             {
         brls::Logger::info("[SessionAppSelect][async] Iniciando conexión en hilo de fondo para {}", hostCopy.ip);
         bool connected = GameStreamClient::instance().connect(hostCopy);
         // Update UI in main thread
-        brls::sync([connected, hostCopy, appCopy, cfgCopy, loadingDialog, prevGridVis, forceStart, this]() mutable {
+        brls::sync([connected, hostCopy, appCopy, cfgCopy, loadingDialog, prevGridVis, forceStart, this, isAliveCopy]() mutable {
+            if (!*isAliveCopy) {
+                if (loadingDialog) { loadingDialog->close(); loadingDialog = nullptr; }
+                return;
+            }
             // Note: we do not immediately close the 'connecting' dialog if
             // we are connected — we will reuse it by changing its text to
             // 'starting'. We only close if the connection failed.
@@ -612,7 +633,7 @@ void SessionAppSelect::AppSelected(const RemoteAppInfo& app, bool forceStart)
             // We continue with startApp.
 
             // Run startApp and VitaSession in a thread to not block UI
-            std::thread([hostCopy, appCopy, cfgCopy, loadingDialog, this, prevGridVis, forceStart]() mutable {
+            std::thread([hostCopy, appCopy, cfgCopy, loadingDialog, this, prevGridVis, forceStart, isAliveCopy]() mutable {
                 bool started = false;
                 if (forceStart) {
                     // If forced (Resume), try explicit resume
@@ -621,7 +642,11 @@ void SessionAppSelect::AppSelected(const RemoteAppInfo& app, bool forceStart)
                     // Normal: allow auto behavior (resume or launch depending on server)
                     started = GameStreamClient::instance().startApp(hostCopy.ip, cfgCopy, std::stoi(appCopy.id), GameStreamClient::StartMode::AUTO);
                 }
-                brls::sync([started, hostCopy, appCopy, loadingDialog, this, prevGridVis]() {
+                brls::sync([started, hostCopy, appCopy, loadingDialog, this, prevGridVis, isAliveCopy]() {
+                    if (!*isAliveCopy) {
+                        if (loadingDialog) { loadingDialog->close(); }
+                        return;
+                    }
                     if (loadingDialog) loadingDialog->close();
                     // Restore inputs and GridView uniformly using helper
                     this->restoreGridViewAndInputs(prevGridVis);

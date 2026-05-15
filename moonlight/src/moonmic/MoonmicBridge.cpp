@@ -223,8 +223,8 @@ MoonmicBridge::HandshakeResult MoonmicBridge::sendResolutionHandshake(const std:
 
     // Set receive timeout (more reliable than poll() on PS Vita)
     struct timeval tv;
-    tv.tv_sec  = 1; // 1 second timeout
-    tv.tv_usec = 0;
+    tv.tv_sec  = 0;
+    tv.tv_usec = 200000; // 200ms timeout
     if (setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) < 0)
     {
         brls::Logger::warning("[MoonmicBridge] Failed to set SO_RCVTIMEO (non-fatal)");
@@ -272,7 +272,7 @@ MoonmicBridge::HandshakeResult MoonmicBridge::sendResolutionHandshake(const std:
     while (true)
     {
         auto now = std::chrono::steady_clock::now();
-        if (std::chrono::duration_cast<std::chrono::milliseconds>(now - start_time).count() > 2000)
+        if (std::chrono::duration_cast<std::chrono::milliseconds>(now - start_time).count() > 300)
         {
             brls::Logger::info("[MoonmicBridge] Handshake timed out after loop");
             break;

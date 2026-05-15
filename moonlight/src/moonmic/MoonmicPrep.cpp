@@ -100,8 +100,8 @@ namespace
     }
 
     bool success = false;
-    // Initial handshake attempt
-    for (int i = 0; i < 3 && !success; ++i) {
+    // Single fast handshake attempt
+    for (int i = 0; i < 1 && !success; ++i) {
         auto result = bridge.sendResolutionHandshake(micHost, micPort, false);
         success = result.success;
 
@@ -164,12 +164,10 @@ namespace
                 });
                 return; // EXIT ASYNC THREAD - Wait for user interaction
             }
-        } else {
-             std::this_thread::sleep_for(std::chrono::milliseconds(400));
         }
     }
 
-    // If we are here, either success+no mismatch, or failed 3 times
+    // If we are here, either success+no mismatch, or failed 1 time
     // In either case, we proceed to wait for apps (if success) or fail (if !success)
 
     if (success) {

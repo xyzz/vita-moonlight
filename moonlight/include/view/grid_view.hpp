@@ -16,6 +16,8 @@ class GridView : public brls::Box
 
     void setItems(const std::vector<std::string>& names, const std::vector<std::string>& icons = {});
 
+    void setItemIcon(int index, const std::string& iconPath);
+
     void setOnItemSelect(ItemSelectCallback cb);
 
     void setColumns(int cols) { this->columns = cols; }

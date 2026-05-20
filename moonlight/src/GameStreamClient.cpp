@@ -85,13 +85,13 @@ bool GameStreamClient::connect(const HostInfo& host)
                 candidates.push_back(base + "/" + makeSafeHostId(shortName));
             }
         }
-        // 3. Raw IP address
+        // 3. Cruda IP
         if (!h.ip.empty())
             candidates.push_back(base + "/" + h.ip);
-        // 4. safeId derived from the IP address
+        // 4. generated safeId from IP
         if (!h.ip.empty())
             candidates.push_back(base + "/" + makeSafeHostId(h.ip));
-        // Use the first directory containing device.ini
+        // The first one that contains device.ini we use it
         for (auto& c : candidates)
         {
             struct stat st {};
@@ -200,7 +200,7 @@ SERVER_DATA& GameStreamClient::serverData(const std::string& address)
     if (m_server_data.count(address) == 0)
     {
         brls::Logger::error("[GameStreamClient] No hay datos para servidor {}", address);
-        // Return an empty result when the host is unknown
+        // This should be handled better, but for now we will return an invalid reference
         static SERVER_DATA empty;
         return empty;
     }
@@ -244,7 +244,9 @@ bool GameStreamClient::startApp(const std::string& address, STREAM_CONFIGURATION
         }
     }
 
-    // Avoid reopening the active-session dialog during a user-requested resume.
+    // If we are attempting a summary requested by the user, mark it so that
+    // probeActiveSession do not show the "Active Session" dialog again
+    // while the resume attempt is in progress.
     bool markedResume = false;
     if (mode == StartMode::RESUME_ONLY)
     {
@@ -389,7 +391,7 @@ bool GameStreamClient::pair(const std::string& address, const std::string& pin)
     // running" if the server actually has an active session. Now
     // we keep the value provided by the server.
     // Invalidate applist cache for this host: after pairing we want to force
-    // Fetch the latest app list from the server on the next request.
+    // The next app fetch asks the server for the current list.
     if (m_app_lists.count(address) > 0)
         m_app_lists.erase(address);
     // If after the pair the server provided us with a valid MAC, update device.ini
@@ -472,7 +474,7 @@ bool GameStreamClient::beginPairing(const HostInfo& host, std::function<void(boo
             // Try to use the exact keyDir where device.ini exists to check
             // if the server recognizes the pairing. This reproduces the
             // Moonlight-Switch behavior: use the same keyDir as
-            // contains device.ini rather than letting connect() select another
+            // contains device.ini instead of letting connect() resolve another
             // candidate (avoids mismatches between device.ini and certs/uniqueid).
             std::string foundKeyDir;
             for (auto& c : candidates)
@@ -796,6 +798,22 @@ void GameStreamClient::getAppList(const std::string& address, AppListCallback ca
     m_app_lists[address] = apps;
 
     callback(apps);
+}
+
+bool GameStreamClient::getAppBoxart(const std::string& address, int appId, Data& outData)
+{
+    if (m_server_data.count(address) == 0)
+    {
+        brls::Logger::error("[GameStreamClient] getAppBoxart: no conectado a {}", address);
+        return false;
+    }
+    int status = gs_app_boxart(&m_server_data[address], appId, &outData);
+    if (status != GS_OK)
+    {
+        brls::Logger::warning("[GameStreamClient] gs_app_boxart falló para appId={} con status={}", appId, status);
+        return false;
+    }
+    return true;
 }
 
 bool GameStreamClient::quitApp(const std::string& address)

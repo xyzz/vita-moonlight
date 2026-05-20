@@ -51,14 +51,26 @@ PCCard::PCCard(const std::string& name, const std::string& imagePath)
     // Make the card focusable so navigation selects the card (restore selection UX)
     this->setFocusable(true);
 
-    image                 = new brls::Image();
-    std::string fixedPath = (imagePath == "resources/img/moonlight/pc.png") ? "img/moonlight/pc.png" : imagePath;
-    // Load image immediately (fixed path already calculated above)
-    image->setImageFromRes(fixedPath);
-    image->setWidth(48);
-    image->setHeight(48);
-    image->setMarginTop(20);
-    image->setMarginBottom(18); // Extra separation between image and text
+    image           = new brls::Image();
+    bool isExternal = (imagePath.rfind("ux0:", 0) == 0 || imagePath.rfind("/", 0) == 0 || imagePath.rfind("cache/", 0) == 0);
+    if (isExternal)
+    {
+        image->setImageFromFile(imagePath);
+        image->setWidth(140);
+        image->setHeight(80);
+        image->setScalingType(brls::ImageScalingType::FIT);
+        image->setMarginTop(10);
+        image->setMarginBottom(10);
+    }
+    else
+    {
+        std::string fixedPath = (imagePath == "resources/img/moonlight/pc.png") ? "img/moonlight/pc.png" : imagePath;
+        image->setImageFromRes(fixedPath);
+        image->setWidth(48);
+        image->setHeight(48);
+        image->setMarginTop(20);
+        image->setMarginBottom(18); // Extra separation between image and text
+    }
     box->addView(image);
 
     label = new brls::Label();
@@ -136,8 +148,25 @@ void PCCard::setPCImage(const std::string& imagePath)
             image->setVisibility(brls::Visibility::GONE);
             return;
         }
-        std::string fixedPath = (imagePath == "resources/img/moonlight/pc.png") ? "img/moonlight/pc.png" : imagePath;
-        image->setImageFromRes(fixedPath);
+        bool isExternal = (imagePath.rfind("ux0:", 0) == 0 || imagePath.rfind("/", 0) == 0 || imagePath.rfind("cache/", 0) == 0);
+        if (isExternal)
+        {
+            image->setImageFromFile(imagePath);
+            image->setWidth(140);
+            image->setHeight(80);
+            image->setScalingType(brls::ImageScalingType::FIT);
+            image->setMarginTop(10);
+            image->setMarginBottom(10);
+        }
+        else
+        {
+            std::string fixedPath = (imagePath == "resources/img/moonlight/pc.png") ? "img/moonlight/pc.png" : imagePath;
+            image->setImageFromRes(fixedPath);
+            image->setWidth(48);
+            image->setHeight(48);
+            image->setMarginTop(20);
+            image->setMarginBottom(18);
+        }
         image->setVisibility(brls::Visibility::VISIBLE);
     }
 }

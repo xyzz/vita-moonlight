@@ -453,9 +453,27 @@ void SessionAppSelect::populateAppList()
 
             std::vector<std::string> appNames;
             std::vector<std::string> appIcons;
-            for (const auto& app : apps) {
+            std::vector<int> appsToDownload;
+
+            std::string cacheDir = "ux0:data/moonlight/cache";
+#ifndef __PSV__
+            cacheDir = "cache";
+#endif
+            // Ensure the cache directory exists
+            mkdir(cacheDir.c_str(), 0777);
+
+            for (size_t i = 0; i < apps.size(); ++i) {
+                const auto& app = apps[i];
                 appNames.push_back(app.name);
-                appIcons.push_back("img/moonlight/pc.png");  // Generic icon for now
+
+                std::string cachePath = cacheDir + "/boxart_" + app.id + ".png";
+                struct stat st;
+                if (stat(cachePath.c_str(), &st) == 0 && st.st_size > 0) {
+                    appIcons.push_back(cachePath);
+                } else {
+                    appIcons.push_back("img/moonlight/pc.png");
+                    appsToDownload.push_back(i);
+                }
             }
 
             if (gridView) {
@@ -466,6 +484,48 @@ void SessionAppSelect::populateAppList()
                     }
                 });
                 gridView->setVisibility(brls::Visibility::VISIBLE);
+
+                // Start downloading missing icons asynchronously in a single background thread
+                if (!appsToDownload.empty()) {
+                    std::string hostIp = this->host.ip;
+                    auto isAliveCopy = this->isAlive;
+                    auto gridViewCopy = this->gridView;
+
+                    std::thread([isAliveCopy, gridViewCopy, apps, appsToDownload, hostIp, cacheDir]() {
+                        for (int idx : appsToDownload) {
+                            if (!*isAliveCopy) break;
+
+                            const auto& app = apps[idx];
+                            int appId = 0;
+                            try {
+                                appId = std::stoi(app.id);
+                            } catch (...) {
+                                continue;
+                            }
+
+                            brls::Logger::info("[SessionAppSelect] Descargando boxart para App: {} (ID: {})", app.name, appId);
+                            Data boxartData;
+                            bool ok = GameStreamClient::instance().getAppBoxart(hostIp, appId, boxartData);
+                            if (ok && boxartData.size() > 0) {
+                                std::string cachePath = cacheDir + "/boxart_" + app.id + ".png";
+                                boxartData.write_to_file(cachePath);
+                                brls::Logger::info("[SessionAppSelect] Boxart guardado en: {}", cachePath);
+
+                                brls::sync([isAliveCopy, gridViewCopy, idx, cachePath]() {
+                                    if (!*isAliveCopy) return;
+                                    if (gridViewCopy) {
+                                        gridViewCopy->setItemIcon(idx, cachePath);
+                                    }
+                                });
+                            } else {
+                                brls::Logger::warning("[SessionAppSelect] Fallo al descargar boxart para App: {} (ID: {})", app.name, appId);
+                            }
+
+                            // Prevent flooding the network/server
+                            std::this_thread::sleep_for(std::chrono::milliseconds(50));
+                        }
+                    }).detach();
+                }
 
                 // Give focus to the first element after a short delay
                 brls::async([this, isAliveCopy]() {

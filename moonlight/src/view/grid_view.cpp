@@ -29,6 +29,18 @@ void GridView::setOnItemSelect(ItemSelectCallback cb)
     this->onItemSelect = cb;
 }
 
+void GridView::setItemIcon(int index, const std::string& iconPath)
+{
+    if (index >= 0 && index < (int)itemViews.size())
+    {
+        PCCard* card = dynamic_cast<PCCard*>(itemViews[index]);
+        if (card)
+        {
+            card->setPCImage(iconPath);
+        }
+    }
+}
+
 void GridView::reload()
 {
     brls::Logger::info("[GridView] reload llamado, itemNames.size()={}", itemNames.size());

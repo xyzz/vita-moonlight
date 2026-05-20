@@ -65,6 +65,8 @@ class GameStreamClient
 
     void getAppList(const std::string& address, AppListCallback callback);
 
+    bool getAppBoxart(const std::string& address, int appId, Data& outData);
+
     bool quitApp(const std::string& address);
 
     void setActiveStream(const std::string& address, int appId, const std::string& appName);
@@ -86,7 +88,7 @@ class GameStreamClient
     bool parseSunshineCurrentGame(const std::string& response, int& outCurrentGame);
 
     std::map<std::string, SERVER_DATA> m_server_data;
-    std::map<std::string, STREAM_CONFIGURATION> m_last_stream_cfg; // address -> last stream configuration
+    std::map<std::string, STREAM_CONFIGURATION> m_last_stream_cfg; // address -> last released config
     std::map<std::string, std::vector<RemoteAppInfo>> m_app_lists;
     std::map<std::string, std::string> m_key_dirs; // address -> keyDir usado en gs_init
     struct ActiveStream

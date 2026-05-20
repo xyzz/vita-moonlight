@@ -2,7 +2,7 @@
 set -e
 
 PROJECT_ROOT=$(pwd)
-HOST_SOURCE_DIR="$PROJECT_ROOT/third_party/libmoonmic/host"
+HOST_SOURCE_DIR="$PROJECT_ROOT/third_party/moonmic/host"
 OUTPUT_DIR="$PROJECT_ROOT/cmake-build-psv/host"
 
 install_deps() {
@@ -63,16 +63,16 @@ unset CMAKE_TOOLCHAIN_FILE
 echo "=== Building MoonMic Host Applications ==="
 
 echo "--- Building for Linux ---"
-mkdir -p "$PROJECT_ROOT/cmake-build-psv/third_party/libmoonmic/build-linux"
-cd "$PROJECT_ROOT/cmake-build-psv/third_party/libmoonmic/build-linux"
+mkdir -p "$PROJECT_ROOT/cmake-build-psv/third_party/moonmic/build-linux"
+cd "$PROJECT_ROOT/cmake-build-psv/third_party/moonmic/build-linux"
 cmake "${HOST_SOURCE_DIR}" -DCMAKE_BUILD_TYPE=Release -DHOST_TARGET_LINUX=ON -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++ -DCMAKE_TOOLCHAIN_FILE=""
 make -j$(nproc)
 cp moonmic-host "$OUTPUT_DIR/linux/"
 echo "Linux build complete: $OUTPUT_DIR/linux/moonmic-host"
 
 echo "--- Building for Windows (MinGW) ---"
-mkdir -p "$PROJECT_ROOT/cmake-build-psv/third_party/libmoonmic/build-windows"
-cd "$PROJECT_ROOT/cmake-build-psv/third_party/libmoonmic/build-windows"
+mkdir -p "$PROJECT_ROOT/cmake-build-psv/third_party/moonmic/build-windows"
+cd "$PROJECT_ROOT/cmake-build-psv/third_party/moonmic/build-windows"
 
 # Crear archivo toolchain temporal
 cat > toolchain-mingw.cmake <<EOF

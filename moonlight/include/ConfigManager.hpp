@@ -8,7 +8,7 @@
 #include <string>
 #include <unordered_map>
 
-#include "../../third_party/libmoonmic/moonmic.h" // For MOONMIC_DEFAULT_* constants
+#include "../../third_party/moonmic/moonmic.h" // For MOONMIC_DEFAULT_* constants
 #include "controller/input_types.hpp"
 #include "controller/special_inputs.hpp"
 

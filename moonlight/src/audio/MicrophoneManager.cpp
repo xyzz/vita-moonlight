@@ -164,7 +164,6 @@ bool MicrophoneManager::startInternal()
     bridge.loadConfig(); // Force reload from device.ini to pick up any changes
     auto [target_width, target_height] = bridge.getTargetResolution();
 
-    // Configure libmoonmic
     moonmic_config_t config = {
         .host_ip     = host_ip_.c_str(),
         .port        = static_cast<uint16_t>(port_),
@@ -245,7 +244,7 @@ void MicrophoneManager::errorCallback(const char* error, void* userData)
         mgr->last_error_ = error ? error : "Unknown error";
     }
 
-    brls::Logger::error("[MicrophoneManager] libmoonmic error: {}",
+    brls::Logger::error("[MicrophoneManager] moonmic error: {}",
         error ? error : "Unknown error");
 }
 

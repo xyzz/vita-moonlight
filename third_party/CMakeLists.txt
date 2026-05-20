@@ -29,8 +29,11 @@ add_subdirectory(borealis/library)
 # gamestream static library
 add_subdirectory(gamestream)
 
-# libmoonmic - Microphone capture and transmission library
-add_subdirectory(libmoonmic)
+# moonmic - Microphone capture and transmission library
+add_subdirectory(moonmic)
+
+# moonbeam - Connection diagnostic tester library
+add_subdirectory(moonbeam)
 
 # mdnsniff portable library (Vita y Windows)
 add_library(mdnsniff STATIC

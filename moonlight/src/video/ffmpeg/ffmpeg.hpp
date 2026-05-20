@@ -70,6 +70,7 @@ extern "C"
 
     // Callbacks para Limelight
     DECODER_RENDERER_CALLBACKS get_ffmpeg_video_callbacks(void);
+    void ffmpeg_process_deferred_releases(void);
 
     void ffmpeg_video_set_render_mode(FFmpegVideoContext* context, const char* mode);
     const char* ffmpeg_video_get_render_mode(FFmpegVideoContext* context);

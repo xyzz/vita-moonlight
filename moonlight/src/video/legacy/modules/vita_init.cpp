@@ -304,10 +304,10 @@ extern "C" int vitavideo_setup(int videoFormat, int width, int height, int redra
         {
             // Create new textures at stream resolution using direct GXM allocation
             uint32_t decoderPixelType         = (decoder_output_mode == 1)
-                        ? SCE_AVCDEC_PIXELFORMAT_YUV420_RASTER
+                        ? SCE_AVCDEC_PIXELFORMAT_YUV420_PACKED_RASTER
                         : SCE_AVCDEC_PIXELFORMAT_RGBA8888;
             SceGxmTextureFormat textureFormat = SCE_GXM_TEXTURE_FORMAT_A8B8G8R8;
-            if (decoderPixelType == SCE_AVCDEC_PIXELFORMAT_YUV420_RASTER)
+            if (decoderPixelType == SCE_AVCDEC_PIXELFORMAT_YUV420_PACKED_RASTER)
             {
                 textureFormat = SCE_GXM_TEXTURE_FORMAT_YVU420P2_CSC0;
             }

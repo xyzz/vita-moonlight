@@ -301,10 +301,11 @@ VideoSettings ConfigManager::getVideoSettings() const
     settings.keyboard_input_mode          = get("video", "keyboard_input_mode", "false") == "true";
     settings.keyboard_numbers_row         = get("video", "keyboard_numbers_row", "true") == "true";
     settings.keyboard_show_arrows         = get("video", "keyboard_show_arrows", "true") == "true";
-    settings.render_mode                  = std::stoi(get("video", "render_mode", "0"));
-    settings.pixel_format_mode            = std::stoi(get("video", "pixel_format_mode", "0"));
+    settings.render_mode                  = std::stoi(get("video", "render_mode", "1"));
+    settings.pixel_format_mode            = std::stoi(get("video", "pixel_format_mode", "1"));
     settings.gamepad_type                 = static_cast<GamepadType>(std::stoi(get("video", "gamepad_type", "0")));
     settings.swap_shoulder_buttons        = get("video", "swap_shoulder_buttons", "false") == "true";
+    settings.swap_interval                = std::stoi(get("video", "swap_interval", "0"));
 
     // Trackpad Settings
     settings.trackpad_pointer_speed          = std::stoi(get("trackpad", "pointer_speed", "100"));
@@ -413,6 +414,7 @@ void ConfigManager::setVideoSettings(const VideoSettings& settings)
     set("video", "pixel_format_mode", std::to_string(settings.pixel_format_mode));
     set("video", "gamepad_type", std::to_string(static_cast<int>(settings.gamepad_type)));
     set("video", "swap_shoulder_buttons", settings.swap_shoulder_buttons ? "true" : "false");
+    set("video", "swap_interval", std::to_string(settings.swap_interval));
 
     // Trackpad Settings
     set("trackpad", "pointer_speed", std::to_string(settings.trackpad_pointer_speed));

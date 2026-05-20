@@ -70,6 +70,26 @@ SettingsTab::SettingsTab()
     StreamConfiguration streamConfig = config.getStreamConfig();
     VideoSettings videoSettings      = config.getVideoSettings();
 
+    // Auto-synchronize correct format settings on startup
+    bool configChanged = false;
+    if (videoSettings.render_mode == 0 && videoSettings.pixel_format_mode != 0)
+    {
+        videoSettings.pixel_format_mode = 0;
+        configChanged                   = true;
+    }
+    else if (videoSettings.render_mode == 1 && videoSettings.pixel_format_mode != 1)
+    {
+        videoSettings.pixel_format_mode = 1;
+        configChanged                   = true;
+    }
+    if (configChanged)
+    {
+        config.setVideoSettings(videoSettings);
+        config.save();
+    }
+    extern VideoSettings g_video_settings_snapshot;
+    g_video_settings_snapshot.pixel_format_mode = videoSettings.pixel_format_mode;
+
     // Initialize global flag for debug logs
     extern bool g_debug_log_enabled;
     g_debug_log_enabled = videoSettings.save_debug_log;
@@ -85,15 +105,12 @@ SettingsTab::SettingsTab()
 #endif
     auto updateModeDependentVisibility = [this](int renderMode, bool persistReset)
     {
-        bool legacyMode = (renderMode == 0);
-        bool modernMode = (renderMode == 1);
+        (void)renderMode;
         (void)persistReset;
 
         if (pixelFormatSelector)
         {
-            bool showPixelFormat = (legacyMode || modernMode);
-            pixelFormatSelector->setVisibility(showPixelFormat ? brls::Visibility::VISIBLE : brls::Visibility::GONE);
-            brls::Logger::debug("[SettingsTab] pixel_format visibility mode={} show={}", renderMode, showPixelFormat ? 1 : 0);
+            pixelFormatSelector->setVisibility(brls::Visibility::GONE);
         }
     };
 
@@ -114,6 +131,11 @@ SettingsTab::SettingsTab()
         int chosen = selected; // allow modern/ffmpeg
 #endif
         settings.render_mode = chosen; // 0=legacy,1=ffmpeg
+        if (chosen == 0) {
+            settings.pixel_format_mode = 0; // Legacy uses RGBA
+        } else if (chosen == 1) {
+            settings.pixel_format_mode = 1; // FFmpeg uses YUV
+        }
         config.setVideoSettings(settings);
         config.save();
         // Update atomic cache without subsequent re-reading
@@ -121,6 +143,7 @@ SettingsTab::SettingsTab()
         updateModeDependentVisibility(chosen, true);
         extern VideoSettings g_video_settings_snapshot;
         g_video_settings_snapshot.render_mode = chosen;
+        g_video_settings_snapshot.pixel_format_mode = settings.pixel_format_mode;
         // Also update available resolution options depending on render mode
     // Legacy mode (0) only exposes resolutions <= 1280x720. FFmpeg (modern) exposes all.
     auto updateResOptions = [this, filteredIndicesPtr](int mode, const StreamConfiguration& sc) {
@@ -801,10 +824,22 @@ SettingsTab::SettingsTab()
         brls::getStr("moonlight/settings_tab/swap_interval/options/3"),
         brls::getStr("moonlight/settings_tab/swap_interval/options/4")
     };
-    int currentSwapInterval = 1; // Default: V-Sync ON (60 FPS)
+    int currentSwapInterval = videoSettings.swap_interval;
+    if (currentSwapInterval < 0 || currentSwapInterval > 4)
+        currentSwapInterval = 1;
     swapInterval->init(brls::getStr("moonlight/settings_tab/swap_interval/title"), swapIntervalOptions, currentSwapInterval, [](int selected)
         {
         if (selected >= 0 && selected <= 4) {
+            ConfigManager config;
+            config.load();
+            VideoSettings settings = config.getVideoSettings();
+            settings.swap_interval = selected;
+            config.setVideoSettings(settings);
+            config.save();
+
+            extern VideoSettings g_video_settings_snapshot;
+            g_video_settings_snapshot.swap_interval = selected;
+
             brls::Application::setSwapInterval(selected);
             brls::Application::notify(brls::getStr("moonlight/settings_tab/swap_interval/saved"));
         } });

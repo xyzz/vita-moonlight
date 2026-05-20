@@ -40,21 +40,19 @@ void GyroManager::update()
     if (!initialized || !sensorAvailable)
         return;
 
-    ConfigManager cfg;
-    cfg.load();
-    VideoSettings settings = cfg.getVideoSettings();
-
-    if (!settings.enable_motion_controls)
-    {
-        return;
-    }
-
     // Rate limit sends to ~125Hz by default (matches input polling)
     const uint64_t now           = nowUs();
     const uint64_t minIntervalUs = 8000; // 125Hz
     if (lastSendUs != 0 && (now - lastSendUs) < minIntervalUs)
         return;
 
+    extern ::VideoSettings g_video_settings_snapshot;
+    if (!g_video_settings_snapshot.enable_motion_controls)
+    {
+        return;
+    }
+
+    const ::VideoSettings& settings = g_video_settings_snapshot;
     float gx = 0.0f, gy = 0.0f, gz = 0.0f;
     float ax = 0.0f, ay = 0.0f, az = 0.0f;
     if (!readPlatformSensor(gx, gy, gz, ax, ay, az))

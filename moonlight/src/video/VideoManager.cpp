@@ -62,6 +62,38 @@ bool VideoManager::initialize()
 {
     if (_initialized)
     {
+        // If already initialized but video is not running, refresh the settings from disk.
+        // This ensures the next session gets the correct callbacks for the newly selected mode.
+        if (!_videoRunning)
+        {
+            _config.load();
+            VideoSettings settings    = _config.getVideoSettings();
+            g_video_settings_snapshot = settings;
+            video_fullscreen_stretch  = settings.fullscreen;
+            _currentModeInt           = settings.render_mode;
+            _currentMode              = (_currentModeInt == 0) ? "legacy" : "ffmpeg";
+            brls::Logger::info("[VideoManager] Re-inicializando modo de renderizado: {}", _currentMode);
+#ifdef BUILD_FFMPEG
+            if (_currentMode == "ffmpeg")
+            {
+                if (!_ffmpegContext)
+                {
+                    _ffmpegContext = new FFmpegVideoContext();
+                    memset(_ffmpegContext, 0, sizeof(FFmpegVideoContext));
+                    ffmpeg_video_set_render_mode(_ffmpegContext, "ffmpeg");
+                }
+            }
+            else
+            {
+                if (_ffmpegContext)
+                {
+                    ffmpeg_video_cleanup(_ffmpegContext);
+                    delete _ffmpegContext;
+                    _ffmpegContext = nullptr;
+                }
+            }
+#endif
+        }
         return true;
     }
 

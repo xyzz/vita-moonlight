@@ -135,8 +135,18 @@ extern "C" void vita_cleanup()
         decoder_buffer_size = 0;
     }
 
-    // Do not release textures here to avoid GPU crashes if Borealis still uses them.
-    // They will be freed in vita_init if the resolution changes.
+    // Release textures on stop now that wait_for_borealis_gxm_idle has run
+    // and the stream is fully stopped. This avoids leaks.
+    if (frame_textures[0])
+    {
+        gxm_texture_free(frame_textures[0]);
+        frame_textures[0] = nullptr;
+    }
+    if (frame_textures[1])
+    {
+        gxm_texture_free(frame_textures[1]);
+        frame_textures[1] = nullptr;
+    }
 
     // Pixel processor objects are not used in the decode hot path.
     // Keep pointer null here to avoid virtual cleanup on potentially stale pointers.

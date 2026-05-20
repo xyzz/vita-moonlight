@@ -50,7 +50,7 @@ class YUVGpuRenderer : public IPixelProcessor
     uint32_t getDecoderPixelFormat() const override
     {
         // Decoder output is NV12/YUV420 raster, compatible with CSC texture path
-        return SCE_AVCDEC_PIXELFORMAT_YUV420_RASTER;
+        return SCE_AVCDEC_PIXELFORMAT_YUV420_PACKED_RASTER;
     }
 
     uint8_t* getDecodeTarget(void* frontBuffer, void* backBuffer) override

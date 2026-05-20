@@ -230,6 +230,18 @@ int main(int argc, char* argv[])
 
     brls::Application::createWindow("moonlight/title"_i18n);
 
+    // Apply saved V-Sync (swap interval) and frame rate limit to main application menus
+    {
+        ConfigManager startupCfg;
+        startupCfg.load();
+        VideoSettings vs = startupCfg.getVideoSettings();
+        brls::Application::setSwapInterval(vs.swap_interval);
+        if (vs.swap_interval == 0)
+        {
+            brls::Application::setLimitedFPS(0); // Unlimited FPS
+        }
+    }
+
     brls::Application::getPlatform()->setThemeVariant(brls::ThemeVariant::DARK);
 
     brls::Application::setGlobalQuit(false);

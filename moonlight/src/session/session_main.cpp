@@ -146,9 +146,16 @@ SessionMainView::SessionMainView(const HostInfo& host, const RemoteAppInfo& app)
         targetFps = 60;
     if (targetFps > 60)
         targetFps = 60;
-    brls::Application::setLimitedFPS(targetFps); // limit FPS according to configuration
-    brls::Application::setSwapInterval(1); // enable vsync for stability
-    brls::Logger::info("[SessionMainView] Init render config (cfg_fps={} -> limitedFPS={} swapInterval=1)", targetFps, targetFps);
+    if (videoSettings.swap_interval == 0)
+    {
+        brls::Application::setLimitedFPS(0); // Unlimited FPS (disable software frame limiter)
+    }
+    else
+    {
+        brls::Application::setLimitedFPS(targetFps); // limit FPS according to configuration
+    }
+    brls::Application::setSwapInterval(videoSettings.swap_interval); // enable vsync according to configuration
+    brls::Logger::info("[SessionMainView] Init render config (cfg_fps={} -> limitedFPS={} swapInterval={})", targetFps, (videoSettings.swap_interval == 0 ? 0 : targetFps), videoSettings.swap_interval);
 
     // Direct GXM mode eliminated. render_mode normalizes: 0=legacy,1=ffmpeg (future)
     bool settingsChanged = false;

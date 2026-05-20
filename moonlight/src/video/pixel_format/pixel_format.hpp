@@ -86,4 +86,8 @@ enum ProcessorMode
 #define SCE_AVCDEC_PIXELFORMAT_YUV420_RASTER 0x1
 #endif
 
+#ifndef SCE_AVCDEC_PIXELFORMAT_YUV420_PACKED_RASTER
+#define SCE_AVCDEC_PIXELFORMAT_YUV420_PACKED_RASTER 0x2
+#endif
+
 } // namespace PixelFormat

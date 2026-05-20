@@ -205,23 +205,23 @@ void VitaVideoRenderer::drawNVG(NVGcontext* vg, float viewportW, float viewportH
     const SceGxmTexture* gxmTex = &tex->gxm_tex;
     const void* currentData     = sceGxmTextureGetData(const_cast<SceGxmTexture*>(gxmTex));
     uint32_t currentFmt         = (uint32_t)sceGxmTextureGetFormat(const_cast<SceGxmTexture*>(gxmTex));
-    bool allowYuvExperimental   = is_gpu_yuv_experimental_enabled() && is_yuv_gxm_format(currentFmt);
-    if (currentFmt != (uint32_t)SCE_GXM_TEXTURE_FORMAT_U8U8U8U8_ABGR && !allowYuvExperimental)
+    bool isYuvTexture           = is_yuv_gxm_format(currentFmt);
+    if (currentFmt != (uint32_t)SCE_GXM_TEXTURE_FORMAT_U8U8U8U8_ABGR && !isYuvTexture)
     {
         static uint32_t yuvFallbackLogCounter = 0;
         if ((yuvFallbackLogCounter++ % 180) == 0)
         {
-            VITA_DEBUG_LOG("[Video][NVG][SAFE] formato 0x%08X no-RGBA; skip frame", (unsigned)currentFmt);
+            VITA_DEBUG_LOG("[Video][NVG][SAFE] formato 0x%08X no-RGBA/no-YUV; skip frame", (unsigned)currentFmt);
         }
         return;
     }
 
-    if (allowYuvExperimental)
+    if (isYuvTexture)
     {
         static uint32_t yuvExpLogCounter = 0;
         if ((yuvExpLogCounter++ % 1200) == 0)
         {
-            VITA_DEBUG_LOG("[Video][NVG][EXP] rendering YUV texture fmt=0x%08X via NVG/GXM", (unsigned)currentFmt);
+            VITA_DEBUG_LOG("[Video][NVG] rendering YUV/NV12 texture fmt=0x%08X via GXM CSC", (unsigned)currentFmt);
         }
         NVGXMwindow* win = gxmGetWindow();
         if (win && win->context)
@@ -257,25 +257,28 @@ void VitaVideoRenderer::drawNVG(NVGcontext* vg, float viewportW, float viewportH
     int useImageId = -1;
     if (foundIdx >= 0)
     {
-        if (imageCache[foundIdx].width != (int)texW || imageCache[foundIdx].height != (int)texH || imageCache[foundIdx].format != currentFmt)
+        if (imageCache[foundIdx].width != (int)texW || imageCache[foundIdx].height != (int)texH || imageCache[foundIdx].format != currentFmt || imageCache[foundIdx].data != currentData)
         {
             nvgDeleteImage(vg, imageCache[foundIdx].imageId);
             int newId = nvgxmCreateImageFromHandle(vg, const_cast<SceGxmTexture*>(gxmTex));
             if (newId > 0)
             {
-                imageCache[foundIdx].imageId = newId;
-                imageCache[foundIdx].width   = (int)texW;
-                imageCache[foundIdx].height  = (int)texH;
-                imageCache[foundIdx].data    = currentData;
-                imageCache[foundIdx].format  = currentFmt;
-                useImageId                   = newId;
-                VITA_DEBUG_LOG("[Video][NVG] Recreated cached image %d (changed size/format)", newId);
+                imageCache[foundIdx].imageId    = newId;
+                imageCache[foundIdx].width      = (int)texW;
+                imageCache[foundIdx].height     = (int)texH;
+                imageCache[foundIdx].data       = currentData;
+                imageCache[foundIdx].format     = currentFmt;
+                useImageId                      = newId;
+                static uint32_t recreateCounter = 0;
+                if ((recreateCounter++ % 600) == 0)
+                {
+                    VITA_DEBUG_LOG("[Video][NVG] Recreated cached image %d due to VRAM reuse (data=%p)", newId, currentData);
+                }
             }
         }
         else
         {
-            useImageId                = imageCache[foundIdx].imageId;
-            imageCache[foundIdx].data = currentData;
+            useImageId = imageCache[foundIdx].imageId;
         }
     }
     else
@@ -354,8 +357,13 @@ void VitaVideoRenderer::destroyImage(NVGcontext* vg)
     imageCacheSize = 0;
 }
 
+extern "C" void ffmpeg_process_deferred_releases(void);
+extern "C" void ffmpeg_increment_presented_frames(void);
+
 void VitaVideoRenderer::onFramePresented()
 {
+    ffmpeg_process_deferred_releases();
+    ffmpeg_increment_presented_frames();
     uint64_t now = vita_monotonic_ms();
     if (stats_start_ms == 0)
     {

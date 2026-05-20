@@ -1,6 +1,6 @@
 [submodule "third_party/borealis"]
 	path = third_party/borealis
-	url = https://github.com/AorsiniYT/borealis.git
+	url = https://github.com/xfangfang/borealis.git
 	branch = vita
 [submodule "third_party/inih"]
 	path = third_party/inih
@@ -17,6 +17,9 @@
 [submodule "third_party/moonmic"]
 	path = third_party/moonmic
 	url = https://github.com/AorsiniYT/moonmic.git
+[submodule "third_party/moonbeam"]
+	path = third_party/moonbeam
+	url = https://github.com/AorsiniYT/moonbeam.git
 
 [submodule "legacy/third_party/moonlight-common-c"]
 	path = legacy/third_party/moonlight-common-c

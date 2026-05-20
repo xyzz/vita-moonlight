@@ -1,11 +1,17 @@
 {
   "dialog": {
-    "title": "Host Options",
+    "title": "Host Menu",
     "close": "Close",
     "connect": "Connect",
     "info": "Info",
     "settings": "Settings",
-    "ok": "OK"
+    "ok": "OK",
+    "test_connection": "Test Connection"
+  },
+  "wol": {
+    "button": "Wake-on-LAN",
+    "success": "Wake-on-LAN magic packet sent successfully",
+    "failure": "Failed to send Wake-on-LAN packet"
   },
   "info": {
     "title": "Host Information",
@@ -60,5 +66,22 @@
   "edit_host_failure": "Failed to update host",
   "actions": {
     "refresh": "Refresh hosts"
+  },
+  "connection_test": {
+    "title": "Connection Diagnostic",
+    "testing": "Testing connection...",
+    "cancelling": "Cancelling...",
+    "cancel": "Cancel",
+    "report_title": "Connection Report",
+    "quality": "Overall Quality: ",
+    "avg_latency": "Average Latency: ",
+    "jitter": "Jitter: ",
+    "packet_loss": "Packet Loss: ",
+    "speed": "Bandwidth: ",
+    "recommendation": "Recommendation: ",
+    "host_server": "Host Server: ",
+    "host_state": "Host State: ",
+    "state_busy": "Busy (Active streaming session)",
+    "state_ready": "Free (Ready to connect)"
   }
 }

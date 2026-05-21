@@ -234,9 +234,6 @@ ulimit -v $(( $(free -m | awk '/^Mem:/{print $2}') * 1024 * 9 / 10 ))  # 90% de 
 export MAKEFLAGS="$MAKEFLAGS -s -r -R"
 echo -e "\n[=== Moonlight PSV Builder ===]"
 echo "[+] Iniciando compilación para PS Vita con ${NUM_CORES} núcleos..."
-if [ "${BUILD_FFMPEG}" = "ON" ]; then
-    echo "[+] BUILD_FFMPEG=ON: FFmpeg integration will be included and PS Vita legacy will support 1920x1088 defaults"
-fi
 
 # Función para limpiar compilación anterior
 clean_build() {
@@ -261,7 +258,7 @@ build_project() {
         -DPLATFORM_PSV=ON \
         -DSIMPLE_HIGHLIGHT=ON \
         -DUSE_GXM=$USE_GXM \
-        -DBUILD_FFMPEG=${BUILD_FFMPEG} \
+
         -DUSE_VITA_SHARK=OFF \
         -DCMAKE_BUILD_TYPE=${1:-Release} \
         -DCMAKE_TOOLCHAIN_FILE="${VITASDK}/share/vita.toolchain.cmake" \
@@ -425,13 +422,6 @@ main() {
         return 1
     fi
 
-    # Parse optional args
-    # If user passed first argument 'ffmpeg' or '--ffmpeg', enable BUILD_FFMPEG
-    BUILD_FFMPEG=OFF
-    if [ "$1" = "ffmpeg" ] || [ "$1" = "--ffmpeg" ]; then
-        BUILD_FFMPEG=ON
-        echo "[+] Habilitando BUILD_FFMPEG=ON (arg: $1)"
-    fi
 
     # Menú de plataforma gráfica
     echo -e "\n\033[1;34m[+] Select graphics backend:\033[0m"

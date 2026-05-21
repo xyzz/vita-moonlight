@@ -62,10 +62,8 @@ if (USE_LIBROMFS)
     add_libromfs(${PROJECT_NAME} ${PROJECT_RESOURCES})
 endif ()
 
-# Set USE_MBEDTLS for moonlight-common-c when BUILD_FFMPEG is enabled
-if(BUILD_FFMPEG)
-    set(USE_MBEDTLS ON CACHE BOOL "Use MbedTLS instead of OpenSSL" FORCE)
-endif()
+# Always use MbedTLS instead of OpenSSL
+set(USE_MBEDTLS ON CACHE BOOL "Use MbedTLS instead of OpenSSL" FORCE)
 
 add_subdirectory(third_party)
 
@@ -91,8 +89,7 @@ list(APPEND APP_PLATFORM_INCLUDE ${CMAKE_CURRENT_SOURCE_DIR}/moonlight/include)
 list(APPEND APP_PLATFORM_INCLUDE ${CMAKE_CURRENT_SOURCE_DIR}/moonlight/src/video)
 
 # Option to enable/disable building the bundled FFmpeg integration
-# It is deactivated due to sudden crashes, until it is solved it will not be activated
-option(BUILD_FFMPEG "Build FFmpeg integration" OFF)
+set(BUILD_FFMPEG ON)
 
 # Collect main sources: glob all and exclude ffmpeg subtree if BUILD_FFMPEG is OFF.
 file(GLOB_RECURSE _ALL_SRC RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} moonlight/*.cpp)
@@ -106,10 +103,7 @@ set(MAIN_SRC)
 # archives under $VITASDK/arm-vita-eabi/lib; if those archives are missing
 # the user must either install/build FFmpeg for Vita in the sysroot or
 # disable BUILD_FFMPEG.
-if(NOT BUILD_FFMPEG)
-    # Remove ffmpeg subtree entries (paths relative to source dir) when not building
-    list(FILTER _ALL_SRC EXCLUDE REGEX "^moonlight/src/video/ffmpeg/")
-endif()
+# Exclude nothing, compile everything including FFmpeg module
 
 foreach(_f IN LISTS _ALL_SRC)
     list(APPEND MAIN_SRC "${CMAKE_CURRENT_SOURCE_DIR}/${_f}")
@@ -119,23 +113,18 @@ endforeach()
 # VITASDK sysroot. Warn if the archives are missing. Note: we still compile
 # our integration glue (moonlight/src/video/ffmpeg/*.cpp) from source because
 # those implement the `ffmpeg_video_*` functions used by the project.
-if(BUILD_FFMPEG)
-    if(NOT EXISTS "$ENV{VITASDK}/arm-vita-eabi/lib/libavcodec.a")
-        message(WARNING "BUILD_FFMPEG=ON but no FFmpeg static libs found in VITASDK sysroot; either install/build FFmpeg for Vita into $ENV{VITASDK}/arm-vita-eabi/lib or set BUILD_FFMPEG=OFF to compile without FFmpeg.")
-    else()
-        message(STATUS "BUILD_FFMPEG=ON and prebuilt FFmpeg libs found in VITASDK sysroot; will link against them.")
-    endif()
+if(NOT EXISTS "$ENV{VITASDK}/arm-vita-eabi/lib/libavcodec.a")
+    message(WARNING "No FFmpeg static libs found in VITASDK sysroot; please install/build FFmpeg for Vita into $ENV{VITASDK}/arm-vita-eabi/lib.")
+else()
+    message(STATUS "Prebuilt FFmpeg libs found in VITASDK sysroot; linking against them.")
 endif()
 # Nota: NetworkOptimizations.cpp añadido en moonlight/src/network/ queda incluido por el GLOB anterior.
 # Si se desea desactivar en runtime se expone vita_netopt_set_enabled().
 add_definitions(-DVITA_NETOPT_ENABLED)
 # vita.cpp se movió a video/legacy/vita.cpp y ya entra en el glob
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/moonlight/src/video/legacy)
-if(BUILD_FFMPEG)
-    include_directories(${CMAKE_CURRENT_SOURCE_DIR}/moonlight/src/video/ffmpeg)
-    include_directories(${CMAKE_CURRENT_SOURCE_DIR}/moonlight/src/video/ffmpeg/modules)
-    include_directories(${CMAKE_CURRENT_SOURCE_DIR}/moonlight/src/video/legacy)
-endif()
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/moonlight/src/video/ffmpeg)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/moonlight/src/video/ffmpeg/modules)
 
 if (PLATFORM_PSV AND CMAKE_BUILD_TYPE STREQUAL "Debug")
     set(PSV_COMPAT_SRC ${CMAKE_BINARY_DIR}/psv_compat_stdio.c)
@@ -152,11 +141,7 @@ if (WIN32)
     endif ()
 elseif (PLATFORM_PSV)
     add_definitions(-D__vita__ -D__PSV__)
-    if(BUILD_FFMPEG)
-        add_definitions(-DUSE_MBEDTLS_CRYPTO)
-    else()
-        add_definitions(-DUSE_OPENSSL_CRYPTO)
-    endif()
+    add_definitions(-DUSE_MBEDTLS_CRYPTO)
 endif ()
 
 # Configuración de curl y OpenSSL para MinGW/Windows y PS Vita
@@ -175,9 +160,7 @@ program_target(${PROJECT_NAME} "${MAIN_SRC}")
 set_target_properties(${PROJECT_NAME} PROPERTIES CXX_STANDARD 17)
 
 # Expose BUILD_FFMPEG macro to sources so we can guard FFmpeg-specific code
-if(BUILD_FFMPEG)
-    target_compile_definitions(${PROJECT_NAME} PRIVATE BUILD_FFMPEG=1 USE_MBEDTLS)
-endif()
+target_compile_definitions(${PROJECT_NAME} PRIVATE BUILD_FFMPEG=1 USE_MBEDTLS)
 
 # Envolver LiRequestIdrFrame para redirigir a optimizaciones de red
 if (PLATFORM_PSV)
@@ -309,50 +292,35 @@ if(PLATFORM_PSV)
     # Si FFmpeg-vita está instalado en el sysroot, enlazar sus bibliotecas para
     # resolver símbolos usados por los sources FFmpeg que ahora se compilan
     # dentro del árbol global de fuentes.
-    if(BUILD_FFMPEG)
-        if (EXISTS "$ENV{VITASDK}/arm-vita-eabi/lib/libavcodec.a")
-            message(STATUS "Linking FFmpeg libs from VITASDK sysroot (absolute paths)")
-            set(FFMPEG_LIB_DIR "$ENV{VITASDK}/arm-vita-eabi/lib")
-            # Prefer absolute static archives to ensure proper linkage order
-            set(FFMPEG_LIBS
-                "${FFMPEG_LIB_DIR}/libavcodec.a"
-                "${FFMPEG_LIB_DIR}/libavformat.a"
-                "${FFMPEG_LIB_DIR}/libavutil.a"
-                "${FFMPEG_LIB_DIR}/libswscale.a"
-                "${FFMPEG_LIB_DIR}/libswresample.a"
-            )
-            if (EXISTS "${FFMPEG_LIB_DIR}/libz.a")
-                list(APPEND FFMPEG_LIBS "${FFMPEG_LIB_DIR}/libz.a")
-            else()
-                list(APPEND FFMPEG_LIBS z)
-            endif()
-            if (EXISTS "${FFMPEG_LIB_DIR}/liblzma.a")
-                list(APPEND FFMPEG_LIBS "${FFMPEG_LIB_DIR}/liblzma.a")
-            else()
-                list(APPEND FFMPEG_LIBS lzma)
-            endif()
-            list(APPEND FFMPEG_LIBS pthread)
-            list(APPEND FFMPEG_LIBS
-                SceAvcodec_stub
-                SceAudiodec_stub
-                SceCodecEngine_stub
-                SceVideodec_stub
-            )
-
-            target_link_libraries(${PROJECT_NAME} PRIVATE ${FFMPEG_LIBS})
-        endif()
-    else()
-        # yuv_gles2_renderer.cpp usa libswscale/libavutil independientemente
-        # de BUILD_FFMPEG, así que si están disponibles enlazamos también.
-        if (EXISTS "$ENV{VITASDK}/arm-vita-eabi/lib/libavutil.a" AND EXISTS "$ENV{VITASDK}/arm-vita-eabi/lib/libswscale.a")
-            message(STATUS "Linking libavutil and libswscale from VITASDK sysroot for YUV swscale renderer")
-            target_link_libraries(${PROJECT_NAME} PRIVATE
-                "$ENV{VITASDK}/arm-vita-eabi/lib/libavutil.a"
-                "$ENV{VITASDK}/arm-vita-eabi/lib/libswscale.a"
-            )
+    if (EXISTS "$ENV{VITASDK}/arm-vita-eabi/lib/libavcodec.a")
+        message(STATUS "Linking FFmpeg libs from VITASDK sysroot (absolute paths)")
+        set(FFMPEG_LIB_DIR "$ENV{VITASDK}/arm-vita-eabi/lib")
+        set(FFMPEG_LIBS
+            "${FFMPEG_LIB_DIR}/libavcodec.a"
+            "${FFMPEG_LIB_DIR}/libavformat.a"
+            "${FFMPEG_LIB_DIR}/libavutil.a"
+            "${FFMPEG_LIB_DIR}/libswscale.a"
+            "${FFMPEG_LIB_DIR}/libswresample.a"
+        )
+        if (EXISTS "${FFMPEG_LIB_DIR}/libz.a")
+            list(APPEND FFMPEG_LIBS "${FFMPEG_LIB_DIR}/libz.a")
         else()
-            message(WARNING "BUILD_FFMPEG=OFF and libavutil.a/libswscale.a not found. yuv_gles2_renderer.cpp requires these libs for swscale conversion.")
+            list(APPEND FFMPEG_LIBS z)
         endif()
+        if (EXISTS "${FFMPEG_LIB_DIR}/liblzma.a")
+            list(APPEND FFMPEG_LIBS "${FFMPEG_LIB_DIR}/liblzma.a")
+        else()
+            list(APPEND FFMPEG_LIBS lzma)
+        endif()
+        list(APPEND FFMPEG_LIBS pthread)
+        list(APPEND FFMPEG_LIBS
+            SceAvcodec_stub
+            SceAudiodec_stub
+            SceCodecEngine_stub
+            SceVideodec_stub
+        )
+
+        target_link_libraries(${PROJECT_NAME} PRIVATE ${FFMPEG_LIBS})
     endif()
 endif()
 

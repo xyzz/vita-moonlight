@@ -106,9 +106,7 @@ SettingsTab::SettingsTab()
     // Render mode selector (Direct GXM removed): 0=Legacy, 1=FFmpeg (future)
     std::vector<std::string> renderModes;
     renderModes.push_back(brls::getStr("moonlight/settings_tab/render_mode/legacy_option"));
-#ifdef BUILD_FFMPEG
     renderModes.push_back(brls::getStr("moonlight/settings_tab/render_mode/modern_option"));
-#endif
     auto updateModeDependentVisibility = [this](int renderMode, bool persistReset)
     {
         (void)persistReset;
@@ -136,12 +134,7 @@ SettingsTab::SettingsTab()
         ConfigManager config;
         config.load();
         VideoSettings settings = config.getVideoSettings();
-        // If BUILD_FFMPEG is not available, force legacy selection
-#ifndef BUILD_FFMPEG
-        int chosen = (selected == 0) ? 0 : 0; // normalize to legacy
-#else
         int chosen = selected; // allow modern/ffmpeg
-#endif
         settings.render_mode = chosen; // 0=legacy,1=ffmpeg
         if (chosen == 0) {
             if (settings.pixel_format_mode != 0 && settings.pixel_format_mode != 1) {
@@ -229,11 +222,9 @@ SettingsTab::SettingsTab()
         if (chosen == 0) {
             modeNameKey = "moonlight/settings_tab/render_mode/legacy_name";
         }
-#ifdef BUILD_FFMPEG
         else if (chosen == 1) {
             modeNameKey = "moonlight/settings_tab/render_mode/modern_name";
         }
-#endif
         else {
             modeNameKey = "moonlight/settings_tab/render_mode/unknown_name";
         }

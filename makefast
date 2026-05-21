@@ -180,9 +180,7 @@ setup_swap() {
     ' EXIT
 }
 
-# Modo: 'release' (por defecto), 'debug', o 'ffmpeg'
-# Soportar combinaciones: ffmpeg debug, debug ffmpeg, etc.
-BUILD_FFMPEG="OFF"
+# Modo: 'release' (por defecto) o 'debug'
 BUILD_TYPE="Release"
 
 # Procesar todos los argumentos
@@ -192,10 +190,6 @@ for arg in "$@"; do
         debug)
             BUILD_TYPE="Debug"
             echo "[makefast] Modo Debug activado"
-            ;;
-        ffmpeg)
-            BUILD_FFMPEG="ON"
-            echo "[makefast] FFmpeg habilitado"
             ;;
         gl)
             FEATURE="gl"
@@ -210,7 +204,7 @@ for arg in "$@"; do
     esac
 done
 
-echo "[makefast] Configuración final: BUILD_TYPE=$BUILD_TYPE, BUILD_FFMPEG=$BUILD_FFMPEG"
+echo "[makefast] Configuración final: BUILD_TYPE=$BUILD_TYPE"
 
 # Si la feature solicita GL (GLES2), cambiar el BUILD_DIR y desactivar GXM
 if [ "$FEATURE" = "gl" ]; then
@@ -285,7 +279,6 @@ build_project() {
         -DUSE_GXM=${use_gxm} \\
         -DUSE_VITA_SHARK=OFF \\
         -DCMAKE_BUILD_TYPE=${BUILD_TYPE} \\
-        -DBUILD_FFMPEG=${BUILD_FFMPEG} \\
         -DCMAKE_TOOLCHAIN_FILE=\"${VITASDK}/share/vita.toolchain.cmake\" \\
         -DCMAKE_MAKE_PROGRAM=\"make\" \\
         -DCMAKE_C_COMPILER=\"${CC}\" \\
@@ -305,7 +298,7 @@ build_project() {
         -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY \\
         -DCMAKE_FIND_ROOT_PATH_MODE_PACKAGE=ONLY"
 
-    echo "[+] BUILD_TYPE=${BUILD_TYPE}, BUILD_FFMPEG=${BUILD_FFMPEG}"
+    echo "[+] BUILD_TYPE=${BUILD_TYPE}"
 
     eval "$cmake_cmd" || {
         echo "[!] Error al configurar el proyecto con CMake"

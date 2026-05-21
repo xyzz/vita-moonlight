@@ -84,7 +84,7 @@
             "pixel_format": {
                 "title": "Pixel format",
                 "rgba": "Direct RGBA",
-                "yuv": "YUV420 (experimental)",
+                "yuv": "YUV420 (hardware CSC)",
                 "notify": "Pixel format: {0}"
             },
             "resolution": {

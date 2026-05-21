@@ -95,10 +95,9 @@ extern "C" int vitavideo_setup(int videoFormat, int width, int height, int redra
             decoder_output_mode = 0;
         }
 
-        // Select decode mode directly (0=RGBA, 1=YUV experimental).
         if (decoder_output_mode == 1)
         {
-            VITA_DEBUG_LOG("[Video][INIT] Modo de procesado: YUV GPU experimental");
+            VITA_DEBUG_LOG("[Video][INIT] Modo de procesado: YUV GPU CSC (Alto Rendimiento)");
         }
         else
         {

@@ -1,12 +1,10 @@
 #include "VideoManager.hpp"
 
-#include "legacy/vita.hpp"
-#ifdef BUILD_FFMPEG
-#include "ffmpeg/ffmpeg.hpp"
-#endif
 #include <borealis/core/logger.hpp>
 
+#include "ffmpeg/ffmpeg.hpp"
 #include "legacy/modules/vita_globals.hpp"
+#include "legacy/vita.hpp"
 #include "video/render_mode_cache.hpp"
 
 // Global snapshot consumed by vita.cpp
@@ -76,7 +74,6 @@ bool VideoManager::initialize()
             _currentModeInt                = settings.render_mode;
             _currentMode                   = (_currentModeInt == 0) ? "legacy" : "ffmpeg";
             brls::Logger::info("[VideoManager] Re-inicializando modo de renderizado: {}", _currentMode);
-#ifdef BUILD_FFMPEG
             if (_currentMode == "ffmpeg")
             {
                 if (!_ffmpegContext)
@@ -95,7 +92,6 @@ bool VideoManager::initialize()
                     _ffmpegContext = nullptr;
                 }
             }
-#endif
         }
         return true;
     }
@@ -117,7 +113,6 @@ bool VideoManager::initialize()
     brls::Logger::info("[VideoManager] Modo de renderizado configurado: {}", _currentMode);
 
     // If the default mode is ffmpeg, prepare the context
-#ifdef BUILD_FFMPEG
     if (_currentMode == "ffmpeg")
     {
         if (!_ffmpegContext)
@@ -127,7 +122,6 @@ bool VideoManager::initialize()
             ffmpeg_video_set_render_mode(_ffmpegContext, "ffmpeg");
         }
     }
-#endif
     // Initialize context based on mode
     // We do not need manual contexts since the legacy system manages its own state
     // via Limelight callbacks
@@ -153,7 +147,6 @@ void VideoManager::setRenderMode(const std::string& mode)
     }
 
     // Clear previous context
-#ifdef BUILD_FFMPEG
     if (_currentMode == "ffmpeg" && _ffmpegContext)
     {
         // Cleanup of FFmpeg context if it exists
@@ -161,14 +154,12 @@ void VideoManager::setRenderMode(const std::string& mode)
         delete _ffmpegContext;
         _ffmpegContext = nullptr;
     }
-#endif
 
     // Set new mode
     _currentMode    = mode;
     _currentModeInt = (mode == "legacy") ? 0 : 1;
 
     // If new mode is ffmpeg, reserve context
-#ifdef BUILD_FFMPEG
     if (_currentMode == "ffmpeg")
     {
         if (!_ffmpegContext)
@@ -178,7 +169,6 @@ void VideoManager::setRenderMode(const std::string& mode)
             ffmpeg_video_set_render_mode(_ffmpegContext, "ffmpeg");
         }
     }
-#endif
 
     // Save to settings
     _config.load();
@@ -202,11 +192,7 @@ void VideoManager::setRenderMode(const std::string& mode)
 // Provide access to the internal render context for LiStartConnection
 void* VideoManager::getRenderContext()
 {
-#ifdef BUILD_FFMPEG
     return static_cast<void*>(_ffmpegContext);
-#else
-    return nullptr;
-#endif
 }
 
 std::string VideoManager::getRenderMode() const
@@ -230,18 +216,8 @@ DECODER_RENDERER_CALLBACKS VideoManager::getDecoderCallbacks()
     }
     else
     {
-#ifdef BUILD_FFMPEG
         // Get callbacks from the FFmpeg wrapper
         callbacks = get_ffmpeg_video_callbacks();
-#else
-        // FFmpeg is not compiled: fallback to legacy callbacks to avoid undefined refs
-        callbacks.setup            = vitavideo_setup;
-        callbacks.start            = vitavideo_start;
-        callbacks.stop             = vitavideo_stop;
-        callbacks.cleanup          = vita_cleanup;
-        callbacks.submitDecodeUnit = vitavideo_submit_decode_unit;
-        callbacks.capabilities     = CAPABILITY_DIRECT_SUBMIT | CAPABILITY_SLICES_PER_FRAME(2);
-#endif
     }
 
     brls::Logger::info("[VideoManager] Callbacks configurados para modo {}", _currentMode);
@@ -317,11 +293,7 @@ void VideoManager::stopVideo()
     {
         if (_ffmpegContext)
         {
-#ifdef BUILD_FFMPEG
             ffmpeg_video_stop(_ffmpegContext);
-#else
-            brls::Logger::warning("[VideoManager] FFmpeg built without ffmpeg support, cannot stop");
-#endif
         }
         brls::Logger::info("[VideoManager] Video FFmpeg detenido");
     }

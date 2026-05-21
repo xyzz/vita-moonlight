@@ -128,6 +128,7 @@ bool VitaSession::start()
 {
     if (m_is_active)
         return true;
+    g_session_stopping = false;
     // Try to reuse previous configuration (to maintain keys) if it exists
     STREAM_CONFIGURATION prev {};
     bool havePrev = GameStreamClient::instance().lastStreamConfig(m_address, prev);
@@ -212,6 +213,12 @@ void VitaSession::stop(bool terminateApp)
 {
     if (!m_is_active && !m_is_terminated)
         return;
+
+    // Set stopping flag to prevent concurrent ENet RTT telemetry queries
+    g_session_stopping = true;
+
+    // Allow in-flight LiGetEstimatedRttInfo queries to finish executing safely
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
 
     // Disable PS button capture so Vita OS handles it normally again
     if (g_controllerInput)

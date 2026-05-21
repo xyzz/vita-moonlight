@@ -92,15 +92,21 @@ extern size_t decoder_block_size;
 extern SceAvcdecQueryDecoderInfo* decoder_info;
 extern SceVideodecQueryInitInfoHwAvcdec* init;
 
-extern GxmTexture* frame_textures[2];
-extern int frame_front_idx;
-extern int frame_back_idx;
-#define FRAME_FRONT() (frame_textures[frame_front_idx])
-#define FRAME_BACK() (frame_textures[frame_back_idx])
+extern GxmTexture* frame_textures[3];
+// Triple-buffer roles:
+//   frame_display_idx - GPU is reading this (renderer thread)
+//   frame_ready_idx   - most recently decoded, waiting to be displayed
+//   frame_write_idx   - decoder is currently writing to this
+extern int frame_display_idx;
+extern int frame_ready_idx;
+extern int frame_write_idx;
+#define FRAME_FRONT() (frame_textures[frame_display_idx])
+#define FRAME_BACK() (frame_textures[frame_write_idx])
+#define FRAME_READY() (frame_textures[frame_ready_idx])
 #ifdef __cplusplus
 extern std::mutex g_frame_slots_mutex;
 #endif
-// Single buffer mode (no double buffering). When active, FRONT and BACK are the same index.
+// Single buffer mode (no triple/double buffering). When active, all indices are the same.
 extern bool single_frame_buffer;
 
 extern image_scaling_settings image_scaling;
@@ -172,6 +178,13 @@ extern ::VideoSettings g_video_settings_snapshot;
 
 // Flag to enable/disable debug logs
 extern bool g_debug_log_enabled;
+
+extern uint32_t g_decode_min_ms;
+extern uint32_t g_decode_max_ms;
+extern uint32_t g_decode_sum_ms;
+extern uint32_t g_decode_count;
+
+extern volatile bool g_session_stopping;
 
 // ========================================
 // Streaming Configuration Constants

@@ -301,7 +301,7 @@ VideoSettings ConfigManager::getVideoSettings() const
     settings.keyboard_input_mode          = get("video", "keyboard_input_mode", "false") == "true";
     settings.keyboard_numbers_row         = get("video", "keyboard_numbers_row", "true") == "true";
     settings.keyboard_show_arrows         = get("video", "keyboard_show_arrows", "true") == "true";
-    settings.render_mode                  = std::stoi(get("video", "render_mode", "1"));
+    settings.render_mode                  = std::stoi(get("video", "render_mode", "0"));
     settings.pixel_format_mode            = std::stoi(get("video", "pixel_format_mode", "1"));
     settings.gamepad_type                 = static_cast<GamepadType>(std::stoi(get("video", "gamepad_type", "0")));
     settings.swap_shoulder_buttons        = get("video", "swap_shoulder_buttons", "false") == "true";

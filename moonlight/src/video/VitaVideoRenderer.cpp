@@ -76,15 +76,9 @@ void VitaVideoRenderer::draw(float viewportW, float viewportH)
         return;
     }
 
-    GxmTexture* tex = nullptr;
-    int frontIdx    = 0;
-    int backIdx     = 0;
-    {
-        std::lock_guard<std::mutex> slotLock(g_frame_slots_mutex);
-        tex      = FRAME_FRONT();
-        frontIdx = frame_front_idx;
-        backIdx  = frame_back_idx;
-    }
+    int displayIdx  = __atomic_load_n(&frame_display_idx, __ATOMIC_ACQUIRE);
+    int writeIdx    = __atomic_load_n(&frame_write_idx, __ATOMIC_ACQUIRE);
+    GxmTexture* tex = frame_textures[displayIdx];
 
     if (!tex)
     {
@@ -113,7 +107,7 @@ void VitaVideoRenderer::draw(float viewportW, float viewportH)
     if (drawCounter < 120 || (drawCounter % 60) == 0)
     {
         unsigned stride = gxm_texture_get_stride(tex);
-        VITA_DEBUG_LOG("[Video][DRAW] frame=%u tex=%p stride=%u frontIdx=%d backIdx=%d", drawCounter, tex, stride, frontIdx, backIdx);
+        VITA_DEBUG_LOG("[Video][DRAW] frame=%u tex=%p stride=%u displayIdx=%d writeIdx=%d", drawCounter, tex, stride, displayIdx, writeIdx);
     }
     drawCounter++;
 
@@ -181,11 +175,14 @@ void VitaVideoRenderer::drawNVG(NVGcontext* vg, float viewportW, float viewportH
     if (g_stats.frames_decoded == 0)
         return;
 
-    const GxmTexture* tex = nullptr;
+    if (g_video_settings_snapshot.render_mode == 0)
     {
-        std::lock_guard<std::mutex> slotLock(g_frame_slots_mutex);
-        tex = FRAME_FRONT();
+        int display_idx = __atomic_load_n(&frame_display_idx, __ATOMIC_ACQUIRE);
+        display_idx     = __atomic_exchange_n(&frame_ready_idx, display_idx, __ATOMIC_SEQ_CST);
+        __atomic_store_n(&frame_display_idx, display_idx, __ATOMIC_RELEASE);
     }
+
+    const GxmTexture* tex = frame_textures[__atomic_load_n(&frame_display_idx, __ATOMIC_ACQUIRE)];
     if (!tex)
         return;
 
@@ -205,22 +202,17 @@ void VitaVideoRenderer::drawNVG(NVGcontext* vg, float viewportW, float viewportH
 
     if (isYuvTexture)
     {
-        static uint32_t yuvExpLogCounter = 0;
-        if ((yuvExpLogCounter++ % 1200) == 0)
+        static bool yuvProfileSet = false;
+        if (!yuvProfileSet)
         {
-            VITA_DEBUG_LOG("[Video][NVG] rendering YUV/NV12 texture fmt=0x%08X via GXM CSC", (unsigned)currentFmt);
+            NVGXMwindow* win = gxmGetWindow();
+            if (win && win->context)
+            {
+                sceGxmSetYuvProfile(win->context, 0, SCE_GXM_YUV_PROFILE_BT709_STANDARD);
+                yuvProfileSet = true;
+                VITA_DEBUG_LOG("[Video][NVG] YUV profile BT709 set (one-time)");
+            }
         }
-        NVGXMwindow* win = gxmGetWindow();
-        if (win && win->context)
-        {
-            sceGxmSetYuvProfile(win->context, 0, SCE_GXM_YUV_PROFILE_BT709_STANDARD);
-        }
-    }
-
-    static uint32_t nvgDiagCounter = 0;
-    if ((nvgDiagCounter++ % 1200) == 0)
-    {
-        VITA_DEBUG_LOG("[Video][NVG][DIAG] tex=%p gxm=%p fmt=0x%08X data=%p", tex, gxmTex, (unsigned int)currentFmt, currentData);
     }
 
     if (!image_scaling.enabled)
@@ -349,8 +341,14 @@ extern "C" void ffmpeg_increment_presented_frames(void);
 
 void VitaVideoRenderer::onFramePresented()
 {
-    ffmpeg_process_deferred_releases();
-    ffmpeg_increment_presented_frames();
+    // Only process ffmpeg deferred releases when in ffmpeg mode.
+    // In legacy mode, the deferred list is always empty but we'd still
+    // pay for a mutex lock+unlock on every single frame for nothing.
+    if (g_video_settings_snapshot.render_mode == 1)
+    {
+        ffmpeg_process_deferred_releases();
+        ffmpeg_increment_presented_frames();
+    }
     uint64_t now = vita_monotonic_ms();
     if (stats_start_ms == 0)
     {
@@ -386,10 +384,32 @@ void VitaVideoRenderer::onFramePresented()
         g_stats.current_fps = (uint32_t)((uint64_t)s_presentWindowFrames * 1000ULL / elapsed);
         curr_fps[0]         = g_stats.current_fps;
         // Compute decode FPS using the global decoded frames counter and the same time window
-        uint32_t nowDecCount  = g_stats.frames_decoded;
-        uint32_t decInWindow  = nowDecCount - s_prevDecodedCount;
-        g_stats.decoded_fps   = (uint32_t)((uint64_t)decInWindow * 1000ULL / elapsed);
-        s_prevDecodedCount    = nowDecCount;
+        uint32_t nowDecCount = g_stats.frames_decoded;
+        uint32_t decInWindow = nowDecCount - s_prevDecodedCount;
+        g_stats.decoded_fps  = (uint32_t)((uint64_t)decInWindow * 1000ULL / elapsed);
+        s_prevDecodedCount   = nowDecCount;
+
+        if (g_decode_count > 0)
+        {
+            uint32_t avg       = g_decode_sum_ms / g_decode_count;
+            uint32_t estRtt    = 0;
+            uint32_t estRttVar = 0;
+            if (!g_session_stopping && LiGetEstimatedRttInfo(&estRtt, &estRttVar))
+            {
+                VITA_DEBUG_LOG("[PERF][DECODE] Latency (min/avg/max): %u/%u/%u ms (frames in window: %u) - RTT: %u ms (var: %u)",
+                    g_decode_min_ms, avg, g_decode_max_ms, g_decode_count, estRtt, estRttVar);
+            }
+            else
+            {
+                VITA_DEBUG_LOG("[PERF][DECODE] Latency (min/avg/max): %u/%u/%u ms (frames in window: %u)",
+                    g_decode_min_ms, avg, g_decode_max_ms, g_decode_count);
+            }
+            g_decode_min_ms = 999999;
+            g_decode_max_ms = 0;
+            g_decode_sum_ms = 0;
+            g_decode_count  = 0;
+        }
+
         last_fps_window_ms    = now;
         s_presentWindowFrames = 0;
     }

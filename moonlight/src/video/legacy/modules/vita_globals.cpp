@@ -16,12 +16,13 @@ size_t decoder_block_size               = 0;
 SceAvcdecQueryDecoderInfo* decoder_info = NULL;
 SceVideodecQueryInitInfoHwAvcdec* init  = NULL;
 
-// Double RGBA texture buffer for direct output
-GxmTexture* frame_textures[2] = { nullptr, nullptr };
-int frame_front_idx           = 0;
-int frame_back_idx            = 1;
+// Triple texture buffer for decode/display pipeline
+GxmTexture* frame_textures[3] = { nullptr, nullptr, nullptr };
+int frame_display_idx         = 0; // GPU reads from this
+int frame_ready_idx           = 1; // most recently decoded frame, waiting
+int frame_write_idx           = 2; // decoder writes to this
 std::mutex g_frame_slots_mutex;
-bool single_frame_buffer = false; // default double buffer; can be activated for legacy testing
+bool single_frame_buffer = false; // default triple buffer; can be activated for legacy testing
 
 int SCREEN_WIDTH  = 960;
 int SCREEN_HEIGHT = 544;
@@ -225,3 +226,10 @@ bool yuv_check_canaries()
         return true;
     return decoder_yuv_raw[0] == 0xCA && decoder_yuv_raw[1] == 0xFE && decoder_yuv_raw[decoder_yuv_total_alloc - 1] == 0xBE && decoder_yuv_raw[decoder_yuv_total_alloc - 2] == 0xEF;
 }
+
+uint32_t g_decode_min_ms = 999999;
+uint32_t g_decode_max_ms = 0;
+uint32_t g_decode_sum_ms = 0;
+uint32_t g_decode_count  = 0;
+
+volatile bool g_session_stopping = false;

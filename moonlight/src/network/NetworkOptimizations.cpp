@@ -5,6 +5,10 @@
 #include <stdio.h>
 #include <time.h>
 
+#include "ConfigManager.hpp"
+
+extern VideoSettings g_video_settings_snapshot;
+
 extern "C" uint64_t LiGetMillis();
 // Original function wrapped by the linker with --wrap
 extern "C" void __real_LiRequestIdrFrame(void);
@@ -270,6 +274,8 @@ extern "C" void vita_netopt_set_target_fps(unsigned fps)
 
 extern "C" void vita_netopt_frame_produced()
 {
+    if (!g_enabled || !g_video_settings_snapshot.enable_frame_pacer)
+        return;
     uint64_t now = monotonicMs();
     if (g_pace_window_start == 0)
         g_pace_window_start = now;
@@ -277,13 +283,19 @@ extern "C" void vita_netopt_frame_produced()
     uint64_t elapsed = now - g_pace_window_start;
     if (elapsed >= 1000)
     {
-        // Calculate excess
-        if (g_pace_frames_produced > g_target_fps)
+        // Only trigger drop budget if the excess is persistent and significant (> 5 frames over target)
+        // to prevent micro-jitter/timing variance from triggering unnecessary drops.
+        if (g_pace_frames_produced > g_target_fps + 5)
         {
-            int excess = (int)g_pace_frames_produced - (int)g_target_fps;
-            g_drop_budget += excess; // accumulate as legacy
-            if (g_drop_budget > (int)g_target_fps)
-                g_drop_budget = g_target_fps; // cap
+            int excess = (int)g_pace_frames_produced - (int)(g_target_fps + 5);
+            g_drop_budget += excess;
+            if (g_drop_budget > 5)
+                g_drop_budget = 5; // limit consecutive drops to 5 to avoid visual jumps
+        }
+        else
+        {
+            // Decay drop budget if we are within normal bounds
+            g_drop_budget = 0;
         }
         g_pace_frames_produced = 0;
         g_pace_window_start    = now;
@@ -292,7 +304,7 @@ extern "C" void vita_netopt_frame_produced()
 
 extern "C" unsigned vita_netopt_consume_drop_budget()
 {
-    if (g_drop_budget <= 0)
+    if (!g_enabled || !g_video_settings_snapshot.enable_frame_pacer || g_drop_budget <= 0)
         return 0;
     unsigned drops = (unsigned)g_drop_budget;
     g_drop_budget  = 0;

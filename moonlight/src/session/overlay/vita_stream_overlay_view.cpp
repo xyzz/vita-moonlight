@@ -9,6 +9,8 @@
 #include "audio/MicrophoneManager.hpp"
 #include "video/legacy/modules/vita_globals.hpp"
 
+extern "C" bool LiGetEstimatedRttInfo(uint32_t* estimatedRtt, uint32_t* estimatedRttVariance);
+
 static uint64_t monotonicMs()
 {
     return sceKernelGetSystemTimeWide() / 1000ULL; // micro -> ms
@@ -18,7 +20,7 @@ VitaStreamOverlayView::VitaStreamOverlayView()
     : BaseOverlay()
 {
     setPanelPosition(10.0f, 10.0f);
-    setPanelSize(300.0f, 150.0f);
+    setPanelSize(320.0f, 210.0f);
     setPanelAlpha(0.5f); // Semi-transparente
     vitavideo_get_stats(&cached);
 }
@@ -72,7 +74,13 @@ void VitaStreamOverlayView::draw(NVGcontext* vg, float x, float y, float width, 
         off += snprintf(statsBuf + off, sizeof(statsBuf) - off, "Mic Latency: ...\n");
     }
 
-    off += snprintf(statsBuf + off, sizeof(statsBuf) - off, "Session(ms): %u\n", (unsigned)cached.session_ms);
+    uint32_t estRtt    = 0;
+    uint32_t estRttVar = 0;
+    if (!g_session_stopping && LiGetEstimatedRttInfo(&estRtt, &estRttVar))
+    {
+        off += snprintf(statsBuf + off, sizeof(statsBuf) - off, "Ping/RTT: %u ms (var: %u)\n", estRtt, estRttVar);
+    }
+
     statsBuf[sizeof(statsBuf) - 1] = '\0';
 
     const float tx        = panelX + 10.0f;

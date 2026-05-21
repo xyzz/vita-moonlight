@@ -147,12 +147,12 @@ SessionMainView::SessionMainView(const HostInfo& host, const RemoteAppInfo& app)
     if (targetFps > 60)
         targetFps = 60;
 
-    // Always limit software FPS to targetFps (typically 60 or 30).
-    // This prevents the main loop from spinning at 100% CPU when VSync (swap_interval) is off,
-    // which would starve the networking and decoding threads and cause microlag.
+    // On PS Vita GXM, hardware swap buffers is non-blocking on the main thread (it runs asynchronously in a worker thread).
+    // Therefore, we must ALWAYS enable the software rate limiter to prevent the main loop from running at uncontrolled
+    // speeds (150+ FPS) and overwriting GXM buffers before they are scanned out, which causes severe screen tearing.
     brls::Application::setLimitedFPS(targetFps);
-    brls::Application::setSwapInterval(videoSettings.swap_interval); // enable vsync according to configuration
-    brls::Logger::info("[SessionMainView] Init render config (cfg_fps={} -> limitedFPS={} swapInterval={})", targetFps, targetFps, videoSettings.swap_interval);
+    brls::Application::setSwapInterval(videoSettings.swap_interval);
+    brls::Logger::info("[SessionMainView] Init render config (cfg_fps={} -> swapInterval={})", targetFps, videoSettings.swap_interval);
 
     // Direct GXM mode eliminated. render_mode normalizes: 0=legacy,1=ffmpeg (future)
     bool settingsChanged = false;
@@ -172,48 +172,19 @@ SessionMainView::SessionMainView(const HostInfo& host, const RemoteAppInfo& app)
 }
 void SessionMainView::draw(NVGcontext* vg, float x, float y, float width, float height, brls::Style style, brls::FrameContext* ctx)
 {
-    using namespace std::chrono;
-    auto t0 = high_resolution_clock::now();
-
     if (g_controllerInput)
         g_controllerInput->handleInput();
-    auto t1 = high_resolution_clock::now();
 
-    bool isFfmpegMode = (g_video_settings_snapshot.render_mode == 1);
     if (vg)
     {
-        // In Borealis draw loop we prefer NVG path for both modes to avoid
-        // mixing direct vita2d draws inside an active NVG frame.
         VitaVideoRenderer::instance().drawNVG(vg, width, height, 1.0f);
-    }
-    else if (isFfmpegMode)
-    {
-        VitaVideoRenderer::instance().draw(width, height);
     }
     else
     {
-        // Keep legacy fallback for cases where no NVG context is available.
         VitaVideoRenderer::instance().draw(width, height);
     }
-    auto t2 = high_resolution_clock::now();
 
     Box::draw(vg, x, y, width, height, style, ctx);
-    auto t3 = high_resolution_clock::now();
-
-    // Throttled logging (once every ~500ms) to avoid spam
-    static uint64_t lastFrameLogMs = 0;
-    uint64_t now_ms                = duration_cast<milliseconds>(t3.time_since_epoch()).count();
-    if (now_ms - lastFrameLogMs > 500)
-    {
-        lastFrameLogMs = now_ms;
-        auto input_us  = duration_cast<microseconds>(t1 - t0).count();
-        auto video_us  = duration_cast<microseconds>(t2 - t1).count();
-        auto ui_us     = duration_cast<microseconds>(t3 - t2).count();
-        auto total_us  = duration_cast<microseconds>(t3 - t0).count();
-        int fps_i      = (int)std::lround(brls::Application::getFPS());
-        // vita_debug_log("[SessionMain][PERF] fps=%d input=%lldus video=%lldus ui=%lldus total=%lldus", fps_i,
-        //                (long long)input_us, (long long)video_us, (long long)ui_us, (long long)total_us);
-    }
 }
 
 // Function to launch the main session screen

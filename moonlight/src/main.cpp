@@ -236,10 +236,8 @@ int main(int argc, char* argv[])
         startupCfg.load();
         VideoSettings vs = startupCfg.getVideoSettings();
         brls::Application::setSwapInterval(vs.swap_interval);
-        if (vs.swap_interval == 0)
-        {
-            brls::Application::setLimitedFPS(0); // Unlimited FPS
-        }
+        // Always limit UI menus to 60 FPS to prevent 100% CPU usage when VSync (swap_interval) is off
+        brls::Application::setLimitedFPS(60);
     }
 
     brls::Application::getPlatform()->setThemeVariant(brls::ThemeVariant::DARK);

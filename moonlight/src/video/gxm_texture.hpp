@@ -19,6 +19,7 @@ struct GxmTexture
     uint32_t height;
     uint32_t stride; // bytes per row (aligned)
     uint32_t data_size; // total allocated size
+    SceGxmTextureFormat format;
 };
 
 // Create a texture with the given format, allocated in the specified memory type.
@@ -108,6 +109,7 @@ static inline GxmTexture* gxm_texture_create(uint32_t w, uint32_t h,
     tex->height    = h;
     tex->stride    = stride;
     tex->data_size = allocSize;
+    tex->format    = fmt;
 
     return tex;
 }

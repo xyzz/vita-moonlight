@@ -262,8 +262,14 @@ extern "C" int vitavideo_submit_decode_unit(PDECODE_UNIT decodeUnit)
     uint32_t cpuPushPitchBytes = 0;
 
     picture.frame.pPicture[0] = decodeTarget; // decode directly to the chosen buffer
-    // (Phase1) Delayed push to FINAL after swap (similar to Switch: stable frame is exposed)
-    picture.frame.pPicture[1] = NULL; // always NULL
+    if (decodeYuv)
+    {
+        picture.frame.pPicture[1] = decodeTarget + (alignedW * baseH);
+    }
+    else
+    {
+        picture.frame.pPicture[1] = NULL;
+    }
 
     if (decoder_buffer_size < (decodeUnit->fullLength + AV_INPUT_BUFFER_PADDING_SIZE))
     {
@@ -391,6 +397,7 @@ extern "C" int vitavideo_submit_decode_unit(PDECODE_UNIT decodeUnit)
 
     if (!single_frame_buffer)
     {
+        std::lock_guard<std::mutex> slotLock(g_frame_slots_mutex);
         int tmp         = frame_front_idx;
         frame_front_idx = frame_back_idx;
         frame_back_idx  = tmp;

@@ -20,21 +20,8 @@ uint32_t s_prevDecodedCount    = 0;
 
 bool is_gpu_yuv_experimental_enabled()
 {
-    static int cached = -1;
-    if (cached == -1)
-    {
-        const char* env      = getenv("MOONLIGHT_FFMPEG_GPU_YUV");
-        bool envEnabled      = (env && env[0] == '1');
-        bool settingsEnabled = (g_video_settings_snapshot.pixel_format_mode == 1);
-        cached               = (envEnabled || settingsEnabled) ? 1 : 0;
-        if (cached)
-        {
-            VITA_DEBUG_LOG("[Video][NVG][EXP] GPU YUV experimental path enabled (env=%d settings_pixel_format_mode=%d)",
-                envEnabled ? 1 : 0,
-                (int)g_video_settings_snapshot.pixel_format_mode);
-        }
-    }
-    return cached == 1;
+    extern bool g_gpu_yuv_experimental_enabled;
+    return g_gpu_yuv_experimental_enabled;
 }
 
 bool is_yuv_gxm_format(uint32_t fmt)

@@ -60,27 +60,8 @@ static inline void wait_for_borealis_gxm_idle()
 
 static bool is_gpu_yuv_experimental_enabled()
 {
-    static int cached = -1;
-    if (cached == -1)
-    {
-        const char* env      = getenv("MOONLIGHT_FFMPEG_GPU_YUV");
-        bool envEnabled      = (env && env[0] == '1');
-        bool settingsEnabled = (g_video_settings_snapshot.pixel_format_mode == 1);
-        cached               = (envEnabled || settingsEnabled) ? 1 : 0;
-        if (cached)
-        {
-            VITA_DEBUG_LOG("[FFMPEG][EXP] GPU YUV experimental path enabled (env=%d settings_pixel_format_mode=%d)",
-                envEnabled ? 1 : 0,
-                (int)g_video_settings_snapshot.pixel_format_mode);
-        }
-        else
-        {
-            VITA_DEBUG_LOG("[FFMPEG][EXP] GPU YUV experimental path disabled (env=%d settings_pixel_format_mode=%d)",
-                envEnabled ? 1 : 0,
-                (int)g_video_settings_snapshot.pixel_format_mode);
-        }
-    }
-    return cached == 1;
+    extern bool g_gpu_yuv_experimental_enabled;
+    return g_gpu_yuv_experimental_enabled;
 }
 
 struct ffmpeg_perf_counters
@@ -1557,6 +1538,20 @@ extern "C"
         VITA_DEBUG_LOG("[FFMPEG] setup %dx%d @ %dfps ctx=%p", width, height, redrawRate, context);
         std::lock_guard<std::mutex> lock(g_ffmpeg_mutex);
         brls::Logger::info("[FFMPEG] setup {}x{} @ {}fps ctx={:#x}", width, height, redrawRate, (uintptr_t)context);
+
+        {
+            std::lock_guard<std::mutex> slotLock(g_frame_slots_mutex);
+            if (frame_textures[0])
+            {
+                gxm_texture_free(frame_textures[0]);
+                frame_textures[0] = nullptr;
+            }
+            if (frame_textures[1])
+            {
+                gxm_texture_free(frame_textures[1]);
+                frame_textures[1] = nullptr;
+            }
+        }
 
         ffmpeg_release_locked(context);
         if (ffmpeg_video_init(context, width, height, redrawRate) < 0)

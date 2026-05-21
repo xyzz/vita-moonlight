@@ -275,7 +275,15 @@ extern "C" int vitavideo_setup(int videoFormat, int width, int height, int redra
         bool texturesOk      = true;
         bool reusingTextures = false;
 
-        // Check if existing textures are the correct size
+        uint32_t decoderPixelType         = (decoder_output_mode == 1)
+                    ? SCE_AVCDEC_PIXELFORMAT_YUV420_PACKED_RASTER
+                    : SCE_AVCDEC_PIXELFORMAT_RGBA8888;
+        SceGxmTextureFormat textureFormat = SCE_GXM_TEXTURE_FORMAT_A8B8G8R8;
+        if (decoderPixelType == SCE_AVCDEC_PIXELFORMAT_YUV420_PACKED_RASTER)
+        {
+            textureFormat = SCE_GXM_TEXTURE_FORMAT_YVU420P2_CSC0;
+        }
+
         if (frame_textures[0] && frame_textures[1])
         {
             uint32_t tex0_w = gxm_texture_get_width(frame_textures[0]);
@@ -283,16 +291,15 @@ extern "C" int vitavideo_setup(int videoFormat, int width, int height, int redra
             uint32_t tex1_w = gxm_texture_get_width(frame_textures[1]);
             uint32_t tex1_h = gxm_texture_get_height(frame_textures[1]);
 
-            if (tex0_w == (unsigned)width && tex0_h == (unsigned)height && tex1_w == (unsigned)width && tex1_h == (unsigned)height)
+            if (tex0_w == (unsigned)width && tex0_h == (unsigned)height && tex1_w == (unsigned)width && tex1_h == (unsigned)height && frame_textures[0]->format == textureFormat && frame_textures[1]->format == textureFormat)
             {
                 reusingTextures = true;
-                VITA_DEBUG_LOG("[Video] Reutilizando texturas existentes (%ux%u)", width, height);
+                VITA_DEBUG_LOG("[Video] Reutilizando texturas existentes (%ux%u format=0x%08X)", width, height, (unsigned)textureFormat);
             }
             else
             {
-                // Different size, release old textures
-                VITA_DEBUG_LOG("[Video] Liberando texturas con tamaño incorrecto (old=%ux%u, new=%ux%u)",
-                    tex0_w, tex0_h, width, height);
+                VITA_DEBUG_LOG("[Video] Liberando texturas incompatibles (size=%ux%u, format=0x%08X)",
+                    tex0_w, tex0_h, (unsigned)frame_textures[0]->format);
                 gxm_texture_free(frame_textures[0]);
                 gxm_texture_free(frame_textures[1]);
                 frame_textures[0] = nullptr;
@@ -303,14 +310,6 @@ extern "C" int vitavideo_setup(int videoFormat, int width, int height, int redra
         if (!reusingTextures)
         {
             // Create new textures at stream resolution using direct GXM allocation
-            uint32_t decoderPixelType         = (decoder_output_mode == 1)
-                        ? SCE_AVCDEC_PIXELFORMAT_YUV420_PACKED_RASTER
-                        : SCE_AVCDEC_PIXELFORMAT_RGBA8888;
-            SceGxmTextureFormat textureFormat = SCE_GXM_TEXTURE_FORMAT_A8B8G8R8;
-            if (decoderPixelType == SCE_AVCDEC_PIXELFORMAT_YUV420_PACKED_RASTER)
-            {
-                textureFormat = SCE_GXM_TEXTURE_FORMAT_YVU420P2_CSC0;
-            }
             for (int i = 0; i < 2; i++)
             {
                 frame_textures[i] = gxm_texture_create(

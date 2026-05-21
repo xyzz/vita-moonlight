@@ -13,6 +13,8 @@
 typedef struct FFmpegVideoContext FFmpegVideoContext;
 #endif
 
+extern bool g_gpu_yuv_experimental_enabled;
+
 // VideoManager - Manage video system selection and configuration
 class VideoManager
 {

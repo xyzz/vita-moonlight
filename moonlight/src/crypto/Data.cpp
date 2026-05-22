@@ -5,6 +5,8 @@
 #include <borealis.hpp>
 #include <cstdlib>
 
+#include "debug.hpp"
+
 Data::Data(unsigned char* bytes, size_t size)
 {
     if (bytes && size > 0)
@@ -36,7 +38,7 @@ Data Data::subdata(size_t start, size_t size)
 {
     if (start + size > m_size)
     {
-        brls::Logger::error("Data: Invalid data length...");
+        vita_log::error("Data: Invalid data length...");
         exit(-1);
     }
     return Data(&m_bytes[start], size);
@@ -135,7 +137,7 @@ void Data::write_to_file(std::string path)
     }
     else
     {
-        brls::Logger::error("Data: Path not found: %s", path.c_str());
+        vita_log::error("Data: Path not found: %s", path.c_str());
     }
 }
 

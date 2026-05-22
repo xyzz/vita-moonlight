@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "GameStreamClient.hpp"
+#include "debug.hpp"
 #include "moonmic/MoonmicBridge.hpp"
 
 namespace moonmic
@@ -31,12 +32,12 @@ namespace
 
         if (userWantedSwitch) {
             // User chose to switch (Restart Host) -> Send FORCE flag
-            brls::Logger::info("[MoonmicPrep] User chose switch -> Sending FORCE handshake");
+            vita_log::info("[MoonmicPrep] User chose switch -> Sending FORCE handshake");
             bridge.sendResolutionHandshake(micHost, micPort, true);
             // After force, host restarts. We proceed to wait for apps.
         } else {
             // User chose to keep host resolution -> Update local target
-            brls::Logger::info("[MoonmicPrep] User chose keep host res -> Updating local target to {}x{}", hostW, hostH);
+            vita_log::info("[MoonmicPrep] User chose keep host res -> Updating local target to %dx%d", hostW, hostH);
             bridge.setTargetResolution(hostW, hostH);
         }
 
@@ -109,7 +110,7 @@ namespace
             if (result.mismatch) {
                 int hostW = result.current_width;
                 int hostH = result.current_height;
-                brls::Logger::warning("[MoonmicPrep] Resolution mismatch detected, Host has {}x{}", hostW, hostH);
+                vita_log::warning("[MoonmicPrep] Resolution mismatch detected, Host has %dx%d", hostW, hostH);
 
                 // Show dialog on main thread AND RETURN from this thread
                 brls::sync([hostW, hostH, hostCopy, micHost, micPort, callbacks]() {

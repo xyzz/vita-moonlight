@@ -168,7 +168,6 @@ RearTouchSettingsTab::RearTouchSettingsTab()
                 updateRearTouchDetail(vs.rear_touch);
             }
         );
-    vita_debug_log("[RearTouchSettingsTab] pushing RearTouchCalibrationOverlay - itemTitle='%s'", overlay->getAppletFrameItem()->title.c_str());
     brls::Application::pushActivity(new brls::Activity(overlay));
         return true; });
 

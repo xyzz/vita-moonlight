@@ -21,8 +21,9 @@
 #include "CryptoManager.hpp"
 #include "client.h"
 #include "errors.h"
-#include <borealis/core/logger.hpp>
+#include "debug.hpp"
 
+#include <fmt/format.h>
 #include <curl/curl.h>
 #include <cstring>
 #include <sys/stat.h>
@@ -30,6 +31,44 @@
 static bool curlGlobalInit = false;
 static std::string certificateFilePath;
 static std::string keyFilePath;
+
+extern "C" void vita_debug_log(const char* fmt, ...);
+
+static void _gs_log_info(const std::string& msg) {
+#if defined(__PSV__) || defined(__psp2__) || defined(__PSP2__)
+    vita_debug_log("%s", msg.c_str());
+#else
+    vita_log::info("{}", msg);
+#endif
+}
+
+static void _gs_log_error(const std::string& msg) {
+#if defined(__PSV__) || defined(__psp2__) || defined(__PSP2__)
+    vita_debug_log("%s", msg.c_str());
+#else
+    vita_log::error("{}", msg);
+#endif
+}
+
+static int _curl_debug_log(CURL* /*handle*/, curl_infotype type, char* data, size_t size, void* /*userptr*/) {
+    if (!data || size == 0) {
+        return 0;
+    }
+
+    // Keep only human-readable verbose lines (skip raw payload dumps)
+    if (type != CURLINFO_TEXT && type != CURLINFO_HEADER_IN && type != CURLINFO_HEADER_OUT) {
+        return 0;
+    }
+
+    std::string msg(data, size);
+    while (!msg.empty() && (msg.back() == '\n' || msg.back() == '\r')) {
+        msg.pop_back();
+    }
+    if (!msg.empty()) {
+        _gs_log_info(msg);
+    }
+    return 0;
+}
 
 static bool _file_exists(const std::string& path) {
     struct stat st {};
@@ -65,11 +104,11 @@ int http_init(const std::string& key_directory) {
     // Always refresh file paths because keyDir can change between hosts/retries.
     certificateFilePath = actual_key_directory + "/" + CERTIFICATE_FILE_NAME;
     keyFilePath = actual_key_directory + "/" + KEY_FILE_NAME;
-    brls::Logger::info("Curl: TLS files cert='{}' ({}) key='{}' ({})",
+    _gs_log_info(fmt::format("Curl: TLS files cert='{}' ({}) key='{}' ({})",
                        certificateFilePath,
                        _file_exists(certificateFilePath) ? "ok" : "missing",
                        keyFilePath,
-                       _file_exists(keyFilePath) ? "ok" : "missing");
+                       _file_exists(keyFilePath) ? "ok" : "missing"));
 
     if (!curlGlobalInit) {
 #if LIBCURL_VERSION_NUM >= 0x075600
@@ -80,7 +119,7 @@ int http_init(const std::string& key_directory) {
 #endif
 #endif
         curl_global_init(CURL_GLOBAL_ALL);
-        brls::Logger::info("Curl: {}", curl_version());
+        _gs_log_info(fmt::format("Curl: {}", curl_version()));
         curlGlobalInit = true;
     }
     return GS_OK;
@@ -93,6 +132,7 @@ CURL* makeCurl() {
         return nullptr;
 
     curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
+    curl_easy_setopt(curl, CURLOPT_DEBUGFUNCTION, _curl_debug_log);
     curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
     curl_easy_setopt(curl, CURLOPT_SSLENGINE_DEFAULT, 1L);
     curl_easy_setopt(curl, CURLOPT_SSLCERTTYPE, "PEM");
@@ -113,7 +153,7 @@ void freeCurl(CURL* curl) {
 
 int http_request(const std::string& url, Data* data,
                  HTTPRequestTimeout timeout) {
-    brls::Logger::info("Curl: Request:\n{}", url.c_str());
+    _gs_log_info(fmt::format("Curl: Request:\n{}", url.c_str()));
 
     auto* http_data = (HTTP_DATA*)malloc(sizeof(HTTP_DATA));
     if (!http_data) {
@@ -143,13 +183,13 @@ int http_request(const std::string& url, Data* data,
 
     if (res != CURLE_OK) {
         gs_set_error(curl_easy_strerror(res));
-        brls::Logger::error("Curl: error: {}", gs_error().c_str());
+        _gs_log_error(fmt::format("Curl: error: {}", gs_error().c_str()));
         freeCurl(curl);
         free(http_data->memory);
         free(http_data);
         return GS_FAILED;
     } else if (http_data->memory == nullptr) {
-        brls::Logger::error("Curl: memory = NULL");
+        _gs_log_error("Curl: memory = NULL");
         freeCurl(curl);
         free(http_data->memory);
         free(http_data);
@@ -159,9 +199,9 @@ int http_request(const std::string& url, Data* data,
     *data = Data(http_data->memory, http_data->size);
 
     if (http_data->size > 3000) {
-        brls::Logger::info("Curl: Response: Ok");
+        _gs_log_info("Curl: Response: Ok");
     } else {
-        brls::Logger::info("Curl: Response:\n{}", http_data->memory);
+        _gs_log_info(fmt::format("Curl: Response:\n{}", http_data->memory));
     }
 
     free(http_data->memory);

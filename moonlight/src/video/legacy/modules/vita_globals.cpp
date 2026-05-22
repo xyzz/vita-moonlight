@@ -22,7 +22,7 @@ int frame_display_idx         = 0; // GPU reads from this
 int frame_ready_idx           = 1; // most recently decoded frame, waiting
 int frame_write_idx           = 2; // decoder writes to this
 std::mutex g_frame_slots_mutex;
-bool single_frame_buffer = false; // default triple buffer; can be activated for legacy testing
+bool single_frame_buffer = true; // single buffer for minimal latency (like original legacy)
 
 int SCREEN_WIDTH  = 960;
 int SCREEN_HEIGHT = 544;

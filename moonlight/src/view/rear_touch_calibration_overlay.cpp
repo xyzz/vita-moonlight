@@ -364,7 +364,7 @@ RearTouchCalibrationOverlay::RearTouchCalibrationOverlay(const RearTouchSettings
     this->setTitle(overlayTitle);
     this->getAppletFrameItem()->title = overlayTitle;
     // Use vita_debug_log so the log can be toggled on Vita via g_debug_log_enabled
-    vita_debug_log("[RearTouchCalibrationOverlay] constructor set title='%s'", overlayTitle.c_str());
+    vita_log::info("[RearTouchCalibrationOverlay] constructor set title='%s'", overlayTitle.c_str());
     root->setGrow(1.0f);
     canvas                              = new RearTouchCalibrationCanvas(initialSettings);
     canvas->getAppletFrameItem()->title = brls::getStr("moonlight/rear_touch/calibration/title");

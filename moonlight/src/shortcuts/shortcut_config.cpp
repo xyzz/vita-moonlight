@@ -464,7 +464,7 @@ bool ShortcutConfigStore::load(ShortcutConfig& outConfig) const
 
     if (parseResult != 0)
     {
-        vita_debug_log("[Shortcuts] shortcuts.conf not found or invalid, writing defaults");
+        vita_log::error("[Shortcuts] shortcuts.conf not found or invalid, writing defaults");
         save(outConfig);
         return false;
     }
@@ -502,7 +502,7 @@ bool ShortcutConfigStore::save(const ShortcutConfig& config) const
     std::ofstream out(path, std::ios::trunc);
     if (!out.is_open())
     {
-        vita_debug_log("[Shortcuts] Failed to open shortcuts config for write: %s", path.c_str());
+        vita_log::error("[Shortcuts] Failed to open shortcuts config for write: %s", path.c_str());
         return false;
     }
 

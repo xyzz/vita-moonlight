@@ -6,11 +6,11 @@
 #include <string.h>
 
 #include <atomic>
-#include <borealis/core/logger.hpp>
 #include <mutex>
 #include <unordered_map>
 #include <vector>
 
+#include "debug.hpp"
 #include "gamestream/client.h"
 #include "gamestream/errors.h"
 
@@ -32,12 +32,19 @@ extern "C"
 #include "video/VitaVideoRenderer.hpp"
 
 #ifdef BOREALIS_USE_GXM
-#include <borealis/extern/nanovg/nanovg_gxm_utils.h>
 #include <psp2/display.h>
 #include <psp2/gxm.h>
 #include <psp2/kernel/processmgr.h>
 #include <psp2/kernel/threadmgr.h>
 #include <psp2/videodec.h>
+
+// Override default buffering for lower latency
+// Keep DISPLAY_BUFFER_COUNT at 3 to prevent vertical tearing
+// Reduce MAX_PENDING_SWAPS from 2 to 1 for lower latency
+#define DISPLAY_BUFFER_COUNT 3
+#define MAX_PENDING_SWAPS 1
+
+#include <borealis/extern/nanovg/nanovg_gxm_utils.h>
 #endif
 
 static FFmpegVideoContext* g_ffmpeg_context = nullptr;
@@ -50,11 +57,11 @@ static unsigned g_ffmpeg_frame_index    = 0;
 static inline void wait_for_borealis_gxm_idle()
 {
 #ifdef BOREALIS_USE_GXM
-    NVGXMwindow* win = gxmGetWindow();
-    if (win && win->context)
-    {
-        sceKernelDelayThread(1000);
-    }
+    // Delay removed to reduce video transmission latency
+    // The original legacy version does not have this delay
+    // NVGXMwindow* win = gxmGetWindow();
+    // if (win && win->context) {
+    //     sceKernelDelayThread(1000);
 #endif
 }
 
@@ -776,8 +783,10 @@ static bool publish_direct_frame(FFmpegVideoContext* ctx, AVFrame* frame)
         return false;
     }
 
-    // Use triple buffering in direct mode so we only recycle the oldest slot.
-    // Rotation: spare -> front, front -> back, back -> spare.
+    // Triple buffering system:
+    // This fixes tearing and synchronization issues but adds latency.
+    // For maximum performance and minimum latency, single buffer would be better,
+    // but triple buffering is used here for stability. Not optimal for max performance.
     dr_texture* texFront = reinterpret_cast<dr_texture*>(ctx->dr_textures[ctx->dr_front_idx]);
     dr_texture* texSpare = reinterpret_cast<dr_texture*>(ctx->dr_textures[ctx->dr_spare_idx]);
     if (!texSpare)
@@ -954,7 +963,7 @@ static bool publish_sw_frame(FFmpegVideoContext* ctx, AVFrame* frame)
             nullptr);
         if (!ctx->sws_context)
         {
-            brls::Logger::error("[FFMPEG] Unable to create swscale context for format {}", frame->format);
+            vita_log::error("[FFMPEG] Unable to create swscale context for format %d", frame->format);
             return false;
         }
         ctx->sws_src_w   = frame->width;
@@ -1177,7 +1186,7 @@ static bool publish_sw_frame(FFmpegVideoContext* ctx, AVFrame* frame)
                 p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7]);
         }
 
-        brls::Logger::error("[FFMPEG] sws_scale failed");
+        vita_log::error("[FFMPEG] sws_scale failed");
         if (used_temp)
         {
             av_free(tmp_y);
@@ -1530,7 +1539,7 @@ extern "C"
         auto* context = static_cast<FFmpegVideoContext*>(ctxPtr);
         if (!context)
         {
-            brls::Logger::error("[FFMPEG] setup received null context");
+            vita_log::error("[FFMPEG] setup received null context");
             VITA_DEBUG_LOG("[FFMPEG] setup received null context");
             return -1;
         }
@@ -1544,7 +1553,7 @@ extern "C"
 
         VITA_DEBUG_LOG("[FFMPEG] setup %dx%d @ %dfps ctx=%p", width, height, redrawRate, context);
         std::lock_guard<std::mutex> lock(g_ffmpeg_mutex);
-        brls::Logger::info("[FFMPEG] setup {}x{} @ {}fps ctx={:#x}", width, height, redrawRate, (uintptr_t)context);
+        vita_log::info("[FFMPEG] setup %dx%d @ %dfps ctx=%p", width, height, redrawRate, context);
 
         {
             std::lock_guard<std::mutex> slotLock(g_frame_slots_mutex);
@@ -1568,7 +1577,7 @@ extern "C"
         ffmpeg_release_locked(context);
         if (ffmpeg_video_init(context, width, height, redrawRate) < 0)
         {
-            brls::Logger::error("[FFMPEG] init failed");
+            vita_log::error("[FFMPEG] init failed");
             return -1;
         }
 
@@ -1592,7 +1601,7 @@ extern "C"
 
         if (ffmpeg_decoder_init(&context->decoder) < 0)
         {
-            brls::Logger::error("[FFMPEG] decoder init failed");
+            vita_log::error("[FFMPEG] decoder init failed");
             ffmpeg_release_locked(context);
             return -1;
         }
@@ -1840,7 +1849,7 @@ extern "C"
                 }
                 if (drain < 0)
                 {
-                    brls::Logger::error("[FFMPEG] receive_frame drain error: 0x{:X}", drain);
+                    vita_log::error("[FFMPEG] receive_frame drain error: 0x%X", drain);
                     break;
                 }
                 if (drainReceived)
@@ -1879,7 +1888,7 @@ extern "C"
         uint32_t copyStartUs = perf_now_us();
         if (av_new_packet(pkt, decodeUnit->fullLength) < 0)
         {
-            brls::Logger::error("[FFMPEG] av_new_packet failed size={}", decodeUnit->fullLength);
+            vita_log::error("[FFMPEG] av_new_packet failed size=%d", decodeUnit->fullLength);
             // Do not free decodeUnit here; ownership belongs to the depacketizer.
             copyUs = perf_now_us() - copyStartUs;
             finalize_submit_metrics();
@@ -1921,7 +1930,7 @@ extern "C"
         }
         if (sendRes < 0 && sendRes != AVERROR(EAGAIN))
         {
-            brls::Logger::error("[FFMPEG] send_packet error=0x{:X}", sendRes);
+            vita_log::error("[FFMPEG] send_packet error=0x%X", sendRes);
             finalize_submit_metrics();
             return DR_NEED_IDR;
         }
@@ -1946,7 +1955,7 @@ extern "C"
                 }
                 if (ret < 0)
                 {
-                    brls::Logger::error("[FFMPEG] receive_frame error=0x{:X}", ret);
+                    vita_log::error("[FFMPEG] receive_frame error=0x%X", ret);
                     av_frame_free(&tempFrame);
                     // Do not free decodeUnit here; caller (depacketizer) handles freeing.
                     recvUs = perf_now_us() - recvStartUs;

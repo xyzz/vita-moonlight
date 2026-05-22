@@ -336,11 +336,11 @@ extern "C" int vitavideo_setup(int videoFormat, int width, int height, int redra
         }
 
         frame_display_idx               = 0;
-        frame_ready_idx                 = 1;
-        frame_write_idx                 = 2;
-        single_frame_buffer             = false;
-        legacy_single_immediate_present = false;
-        VITA_DEBUG_LOG("[Video][INIT] triple buffer (display=%d ready=%d write=%d)", frame_display_idx, frame_ready_idx, frame_write_idx);
+        frame_ready_idx                 = 0;
+        frame_write_idx                 = 0;
+        single_frame_buffer             = true;
+        legacy_single_immediate_present = true;
+        VITA_DEBUG_LOG("[Video][INIT] single buffer (display=%d ready=%d write=%d) - minimal latency mode", frame_display_idx, frame_ready_idx, frame_write_idx);
         VITA_DEBUG_LOG("[Video][INIT] tex0=%p tex1=%p tex2=%p", gxm_texture_get_datap(frame_textures[0]), gxm_texture_get_datap(frame_textures[1]), gxm_texture_get_datap(frame_textures[2]));
         VITA_DEBUG_LOG("[Video] Framebuffer inicializado");
 

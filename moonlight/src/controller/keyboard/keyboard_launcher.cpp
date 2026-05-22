@@ -26,14 +26,14 @@ bool open_configured_keyboard()
 {
     if (!g_controllerInput)
     {
-        vita_debug_log("[KeyboardLauncher] g_controllerInput is null");
+        vita_log::error("[KeyboardLauncher] g_controllerInput is null");
         return false;
     }
 
     IKeyboard* active = g_controllerInput->getActiveKeyboard();
     if (active)
     {
-        vita_debug_log("[KeyboardLauncher] Keyboard is already active (%p)", active);
+        vita_log::info("[KeyboardLauncher] Keyboard is already active (%p)", active);
         return false;
     }
 
@@ -48,7 +48,7 @@ bool open_configured_keyboard()
         if (!legacyKb->isOpen())
         {
             delete legacyKb;
-            vita_debug_log("[KeyboardLauncher] Legacy keyboard failed to open");
+            vita_log::error("[KeyboardLauncher] Legacy keyboard failed to open");
             return false;
         }
         g_controllerInput->setActiveKeyboard(legacyKb);

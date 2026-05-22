@@ -2,6 +2,7 @@
 
 #include <borealis/core/logger.hpp>
 
+#include "debug.hpp"
 #include "ffmpeg/ffmpeg.hpp"
 #include "legacy/modules/vita_globals.hpp"
 #include "legacy/vita.hpp"
@@ -73,7 +74,7 @@ bool VideoManager::initialize()
             video_fullscreen_stretch       = settings.fullscreen;
             _currentModeInt                = settings.render_mode;
             _currentMode                   = (_currentModeInt == 0) ? "legacy" : "ffmpeg";
-            brls::Logger::info("[VideoManager] Re-inicializando modo de renderizado: {}", _currentMode);
+            vita_log::info("[VideoManager] Re-inicializando modo de renderizado: %s", _currentMode.c_str());
             if (_currentMode == "ffmpeg")
             {
                 if (!_ffmpegContext)
@@ -96,7 +97,7 @@ bool VideoManager::initialize()
         return true;
     }
 
-    brls::Logger::info("[VideoManager] Inicializando sistema de video...");
+    vita_log::info("[VideoManager] Inicializando sistema de video...");
 
     // Load configuration
     _config.load();
@@ -110,7 +111,7 @@ bool VideoManager::initialize()
     _currentModeInt = settings.render_mode;
     _currentMode    = (_currentModeInt == 0) ? "legacy" : "ffmpeg";
 
-    brls::Logger::info("[VideoManager] Modo de renderizado configurado: {}", _currentMode);
+    vita_log::info("[VideoManager] Modo de renderizado configurado: %s", _currentMode.c_str());
 
     // If the default mode is ffmpeg, prepare the context
     if (_currentMode == "ffmpeg")
@@ -127,7 +128,7 @@ bool VideoManager::initialize()
     // via Limelight callbacks
 
     _initialized = true;
-    brls::Logger::info("[VideoManager] Sistema de video inicializado correctamente");
+    vita_log::info("[VideoManager] Sistema de video inicializado correctamente");
     return true;
 }
 
@@ -138,7 +139,7 @@ void VideoManager::setRenderMode(const std::string& mode)
         return;
     }
 
-    brls::Logger::info("[VideoManager] Cambiando modo de renderizado de {} a {}", _currentMode, mode);
+    vita_log::info("[VideoManager] Cambiando modo de renderizado de %s a %s", _currentMode.c_str(), mode.c_str());
 
     // Stop current video if it is running
     if (_videoRunning)
@@ -185,7 +186,7 @@ void VideoManager::setRenderMode(const std::string& mode)
     // We do not need manual contexts since the legacy system manages its own state
     // via Limelight callbacks
 
-    brls::Logger::info("[VideoManager] Modo de renderizado cambiado exitosamente");
+    vita_log::info("[VideoManager] Modo de renderizado cambiado exitosamente");
 }
 
 // Static callbacks that delegate based on current mode
@@ -220,14 +221,14 @@ DECODER_RENDERER_CALLBACKS VideoManager::getDecoderCallbacks()
         callbacks = get_ffmpeg_video_callbacks();
     }
 
-    brls::Logger::info("[VideoManager] Callbacks configurados para modo {}", _currentMode);
+    vita_log::info("[VideoManager] Callbacks configurados para modo %s", _currentMode.c_str());
     // Debug: log the function pointer addresses so device memory/stack dumps can be correlated
-    brls::Logger::info("[VideoManager] Decoder callback ptrs - setup: {:#x}, start: {:#x}, stop: {:#x}, cleanup: {:#x}, submit: {:#x}",
-        reinterpret_cast<uintptr_t>(callbacks.setup),
-        reinterpret_cast<uintptr_t>(callbacks.start),
-        reinterpret_cast<uintptr_t>(callbacks.stop),
-        reinterpret_cast<uintptr_t>(callbacks.cleanup),
-        reinterpret_cast<uintptr_t>(callbacks.submitDecodeUnit));
+    vita_log::info("[VideoManager] Decoder callback ptrs - setup: %p, start: %p, stop: %p, cleanup: %p, submit: %p",
+        (void*)callbacks.setup,
+        (void*)callbacks.start,
+        (void*)callbacks.stop,
+        (void*)callbacks.cleanup,
+        (void*)callbacks.submitDecodeUnit);
     return callbacks;
 }
 
@@ -235,13 +236,13 @@ void VideoManager::startVideo()
 {
     if (!_initialized)
     {
-        brls::Logger::error("[VideoManager] No se puede iniciar video: sistema no inicializado");
+        vita_log::error("[VideoManager] No se puede iniciar video: sistema no inicializado");
         return;
     }
 
     if (_videoRunning)
     {
-        brls::Logger::warning("[VideoManager] Video ya está corriendo");
+        vita_log::warning("[VideoManager] Video ya está corriendo");
         return;
     }
 
@@ -252,24 +253,24 @@ void VideoManager::startVideo()
         _currentModeInt = settings.render_mode;
         _currentMode    = (_currentModeInt == 0) ? "legacy" : "ffmpeg";
         set_render_mode_cached(_currentModeInt);
-        brls::Logger::info("[VideoManager] Modo de render actualizado dinámicamente a {}", _currentMode);
+        vita_log::info("[VideoManager] Modo de render actualizado dinámicamente a %s", _currentMode.c_str());
     }
     g_video_settings_snapshot      = settings;
     const char* env                = getenv("MOONLIGHT_FFMPEG_GPU_YUV");
     g_gpu_yuv_experimental_enabled = (env && env[0] == '1') || (settings.pixel_format_mode == 1);
     video_fullscreen_stretch       = settings.fullscreen;
 
-    brls::Logger::info("[VideoManager] Iniciando video en modo {}", _currentMode);
+    vita_log::info("[VideoManager] Iniciando video en modo %s", _currentMode.c_str());
 
     if (_currentMode == "legacy")
     {
         // The legacy system manages its own internal state through callbacks
-        brls::Logger::info("[VideoManager] Video legacy iniciado");
+        vita_log::info("[VideoManager] Video legacy iniciado");
     }
     else if (_currentMode == "ffmpeg")
     {
         // TODO: Deploy when we have FFmpeg
-        brls::Logger::info("[VideoManager] Video FFmpeg iniciado (placeholder)");
+        vita_log::info("[VideoManager] Video FFmpeg iniciado (placeholder)");
     }
 
     _videoRunning = true;
@@ -282,12 +283,12 @@ void VideoManager::stopVideo()
         return;
     }
 
-    brls::Logger::info("[VideoManager] Deteniendo video en modo {}", _currentMode);
+    vita_log::info("[VideoManager] Deteniendo video en modo %s", _currentMode.c_str());
 
     if (_currentMode == "legacy")
     {
         // The legacy system handles its own cleanup through callbacks
-        brls::Logger::info("[VideoManager] Video legacy detenido");
+        vita_log::info("[VideoManager] Video legacy detenido");
     }
     else if (_currentMode == "ffmpeg")
     {
@@ -295,7 +296,7 @@ void VideoManager::stopVideo()
         {
             ffmpeg_video_stop(_ffmpegContext);
         }
-        brls::Logger::info("[VideoManager] Video FFmpeg detenido");
+        vita_log::info("[VideoManager] Video FFmpeg detenido");
     }
 
     _videoRunning = false;

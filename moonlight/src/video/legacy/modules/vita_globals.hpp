@@ -44,7 +44,7 @@ extern gs::SpsContext* g_sps_ctx; // SPS context (raw pointer)
 #include "../vita.hpp"
 
 // Defines
-#define VITA_DEBUG_LOG(...) vita_debug_log(__VA_ARGS__)
+#define VITA_DEBUG_LOG(...) vita_log::info(__VA_ARGS__)
 
 #define DECODER_BUFFER_SIZE (128 * 1024)
 #define AV_INPUT_BUFFER_PADDING_SIZE 64

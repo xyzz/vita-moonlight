@@ -45,7 +45,7 @@ bool executeShortcutAction(ShortcutAction action)
             break;
     }
 
-    vita_debug_log("[Shortcuts] Action requested without callback: %u", static_cast<unsigned>(action));
+    vita_log::info("[Shortcuts] Action requested without callback: %u", static_cast<unsigned>(action));
     return false;
 }
 

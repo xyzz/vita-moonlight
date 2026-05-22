@@ -86,23 +86,23 @@ void startConnectionTest(const HostInfo& host)
         bool is_es = (currentLocale == "es");
         auto result = tester->run();
 
-        vita_debug_log("[Moonbeam] Unified Connection Test finished for Host: %s (%s)", host.name.c_str(), host.ip.c_str());
+        vita_log::info("[Moonbeam] Unified Connection Test finished for Host: %s (%s)", host.name.c_str(), host.ip.c_str());
         if (!result.success) {
-            vita_debug_log("[Moonbeam] Test failed: %s", result.error_message.c_str());
+            vita_log::error("[Moonbeam] Test failed: %s", result.error_message.c_str());
         } else {
-            vita_debug_log("[Moonbeam] Quality Rating: %s", result.rating.c_str());
-            vita_debug_log("[Moonbeam] Latency: Avg: %.2f ms (Min: %.2f, Max: %.2f), Jitter: %.2f ms, Packet Loss: %.2f%%",
+            vita_log::info("[Moonbeam] Quality Rating: %s", result.rating.c_str());
+            vita_log::info("[Moonbeam] Latency: Avg: %.2f ms (Min: %.2f, Max: %.2f), Jitter: %.2f ms, Packet Loss: %.2f%%",
                            result.avg_ping_ms, result.min_ping_ms, result.max_ping_ms, result.jitter_ms, result.packet_loss_pct);
-            vita_debug_log("[Moonbeam] - Video Bitrate Stability Results:");
+            vita_log::info("[Moonbeam] - Video Bitrate Stability Results:");
             for (const auto& r : result.steps) {
                 std::string nameStr = (r.bitrate == -1) ? "Maximum/Unlimited" : std::to_string(r.bitrate) + " Kbps";
-                vita_debug_log("[Moonbeam]   - Bitrate %s: %s (Achieved: %.1f Kbps)",
+                vita_log::info("[Moonbeam]   - Bitrate %s: %s (Achieved: %.1f Kbps)",
                                nameStr.c_str(), r.stable ? "STABLE" : "UNSTABLE", r.speed_kbps);
-                vita_debug_log("[Moonbeam]     Latency under load: Avg: %.2f ms, Min: %.2f ms, Max: %.2f ms, Jitter: %.2f ms",
+                vita_log::info("[Moonbeam]     Latency under load: Avg: %.2f ms, Min: %.2f ms, Max: %.2f ms, Jitter: %.2f ms",
                                r.avg_latency_ms, r.min_latency_ms, r.max_latency_ms, r.jitter_ms);
-                vita_debug_log("[Moonbeam]     Stutter/Drop events: %d", r.stutters);
+                vita_log::info("[Moonbeam]     Stutter/Drop events: %d", r.stutters);
             }
-            vita_debug_log("[Moonbeam] Recommendation: %s", result.recommendation.c_str());
+            vita_log::info("[Moonbeam] Recommendation: %s", result.recommendation.c_str());
         }
 
         brls::sync([result, progressDialog, host, tester, is_es]() {

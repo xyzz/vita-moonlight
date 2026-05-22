@@ -2,7 +2,6 @@
 #include "session/vita_session.hpp"
 
 #include <borealis/core/application.hpp>
-#include <borealis/core/logger.hpp>
 #include <chrono>
 #include <cstring>
 #include <thread>
@@ -12,13 +11,21 @@
 #include "Limelight.h"
 #include "controller/ControllerInput.hpp"
 #include "controller/audio.hpp"
+#include "debug.hpp"
 #include "video/VideoManager.hpp"
 #include "video/VitaVideoRenderer.hpp"
 #include "video/legacy/modules/vita_globals.hpp"
 #include "video/legacy/vita.hpp" // vitavideo_get_stats, decoder callbacks
 #ifdef BOREALIS_USE_GXM
-#include <borealis/extern/nanovg/nanovg_gxm_utils.h>
 #include <psp2/gxm.h>
+
+// Override default buffering for lower latency
+// Keep DISPLAY_BUFFER_COUNT at 3 to prevent vertical tearing
+// Reduce MAX_PENDING_SWAPS from 2 to 1 for lower latency
+#define DISPLAY_BUFFER_COUNT 3
+#define MAX_PENDING_SWAPS 1
+
+#include <borealis/extern/nanovg/nanovg_gxm_utils.h>
 #endif
 
 namespace
@@ -43,14 +50,14 @@ VitaSession::VitaSession(const std::string& address, int appId, bool isSunshine)
     , m_is_sunshine(isSunshine)
 {
     s_active = this;
-    brls::Logger::info("[VitaSession] creada address={} appId={} sunshine={}", address, appId, isSunshine);
+    vita_log::info("[VitaSession] creada address=%s appId=%d sunshine=%d", address.c_str(), appId, isSunshine);
 }
 
 VitaSession::~VitaSession()
 {
     if (s_active == this)
         s_active = nullptr;
-    brls::Logger::info("[VitaSession] destruida");
+    vita_log::info("[VitaSession] destruida");
 }
 
 VitaSession* VitaSession::active() { return s_active; }
@@ -73,11 +80,11 @@ void VitaSession::notifyGamepadType()
 
     if (LiSendControllerArrivalEvent(0, 0x01, liType, supportedButtonFlags, capabilities) != 0)
     {
-        brls::Logger::error("[VitaSession] Fallo notificar tipo de gamepad al servidor");
+        vita_log::error("[VitaSession] Fallo notificar tipo de gamepad al servidor");
     }
     else
     {
-        brls::Logger::info("[VitaSession] Tipo de gamepad notificado al servidor (LI_CTYPE={})", liType);
+        vita_log::info("[VitaSession] Tipo de gamepad notificado al servidor (LI_CTYPE=%d)", liType);
     }
 }
 
@@ -98,7 +105,7 @@ void VitaSession::destroyActive(bool terminateApp)
     // while GPU calls may still be in-flight.
     std::thread([]()
         {
-        brls::Logger::info("[VitaSession] deferred delete watcher started");
+        vita_log::info("[VitaSession] deferred delete watcher started");
 
         // Wait until the session reports terminated and the pacer thread is gone.
         // Timeout after ~5 seconds to avoid leaking forever in pathological cases.
@@ -111,14 +118,14 @@ void VitaSession::destroyActive(bool terminateApp)
         }
 
         // Ensure any pending rendering on Borealis GXM context is finished before finalizing.
-        brls::Logger::info("[VitaSession] waiting for GXM rendering to finish before delete");
+        vita_log::info("[VitaSession] waiting for GXM rendering to finish before delete");
         wait_for_borealis_gxm_idle();
 
         // Small back-off to further reduce race-window.
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
         if (s_active) {
-            brls::Logger::info("[VitaSession] performing deferred delete now");
+            vita_log::info("[VitaSession] performing deferred delete now");
             delete s_active;
         } })
         .detach();
@@ -135,7 +142,7 @@ bool VitaSession::start()
     if (havePrev)
     {
         m_config = prev;
-        brls::Logger::info("[VitaSession] Reutilizando configuración previa");
+        vita_log::info("[VitaSession] Reutilizando configuración previa");
     }
     else
     {
@@ -171,10 +178,10 @@ bool VitaSession::start()
     // Video callbacks: use VideoManager to choose between legacy and FFmpeg
     if (!VideoManager::instance()->initialize())
     {
-        brls::Logger::error("[VitaSession] Fallo al inicializar VideoManager");
+        vita_log::error("[VitaSession] Fallo al inicializar VideoManager");
         return false;
     }
-    brls::Logger::info("[VitaSession] Decodificador inicializado: {}", VideoManager::instance()->getRenderMode());
+    vita_log::info("[VitaSession] Decodificador inicializado: %s", VideoManager::instance()->getRenderMode());
     LiInitializeVideoCallbacks(&m_video_callbacks);
     m_video_callbacks = VideoManager::instance()->getDecoderCallbacks();
 
@@ -197,13 +204,13 @@ bool VitaSession::internalStart()
     int res             = LiStartConnection(&srv.serverInfo, &m_config, &m_conn_callbacks, &m_video_callbacks, &m_audio_callbacks, renderContext, 0, nullptr, 0);
     if (res != 0)
     {
-        brls::Logger::error("[VitaSession] LiStartConnection fallo={} ", res);
+        vita_log::error("[VitaSession] LiStartConnection fallo=%d", res);
         LiStopConnection();
         return false;
     }
-    brls::Logger::info("[VitaSession] LiStartConnection ok ({}x{}@{} fps bitrate={}K formats=0x{:X})", m_config.width, m_config.height, m_config.fps, m_config.bitrate, m_config.supportedVideoFormats);
+    vita_log::info("[VitaSession] LiStartConnection ok (%dx%d@%d fps bitrate=%dK formats=0x%X)", m_config.width, m_config.height, m_config.fps, m_config.bitrate, m_config.supportedVideoFormats);
     VideoManager::instance()->startVideo();
-    brls::Logger::info("[VitaSession] Video iniciado con decodificador: {}", VideoManager::instance()->getRenderMode());
+    vita_log::info("[VitaSession] Video iniciado con decodificador: %s", VideoManager::instance()->getRenderMode());
     m_is_active     = true;
     m_is_terminated = false;
     return true;
@@ -237,7 +244,7 @@ bool VitaSession::attemptReconnect()
     if (m_reconnect_attempts >= m_reconnect_limit)
         return false;
     m_reconnect_attempts++;
-    brls::Logger::info("[VitaSession] Reconnect intento {}", m_reconnect_attempts);
+    vita_log::info("[VitaSession] Reconnect intento %d", m_reconnect_attempts);
     // Simple: stop and restart
     LiStopConnection();
     return internalStart();
@@ -295,9 +302,9 @@ uint64_t VitaSession::monotonicMs()
 }
 
 // ==== Connection callbacks ====
-void VitaSession::connection_stage_starting(int stage) { brls::Logger::info("[VitaSession] Stage starting {}", stage); }
-void VitaSession::connection_stage_complete(int stage) { brls::Logger::info("[VitaSession] Stage complete {}", stage); }
-void VitaSession::connection_stage_failed(int stage, int error_code) { brls::Logger::error("[VitaSession] Stage failed {} ec={}", stage, error_code); }
+void VitaSession::connection_stage_starting(int stage) { vita_log::info("[VitaSession] Stage starting %d", stage); }
+void VitaSession::connection_stage_complete(int stage) { vita_log::info("[VitaSession] Stage complete %d", stage); }
+void VitaSession::connection_stage_failed(int stage, int error_code) { vita_log::error("[VitaSession] Stage failed %d ec=%d", stage, error_code); }
 void VitaSession::connection_started()
 {
     if (s_active)
@@ -305,7 +312,7 @@ void VitaSession::connection_started()
 }
 void VitaSession::connection_terminated(int error_code)
 {
-    brls::Logger::info("[VitaSession] Connection terminated ec={}", error_code);
+    vita_log::info("[VitaSession] Connection terminated ec=%d", error_code);
     if (!s_active)
         return;
     s_active->m_is_active     = false;

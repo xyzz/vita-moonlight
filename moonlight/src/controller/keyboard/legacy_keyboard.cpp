@@ -110,7 +110,7 @@ static void send_char_as_keypress(wchar_t ch)
     // Fall back to UTF-8 text input (works well on Windows Sunshine)
     if (!send_utf8_codepoint(static_cast<std::uint32_t>(ch)))
     {
-        vita_debug_log("[LegacyKB] UTF-8 text send failed for U+%04X", (unsigned)ch);
+        vita_log::error("[LegacyKB] UTF-8 text send failed for U+%04X", (unsigned)ch);
     }
 }
 
@@ -162,7 +162,7 @@ static void legacykb_ime_event_handler(void* /*arg*/, const SceImeEventData* e)
     {
         caretIndexLog = static_cast<int>(e->param.caretIndex);
     }
-    vita_debug_log(
+    vita_log::info(
         "[LegacyKB][IME] id=%d, caretIndex=%d, buffer=[%04X %04X %04X %04X]",
         static_cast<int>(e->id),
         caretIndexLog,
@@ -240,7 +240,7 @@ void LegacyKeyboard::open()
 {
     if (isOpenFlag.load(std::memory_order_acquire))
     {
-        vita_debug_log("[LegacyKB] Already open, ignoring");
+        vita_log::info("[LegacyKB] Already open, ignoring");
         return;
     }
 
@@ -261,7 +261,7 @@ void LegacyKeyboard::open()
     int loadRes = sceSysmoduleLoadModule(SCE_SYSMODULE_IME);
     if (loadRes < 0)
     {
-        vita_debug_log("[LegacyKB] sceSysmoduleLoadModule(IME) failed: 0x%08X", loadRes);
+        vita_log::error("[LegacyKB] sceSysmoduleLoadModule(IME) failed: 0x%08X", loadRes);
     }
 
     SceImeParam param;
@@ -295,16 +295,16 @@ void LegacyKeyboard::open()
     int openRes = sceImeOpen(&param);
     if (openRes < 0)
     {
-        vita_debug_log("[LegacyKB] sceImeOpen failed: 0x%08X", openRes);
+        vita_log::error("[LegacyKB] sceImeOpen failed: 0x%08X", openRes);
         isOpenFlag.store(false, std::memory_order_release);
         return;
     }
 
     reset_ime_virtual_text();
     isOpenFlag.store(true, std::memory_order_release);
-    vita_debug_log("[LegacyKB] IME opened (sceImeOpen)");
+    vita_log::info("[LegacyKB] IME opened (sceImeOpen)");
 #else
-    vita_debug_log("[LegacyKB] IME not available on this platform");
+    vita_log::info("[LegacyKB] IME not available on this platform");
 #endif
 }
 
@@ -377,14 +377,14 @@ void LegacyKeyboard::update()
     {
         sceImeClose();
         isOpenFlag.store(false, std::memory_order_release);
-        vita_debug_log("[LegacyKB] IME closed by event request");
+        vita_log::info("[LegacyKB] IME closed by event request");
         return;
     }
 
     if (updateRes < 0)
     {
         isOpenFlag.store(false, std::memory_order_release);
-        vita_debug_log("[LegacyKB] IME update ended: 0x%08X", updateRes);
+        vita_log::info("[LegacyKB] IME update ended: 0x%08X", updateRes);
     }
 #endif
 }

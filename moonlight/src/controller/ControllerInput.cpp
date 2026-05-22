@@ -99,7 +99,7 @@ ControllerInputManager::ControllerInputManager()
 
     gyroManager = new GyroManager();
 
-    vita_debug_log("[ControllerInput] Initialized (gamepad_type=%d)", (int)currentGamepadType);
+    vita_log::info("[ControllerInput] Initialized (gamepad_type=%d)", (int)currentGamepadType);
 }
 
 ControllerInputManager::~ControllerInputManager()
@@ -169,7 +169,7 @@ void ControllerInputManager::handleInput()
     static int debug_counter = 0;
     if (debug_counter++ % 300 == 0)
     { // Approximately every 2-3 seconds (depends on poll rate)
-        vita_debug_log("[ControllerInput] Botones: 0x%08X (L1:%d R1:%d L2:%d R2:%d START:%d) LT:%d RT:%d LX:%d LY:%d RX:%d RY:%d",
+        vita_log::info("[ControllerInput] Botones: 0x%08X (L1:%d R1:%d L2:%d R2:%d START:%d) LT:%d RT:%d LX:%d LY:%d RX:%d RY:%d",
             ctrlData.buttons,
             (ctrlData.buttons & SCE_CTRL_L1) ? 1 : 0,
             (ctrlData.buttons & SCE_CTRL_R1) ? 1 : 0,
@@ -186,7 +186,7 @@ void ControllerInputManager::handleInput()
 
     if (process_physical_shortcuts(&ctrlData, &lastCtrlData))
     {
-        vita_debug_log("[ControllerInput] Shortcut ejecutado, retornando temprano");
+        vita_log::info("[ControllerInput] Shortcut ejecutado, retornando temprano");
         lastCtrlData = ctrlData;
         return;
     }
@@ -205,13 +205,13 @@ void ControllerInputManager::handleInput()
             {
                 if ((nowPollUs - psButtonPressedTimeUs) < PSBTN_DOUBLETAP_DELAY_US)
                 {
-                    vita_debug_log("[PSBTN] Double-tap detected -> unlock");
+                    vita_log::info("[PSBTN] Double-tap detected -> unlock");
                     unlockPSButton();
                     psButtonSpecialActive = false;
                 }
                 else
                 {
-                    vita_debug_log("[PSBTN] Single tap -> SPECIAL active");
+                    vita_log::info("[PSBTN] Single tap -> SPECIAL active");
                     psButtonSpecialActive = true;
                 }
             }
@@ -232,13 +232,13 @@ void ControllerInputManager::handleInput()
         {
             if (psButtonWasPressed)
             {
-                vita_debug_log("[PSBTN] Released -> SPECIAL inactive");
+                vita_log::info("[PSBTN] Released -> SPECIAL inactive");
                 psButtonSpecialActive = false;
             }
 
             if (!psButtonLocked && (nowPollUs - psButtonPressedTimeUs) > PSBTN_DOUBLETAP_DELAY_US)
             {
-                vita_debug_log("[PSBTN] Auto re-lock after delay");
+                vita_log::info("[PSBTN] Auto re-lock after delay");
                 lockPSButton(); // re-lock after delay since last release
             }
         }
@@ -362,7 +362,7 @@ void ControllerInputManager::handleInput()
         // This avoids destroying legacy keyboard while its IME thread is still starting.
         if (activeKeyboardSeenOpen && !activeKeyboard->isOpen())
         {
-            vita_debug_log("[ControllerInput] Active keyboard closed itself, cleaning up");
+            vita_log::info("[ControllerInput] Active keyboard closed itself, cleaning up");
             IKeyboard* kb          = activeKeyboard;
             activeKeyboard         = nullptr;
             activeKeyboardSeenOpen = false;
@@ -389,7 +389,7 @@ void ControllerInputManager::handleInput()
                     keyboardState.keys[i] ? KEY_ACTION_DOWN : KEY_ACTION_UP,
                     0,
                     kbFlags);
-                vita_debug_log("[ControllerInput] Keyboard VK 0x%02X -> %s",
+                vita_log::info("[ControllerInput] Keyboard VK 0x%02X -> %s",
                     i, keyboardState.keys[i] ? "DOWN" : "UP");
             }
         }
@@ -402,7 +402,7 @@ void ControllerInputManager::handleInput()
     if (now_ms - lastInputLogMs > 2000)
     {
         lastInputLogMs = now_ms;
-        vita_debug_log("[ControllerInput][PERF] handleInput time=%lld us inputEnabled=%d inputDropped=%d", (long long)dur_us, inputEnabled ? 1 : 0, inputDropped ? 1 : 0);
+        vita_log::debug("[ControllerInput][PERF] handleInput time=%lld us inputEnabled=%d inputDropped=%d", (long long)dur_us, inputEnabled ? 1 : 0, inputDropped ? 1 : 0);
     }
 }
 
@@ -412,7 +412,7 @@ void ControllerInputManager::sendGamepadState(const GamepadState& state)
             state.leftStickX, state.leftStickY, state.rightStickX, state.rightStickY)
         != 0)
     {
-        vita_debug_log("[ControllerInput] Failed to send gamepad state");
+        vita_log::error("[ControllerInput] Failed to send gamepad state");
     }
 }
 
@@ -435,13 +435,13 @@ void ControllerInputManager::dropInput()
     }
 
     inputDropped = true;
-    vita_debug_log("[ControllerInput] Input dropped");
+    vita_log::info("[ControllerInput] Input dropped");
 }
 
 void ControllerInputManager::setPauseCallback(const std::function<void()>& cb)
 {
     pauseCallback = cb;
-    vita_debug_log("[ControllerInput] setPauseCallback llamado, configurando callback");
+    vita_log::info("[ControllerInput] setPauseCallback llamado, configurando callback");
     set_pause_callback(cb);
 }
 
@@ -452,7 +452,7 @@ void ControllerInputManager::setKeyboardShortcutCallback(const std::function<voi
 
 void ControllerInputManager::setActiveKeyboard(IKeyboard* kb)
 {
-    vita_debug_log("[ControllerInput] setActiveKeyboard: %p", kb);
+    vita_log::info("[ControllerInput] setActiveKeyboard: %p", kb);
     activeKeyboard         = kb;
     activeKeyboardSeenOpen = (kb != nullptr && kb->isOpen());
 }
@@ -473,7 +473,7 @@ void ControllerInputManager::setInputEnabled(bool enabled)
             { this->dropInput(); })
             .detach();
     }
-    vita_debug_log("[ControllerInput] setInputEnabled -> %d", enabled ? 1 : 0);
+    vita_log::info("[ControllerInput] setInputEnabled -> %d", enabled ? 1 : 0);
 }
 
 void ControllerInputManager::initMapping()
@@ -680,18 +680,18 @@ void ControllerInputManager::setGamepadType(GamepadType type)
 {
     if (currentGamepadType == type)
     {
-        vita_debug_log("[ControllerInput] Gamepad type ya es %d, ignorando", (int)type);
+        vita_log::info("[ControllerInput] Gamepad type ya es %d, ignorando", (int)type);
         return;
     }
 
     currentGamepadType = type;
-    vita_debug_log("[ControllerInput] Cambiando tipo de gamepad a %d (%s)",
+    vita_log::info("[ControllerInput] Cambiando tipo de gamepad a %d (%s)",
         (int)type, (type == GAMEPAD_TYPE_PS4) ? "PS4" : "XBOX");
 
-    vita_debug_log("[ControllerInput] Desconectando controlador para cambio de tipo...");
+    vita_log::info("[ControllerInput] Desconectando controlador para cambio de tipo...");
     if (LiSendMultiControllerEvent(0, 0, 0, 0, 0, 0, 0, 0, 0) != 0)
     {
-        vita_debug_log("[ControllerInput][ERR] Fallo al desconectar controlador");
+        vita_log::error("[ControllerInput][ERR] Fallo al desconectar controlador");
     }
 
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
@@ -700,14 +700,14 @@ void ControllerInputManager::setGamepadType(GamepadType type)
     uint16_t capabilities         = 0x01 | 0x02; // ANALOG_TRIGGERS | RUMBLE
     uint32_t supportedButtonFlags = 0xFFFFFFFF; // All buttons
 
-    vita_debug_log("[ControllerInput] Reconectando controlador con nuevo tipo (LI_CTYPE=%d)...", liType);
+    vita_log::info("[ControllerInput] Reconectando controlador con nuevo tipo (LI_CTYPE=%d)...", liType);
     if (LiSendControllerArrivalEvent(0, 0x01, liType, supportedButtonFlags, capabilities) != 0)
     {
-        vita_debug_log("[ControllerInput][ERR] LiSendControllerArrivalEvent fallo");
+        vita_log::error("[ControllerInput][ERR] LiSendControllerArrivalEvent fallo");
     }
     else
     {
-        vita_debug_log("[ControllerInput] Tipo de gamepad notificado al host (LI_CTYPE=%d)", liType);
+        vita_log::info("[ControllerInput] Tipo de gamepad notificado al host (LI_CTYPE=%d)", liType);
     }
 
     GamepadState zeroState = { 0 };
@@ -724,7 +724,7 @@ void ControllerInputManager::setRearTouchEnabled(bool enabled)
 void ControllerInputManager::setSwapShoulderButtons(bool enabled)
 {
     swapShoulderButtons = enabled;
-    vita_debug_log("[ControllerInput] Swap shoulder buttons -> %d", enabled ? 1 : 0);
+    vita_log::info("[ControllerInput] Swap shoulder buttons -> %d", enabled ? 1 : 0);
     if (rearTouchManager)
     {
         rearTouchManager->setSwapShoulderButtons(enabled);
@@ -751,19 +751,19 @@ bool ControllerInputManager::setTouchscreenModeWithValidation(int newMode)
 {
     if (!touchManager)
     {
-        vita_debug_log("[ControllerInput][ERR] TouchManager no inicializado");
+        vita_log::error("[ControllerInput][ERR] TouchManager no inicializado");
         return false;
     }
 
     if (touchManager->setTouchMode(newMode, static_cast<int>(currentGamepadType)))
     {
         touchscreenMode = newMode;
-        vita_debug_log("[ControllerInput] Modo touch validado y cambiado a %d", newMode);
+        vita_log::info("[ControllerInput] Modo touch validado y cambiado a %d", newMode);
         return true;
     }
     else
     {
-        vita_debug_log("[ControllerInput][WARN] Modo touch %d no compatible con gamepad tipo %d",
+        vita_log::warning("[ControllerInput][WARN] Modo touch %d no compatible con gamepad tipo %d",
             newMode, static_cast<int>(currentGamepadType));
         return false;
     }
@@ -773,25 +773,25 @@ bool ControllerInputManager::setTouchscreenModeRuntime(int newMode)
 {
     if (touchscreenMode == newMode)
     {
-        vita_debug_log("[ControllerInput] Modo touch ya es %d, ignorando", newMode);
+        vita_log::info("[ControllerInput] Modo touch ya es %d, ignorando", newMode);
         return true;
     }
 
     if (!touchManager)
     {
-        vita_debug_log("[ControllerInput][ERR] TouchManager no inicializado");
+        vita_log::error("[ControllerInput][ERR] TouchManager no inicializado");
         return false;
     }
 
     if (!touchManager->setTouchMode(newMode, static_cast<int>(currentGamepadType)))
     {
-        vita_debug_log("[ControllerInput][WARN] Modo touch %d no compatible con gamepad tipo %d",
+        vita_log::warning("[ControllerInput][WARN] Modo touch %d no compatible con gamepad tipo %d",
             newMode, static_cast<int>(currentGamepadType));
         return false;
     }
 
     touchscreenMode = newMode;
-    vita_debug_log("[ControllerInput] Modo touch cambiado en tiempo de ejecución a %d", newMode);
+    vita_log::info("[ControllerInput] Modo touch cambiado en tiempo de ejecución a %d", newMode);
 
     ConfigManager config;
     config.load();

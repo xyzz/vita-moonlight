@@ -19,7 +19,7 @@ GyroManager::GyroManager()
     int res = sceMotionStartSampling();
     if (res < 0 && res != (int)SCE_MOTION_ERROR_ALREADY_SAMPLING)
     {
-        vita_debug_log("[Gyro] sceMotionStartSampling failed: 0x%08X", res);
+        vita_log::error("[Gyro] sceMotionStartSampling failed: 0x%08X", res);
         sensorAvailable = false;
         initialized     = false;
         return;
@@ -27,7 +27,7 @@ GyroManager::GyroManager()
 
     sensorAvailable = true;
     initialized     = true;
-    vita_debug_log("[Gyro] Motion sensor ready");
+    vita_log::info("[Gyro] Motion sensor ready");
 }
 
 static uint64_t nowUs()
@@ -70,7 +70,7 @@ void GyroManager::update()
 
     if (LiSendControllerMotionEvent(0, LI_MOTION_TYPE_GYRO, sx_v, sy_v, sz_v) != 0)
     {
-        vita_debug_log("[Gyro] LiSendControllerMotionEvent (gyro) fallo");
+        vita_log::error("[Gyro] LiSendControllerMotionEvent (gyro) fallo");
     }
 
     float ax_v = ax * kGyroBaseScale * sx;
@@ -79,7 +79,7 @@ void GyroManager::update()
 
     if (LiSendControllerMotionEvent(0, LI_MOTION_TYPE_ACCEL, ax_v, ay_v, az_v) != 0)
     {
-        vita_debug_log("[Gyro] LiSendControllerMotionEvent (accel) fallo");
+        vita_log::error("[Gyro] LiSendControllerMotionEvent (accel) fallo");
     }
 
     lastSendUs = now;
@@ -96,7 +96,7 @@ bool GyroManager::readMotionData(MotionSensorData& out)
     int res = sceMotionGetState(&motionState);
     if (res < 0)
     {
-        vita_debug_log("[Gyro] sceMotionGetState failed: 0x%08X", res);
+        vita_log::error("[Gyro] sceMotionGetState failed: 0x%08X", res);
         return false;
     }
 

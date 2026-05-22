@@ -20,8 +20,9 @@
 #include "xml.h"
 #include "client.h"
 #include "errors.h"
-#include <borealis/core/logger.hpp>
+#include "debug.hpp"
 
+#include <fmt/format.h>
 #include <expat.h>
 #include <string.h>
 #include <string>
@@ -137,12 +138,12 @@ static void XMLCALL _xml_write_data_legacy(void* userData, const XML_Char* s, in
     if (search->start > 0) {
         const size_t MAX_XML_VALUE = 8192;
         if (search->size + (size_t)len + 1 > MAX_XML_VALUE) {
-            brls::Logger::error("[xml] Valor XML demasiado grande (>8KB), abortando acumulación");
+            vita_log::error("[xml] Valor XML demasiado grande (>8KB), abortando acumulación");
             return;
         }
         char* newMem = (char*)realloc(search->memory, search->size + len + 1);
         if (!newMem) {
-            brls::Logger::error("[xml] realloc falló (size={}, len={})", search->size, len);
+            vita_log::error("[xml] realloc falló (size={}, len={})", search->size, len);
             return;
         }
         search->memory = newMem;
@@ -158,7 +159,7 @@ static void XMLCALL _xml_write_data_string(void* userData, const XML_Char* s, in
     xml_string_query* q = (xml_string_query*)userData;
     if (q->capturing && len > 0) {
         if (q->out->size() + (size_t)len > 8192) {
-            brls::Logger::error("[xml_string] Valor excede máximo 8KB, truncando");
+            vita_log::error("[xml_string] Valor excede máximo 8KB, truncando");
             return;
         }
         q->out->append(s, len);
@@ -182,7 +183,7 @@ int xml_search(const Data& data, const std::string node, int* result) {
 }
 
 int xml_search(const Data& data, const std::string node, std::string* result) {
-    brls::Logger::info("[xml_search] (safe) Buscando nodo '{}' ({} bytes)", node, (int)data.size());
+    vita_log::info("[xml_search] (safe) Buscando nodo '%s' (%d bytes)", node.c_str(), (int)data.size());
     result->clear();
     xml_string_query q;
     q.target = node.c_str();
@@ -202,12 +203,12 @@ int xml_search(const Data& data, const std::string node, std::string* result) {
     if (!XML_Parse(parser, (const char*)data.bytes(), (int)data.size(), 1)) {
         XML_Error code = XML_GetErrorCode(parser);
         gs_set_error(XML_ErrorString(code));
-        brls::Logger::error("[xml_search] Parse FAIL nodo='{}' error={}", node, (int)code);
+        vita_log::error("[xml_search] Parse FAIL nodo='%s' error=%d", node.c_str(), (int)code);
         XML_ParserFree(parser);
         return GS_INVALID;
     }
     XML_ParserFree(parser);
-    brls::Logger::info("[xml_search] (safe) Nodo '{}' => '{}' (len={})", node, *result, result->size());
+    vita_log::info("[xml_search] (safe) Nodo '%s' => '%s' (len=%zu)", node.c_str(), result->c_str(), result->size());
     return GS_OK;
 }
 

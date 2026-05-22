@@ -12,6 +12,7 @@
 #include <thread>
 
 #include "ConfigManager.hpp"
+#include "debug.hpp"
 
 MicrophoneManager& MicrophoneManager::getInstance()
 {
@@ -21,20 +22,20 @@ MicrophoneManager& MicrophoneManager::getInstance()
 
 MicrophoneManager::MicrophoneManager()
 {
-    brls::Logger::info("[MicrophoneManager] Initialized");
+    vita_log::info("[MicrophoneManager] Initialized");
 }
 
 MicrophoneManager::~MicrophoneManager()
 {
     stop();
-    brls::Logger::info("[MicrophoneManager] Destroyed");
+    vita_log::info("[MicrophoneManager] Destroyed");
 }
 
 bool MicrophoneManager::start(const std::string& hostIp, int port, int sampleRate, int channels, int bitrate)
 {
     if (running_)
     {
-        brls::Logger::warning("[MicrophoneManager] Already running");
+        vita_log::warning("[MicrophoneManager] Already running");
         return true;
     }
 
@@ -44,22 +45,23 @@ bool MicrophoneManager::start(const std::string& hostIp, int port, int sampleRat
     channels_    = channels;
     bitrate_     = bitrate;
 
-    brls::Logger::info("[MicrophoneManager] Starting microphone ({}:{}, {}Hz, {}ch, {}bps)",
-        host_ip_, port_, sample_rate_, channels_, bitrate_);
+    vita_log::info("[MicrophoneManager] Starting microphone (%s:%d, %dHz, %dch, %dbps)",
+        host_ip_.c_str(), port_, sample_rate_, channels_, bitrate_);
 
-    brls::Logger::warning("[MicrophoneManager] Delaying microphone start by 3 seconds to avoid port conflict...");
+    vita_log::warning("[MicrophoneManager] Delaying microphone start by 3 seconds to avoid port conflict...");
 
+    // Starting immediately can race Moonlight's audio initialization.
     std::this_thread::sleep_for(std::chrono::seconds(3));
 
-    brls::Logger::info("[MicrophoneManager] Delay complete, attempting to start microphone...");
+    vita_log::info("[MicrophoneManager] Delay complete, attempting to start microphone...");
 
     if (startInternal())
     {
-        brls::Logger::info("[MicrophoneManager] Started successfully");
+        vita_log::info("[MicrophoneManager] Started successfully");
         return true;
     }
 
-    brls::Logger::warning("[MicrophoneManager] Initial start failed, enabling retry every {} seconds",
+    vita_log::warning("[MicrophoneManager] Initial start failed, enabling retry every %d seconds",
         RETRY_INTERVAL_SECONDS);
 
     retry_enabled_ = true;
@@ -70,13 +72,13 @@ bool MicrophoneManager::start(const std::string& hostIp, int port, int sampleRat
 
 void MicrophoneManager::stop()
 {
-    brls::Logger::info("[MicrophoneManager] Stopping...");
+    vita_log::info("[MicrophoneManager] Stopping...");
 
     retry_enabled_ = false;
     if (retry_thread_.joinable())
     {
         retry_thread_.join();
-        brls::Logger::debug("[MicrophoneManager] Retry thread stopped");
+        vita_log::debug("[MicrophoneManager] Retry thread stopped");
     }
 
     if (client_)
@@ -84,7 +86,7 @@ void MicrophoneManager::stop()
         moonmic_destroy(client_);
         client_  = nullptr;
         running_ = false;
-        brls::Logger::info("[MicrophoneManager] Microphone stopped");
+        vita_log::info("[MicrophoneManager] Microphone stopped");
     }
 }
 
@@ -147,7 +149,7 @@ bool MicrophoneManager::startInternal()
 
     bool raw_mode = !settings.enable_microphone_compression;
 
-    brls::Logger::info("[MicrophoneManager] Compression mode: {} (raw_mode={})",
+    vita_log::info("[MicrophoneManager] Compression mode: %s (raw_mode=%d)",
         settings.enable_microphone_compression ? "Opus" : "RAW PCM",
         raw_mode);
 
@@ -157,9 +159,9 @@ bool MicrophoneManager::startInternal()
     std::string uniqueid   = sunInfo.uniqueid;
     std::string devicename = sunInfo.devicename;
 
-    brls::Logger::info("[MicrophoneManager] Sunshine validation result: PairStatus={}", pair_status);
-    brls::Logger::info("[MicrophoneManager] uniqueid='{}' len={}", uniqueid, uniqueid.length());
-    brls::Logger::info("[MicrophoneManager] devicename='{}' len={}", devicename, devicename.length());
+    vita_log::info("[MicrophoneManager] Sunshine validation result: PairStatus=%d", pair_status);
+    vita_log::info("[MicrophoneManager] uniqueid='%s' len=%zu", uniqueid.c_str(), uniqueid.length());
+    vita_log::info("[MicrophoneManager] devicename='%s' len=%zu", devicename.c_str(), devicename.length());
 
     bridge.loadConfig(); // Force reload from device.ini to pick up any changes
     auto [target_width, target_height] = bridge.getTargetResolution();
@@ -189,22 +191,22 @@ bool MicrophoneManager::startInternal()
     {
         std::lock_guard<std::mutex> lock(error_mutex_);
         last_error_ = "Failed to create microphone client";
-        brls::Logger::error("[MicrophoneManager] {}", last_error_);
+        vita_log::error("[MicrophoneManager] %s", last_error_.c_str());
         return false;
     }
 
     moonmic_set_error_callback(client_, &MicrophoneManager::errorCallback, this);
 
     running_       = true;
-    retry_enabled_ = false; // Stop retry thread if it was running
+    retry_enabled_ = false;
 
-    brls::Logger::info("[MicrophoneManager] Client created successfully");
+    vita_log::info("[MicrophoneManager] Client created successfully");
     return true;
 }
 
 void MicrophoneManager::retryThreadFunc()
 {
-    brls::Logger::info("[MicrophoneManager] Retry thread started");
+    vita_log::info("[MicrophoneManager] Retry thread started");
 
     while (retry_enabled_)
     {
@@ -216,21 +218,21 @@ void MicrophoneManager::retryThreadFunc()
         if (!retry_enabled_)
             break;
 
-        brls::Logger::info("[MicrophoneManager] Retrying connection to {}:{}", host_ip_, port_);
+        vita_log::info("[MicrophoneManager] Retrying connection to %s:%d", host_ip_.c_str(), port_);
 
         if (startInternal())
         {
-            brls::Logger::info("[MicrophoneManager] Retry successful - microphone now running");
-            break; // Exit retry loop
+            vita_log::info("[MicrophoneManager] Retry successful - microphone now running");
+            break;
         }
         else
         {
-            brls::Logger::warning("[MicrophoneManager] Retry failed, will try again in {} seconds",
+            vita_log::warning("[MicrophoneManager] Retry failed, will try again in %d seconds",
                 RETRY_INTERVAL_SECONDS);
         }
     }
 
-    brls::Logger::info("[MicrophoneManager] Retry thread stopped");
+    vita_log::info("[MicrophoneManager] Retry thread stopped");
 }
 
 void MicrophoneManager::errorCallback(const char* error, void* userData)
@@ -244,7 +246,7 @@ void MicrophoneManager::errorCallback(const char* error, void* userData)
         mgr->last_error_ = error ? error : "Unknown error";
     }
 
-    brls::Logger::error("[MicrophoneManager] moonmic error: {}",
+    vita_log::error("[MicrophoneManager] moonmic error: %s",
         error ? error : "Unknown error");
 }
 
@@ -260,7 +262,7 @@ void MicrophoneManager::setGain(float gain)
     if (running_ && client_)
     {
         moonmic_set_gain(client_, gain);
-        brls::Logger::info("[MicrophoneManager] Updated gain to {:.1f}x during transmission", gain);
+        vita_log::info("[MicrophoneManager] Updated gain to %.1fx during transmission", gain);
     }
 }
 

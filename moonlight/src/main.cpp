@@ -149,13 +149,13 @@ int main(int argc, char* argv[])
     for (int i = 1; i < argc; i++)
     {
         if (std::strcmp(argv[i], "-d") == 0)
-        { // Set log level
-            brls::Logger::setLogLevel(brls::LogLevel::LOG_DEBUG);
+        { // Set log level (compat)
+            vita_debug_log("[main] -d recibido: usando salida via vita_debug_log");
         }
         else if (std::strcmp(argv[i], "-o") == 0)
         {
             const char* path = (i + 1 < argc) ? argv[++i] : "borealis.log";
-            brls::Logger::setLogOutput(std::fopen(path, "w+"));
+            vita_debug_log("[main] -o ignorado (ruta solicitada: %s), salida controlada por save_debug_log", path);
         }
         else if (std::strcmp(argv[i], "-v") == 0)
         {
@@ -169,10 +169,10 @@ int main(int argc, char* argv[])
 #endif
 
     // Init the app and i18n. This also initializes the platform.
-    brls::Logger::info("main: init app");
+    vita_log::info("main: init app");
     if (!brls::Application::init())
     {
-        brls::Logger::error("Unable to init Borealis application");
+        vita_log::error("Unable to init Borealis application");
         return EXIT_FAILURE;
     }
 
@@ -212,6 +212,8 @@ int main(int argc, char* argv[])
         cfg.load();
         VideoSettings vs    = cfg.getVideoSettings();
         g_debug_log_enabled = vs.save_debug_log;
+        // If enabled, open/truncate session log
+        enable_file_logging(vs.save_debug_log);
     }
     vita_debug_log("[TEST] vita_debug_log c_str: %s", testName.c_str());
     // Other outputs to compare

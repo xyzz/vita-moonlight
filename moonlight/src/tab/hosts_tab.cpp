@@ -13,7 +13,6 @@
 #include <sys/types.h>
 
 #include <borealis/core/application.hpp>
-#include <borealis/core/logger.hpp>
 #include <borealis/core/thread.hpp>
 #include <borealis/views/applet_frame.hpp>
 #include <borealis/views/edit_text_dialog.hpp>
@@ -62,7 +61,7 @@ void HostsTab::requestGlobalRefresh()
     // still handling its input/event (prevents reentrancy crashes on Vita).
     brls::delay(50, []()
         {
-        brls::Logger::info("[HostsTab::requestGlobalRefresh] Clearing stack and pushing new MainActivity");
+        vita_log::info("[HostsTab::requestGlobalRefresh] Clearing stack and pushing new MainActivity");
         // Pop all existing activities to prevent duplicates in the stack.
         // Application::clear() is private, so we pop one by one.
         auto stack = brls::Application::getActivitiesStack();
@@ -70,15 +69,15 @@ void HostsTab::requestGlobalRefresh()
         for (size_t i = 0; i < initialCount; ++i) {
             brls::Application::popActivity(brls::TransitionAnimation::NONE);
         }
-        vita_debug_log("[HostsTab::requestGlobalRefresh] Popped %zu activities", initialCount);
+        vita_log::info("[HostsTab::requestGlobalRefresh] Popped %zu activities", initialCount);
         // Push a fresh MainActivity
         brls::Application::pushActivity(new MainActivity(), brls::TransitionAnimation::NONE);
-        vita_debug_log("[HostsTab::requestGlobalRefresh] New MainActivity pushed");
+        vita_log::info("[HostsTab::requestGlobalRefresh] New MainActivity pushed");
         auto activities = brls::Application::getActivitiesStack();
         if (!activities.empty()) {
             brls::Application::giveFocus(nullptr); // Clear focus from previous activity
             brls::Application::giveFocus(activities.back()->getContentView());
-            vita_debug_log("[HostsTab::requestGlobalRefresh] Focus given to new MainActivity");
+            vita_log::info("[HostsTab::requestGlobalRefresh] Focus given to new MainActivity");
         } });
 }
 
@@ -126,7 +125,7 @@ void HostsTab::refreshHostsList()
 #ifdef __PSV__
         VITALOG("[HostsTab::refreshHostsList] Procesando host: %s (%s)\n", host.name.c_str(), host.ip.c_str());
 #else
-        brls::Logger::info("[HostsTab::refreshHostsList] Procesando host: %s (%s)", host.name.c_str(), host.ip.c_str());
+        vita_log::info("[HostsTab::refreshHostsList] Procesando host: %s (%s)", host.name.c_str(), host.ip.c_str());
 #endif
         if (count % CARDS_PER_ROW == 0)
         {

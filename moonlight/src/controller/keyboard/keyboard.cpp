@@ -9,6 +9,7 @@
 
 #include "controller/keyboard/keyboard_utf8.hpp"
 #include "controller/keyboard/keyboardloader.hpp"
+#include "debug.hpp"
 // Limelight API for keyboard submission
 #include "Limelight.h"
 
@@ -407,7 +408,7 @@ void KeyboardOverlay::willAppear(bool resetState)
     if (it != properties.end() && !it->second.empty())
     {
         // Not implemented: load background image for keyboard overlay.
-        brls::Logger::info("[KeyboardOverlay] background-image specified: {}", it->second);
+        vita_log::info("[KeyboardOverlay] background-image specified: %s", it->second.c_str());
     }
 
     // Adjust panel so that it fills the entire width and is at the bottom
@@ -1461,7 +1462,7 @@ void KeyboardOverlay::sendKeyByLabel(const std::string& label)
     // Fall back to UTF-8 text input (works well on Windows Sunshine)
     if (!send_utf8_codepoint(codepoint))
     {
-        brls::Logger::info("[KeyboardOverlay] UTF-8 send failed for key: {}", label);
+        vita_log::info("[KeyboardOverlay] UTF-8 send failed for key: %s", label.c_str());
     }
 }
 

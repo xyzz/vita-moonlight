@@ -3,14 +3,23 @@
 
 #include <borealis/extern/nanovg/nanovg.h>
 #include <borealis/extern/nanovg/nanovg_gxm.h>
+#include <psp2/gxm.h>
+
+#include <borealis/core/application.hpp>
+
+#include "legacy/modules/vita_globals.hpp"
+
+// Override default buffering for lower latency
+// Keep DISPLAY_BUFFER_COUNT at 3 to prevent vertical tearing
+// Reduce MAX_PENDING_SWAPS from 2 to 1 for lower latency
+#define DISPLAY_BUFFER_COUNT 3
+#define MAX_PENDING_SWAPS 1
+
 #include <borealis/extern/nanovg/nanovg_gxm_utils.h>
 #include <psp2/gxm.h>
 #include <stdlib.h>
 
-#include <borealis/core/application.hpp>
 #include <mutex>
-
-#include "legacy/modules/vita_globals.hpp"
 
 namespace
 {
@@ -175,14 +184,17 @@ void VitaVideoRenderer::drawNVG(NVGcontext* vg, float viewportW, float viewportH
     if (g_stats.frames_decoded == 0)
         return;
 
-    if (g_video_settings_snapshot.render_mode == 0)
+    // Force single buffer mode for complete frame rendering (like legacy)
+    // This prevents vertical tearing/partitioning by ensuring the entire frame
+    // is drawn at once without buffering delays
+    if (!single_frame_buffer)
     {
-        int display_idx = __atomic_load_n(&frame_display_idx, __ATOMIC_ACQUIRE);
-        display_idx     = __atomic_exchange_n(&frame_ready_idx, display_idx, __ATOMIC_SEQ_CST);
-        __atomic_store_n(&frame_display_idx, display_idx, __ATOMIC_RELEASE);
+        VITA_DEBUG_LOG("[Video][NVG] Forcing single buffer mode to prevent frame partitioning");
+        single_frame_buffer = true;
     }
 
-    const GxmTexture* tex = frame_textures[__atomic_load_n(&frame_display_idx, __ATOMIC_ACQUIRE)];
+    // No atomic exchange in single-buffer mode - all indices are the same (0)
+    const GxmTexture* tex = frame_textures[0];
     if (!tex)
         return;
 
@@ -223,79 +235,12 @@ void VitaVideoRenderer::drawNVG(NVGcontext* vg, float viewportW, float viewportH
     if (texW == 0 || texH == 0)
         return;
 
-    int foundIdx = -1;
-    for (int i = 0; i < imageCacheSize; i++)
-    {
-        if (imageCache[i].tex == tex)
-        {
-            foundIdx = i;
-            break;
-        }
-    }
-
-    int useImageId = -1;
-    if (foundIdx >= 0)
-    {
-        if (imageCache[foundIdx].width != (int)texW || imageCache[foundIdx].height != (int)texH || imageCache[foundIdx].format != currentFmt || imageCache[foundIdx].data != currentData)
-        {
-            nvgDeleteImage(vg, imageCache[foundIdx].imageId);
-            int newId = nvgxmCreateImageFromHandle(vg, const_cast<SceGxmTexture*>(gxmTex));
-            if (newId > 0)
-            {
-                imageCache[foundIdx].imageId    = newId;
-                imageCache[foundIdx].width      = (int)texW;
-                imageCache[foundIdx].height     = (int)texH;
-                imageCache[foundIdx].data       = currentData;
-                imageCache[foundIdx].format     = currentFmt;
-                useImageId                      = newId;
-                static uint32_t recreateCounter = 0;
-                if ((recreateCounter++ % 600) == 0)
-                {
-                    VITA_DEBUG_LOG("[Video][NVG] Recreated cached image %d due to VRAM reuse (data=%p)", newId, currentData);
-                }
-            }
-        }
-        else
-        {
-            useImageId = imageCache[foundIdx].imageId;
-        }
-    }
-    else
-    {
-        int newId = nvgxmCreateImageFromHandle(vg, const_cast<SceGxmTexture*>(gxmTex));
-        if (newId > 0)
-        {
-            if (imageCacheSize < 4)
-            {
-                int idx                 = imageCacheSize++;
-                imageCache[idx].tex     = tex;
-                imageCache[idx].imageId = newId;
-                imageCache[idx].width   = (int)texW;
-                imageCache[idx].height  = (int)texH;
-                imageCache[idx].data    = currentData;
-                imageCache[idx].format  = currentFmt;
-                useImageId              = newId;
-                VITA_DEBUG_LOG("[Video][NVG] Cached new image %d (slot %d)", newId, idx);
-            }
-            else
-            {
-                VITA_DEBUG_LOG("[Video][NVG] Cache full, evicting slot 0");
-                nvgDeleteImage(vg, imageCache[0].imageId);
-                imageCache[0].tex     = tex;
-                imageCache[0].imageId = newId;
-                imageCache[0].width   = (int)texW;
-                imageCache[0].height  = (int)texH;
-                imageCache[0].data    = currentData;
-                imageCache[0].format  = currentFmt;
-                useImageId            = newId;
-            }
-            nvgImageCreateCount++;
-        }
-    }
-
+    // Disable image caching for complete frame rendering (like legacy)
+    // This prevents frame partitioning by ensuring the texture is drawn directly
+    int useImageId = nvgxmCreateImageFromHandle(vg, const_cast<SceGxmTexture*>(gxmTex));
     if (useImageId <= 0)
     {
-        VITA_DEBUG_LOG("[Video][DRAW NVG][ERR] Failed to get/create image for tex=%p", tex);
+        VITA_DEBUG_LOG("[Video][DRAW NVG][ERR] Failed to create image for tex=%p", tex);
         return;
     }
 
@@ -306,11 +251,15 @@ void VitaVideoRenderer::drawNVG(NVGcontext* vg, float viewportW, float viewportH
     if (dw <= 0 || dh <= 0)
         return;
 
+    // Draw complete frame at once (like legacy draw_streaming)
     NVGpaint paint = nvgImagePattern(vg, (float)ox, (float)oy, (float)dw, (float)dh, 0.0f, useImageId, alpha);
     nvgBeginPath(vg);
     nvgRect(vg, (float)ox, (float)oy, (float)dw, (float)dh);
     nvgFillPaint(vg, paint);
     nvgFill(vg);
+
+    // Delete image immediately after drawing (no caching)
+    nvgDeleteImage(vg, useImageId);
 
     g_stats.frames_presented++;
     onFramePresented();

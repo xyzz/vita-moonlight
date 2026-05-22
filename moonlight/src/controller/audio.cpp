@@ -57,7 +57,7 @@ int audio_init(int /*audioConfiguration*/, const POPUS_MULTISTREAM_CONFIGURATION
 
     if (opusConfig == nullptr)
     {
-        vita_debug_log("[Audio] Opus config nulo");
+        vita_log::info("[Audio] Opus config nulo");
         return VITA_AUDIO_ERROR_BAD_OPUS;
     }
 
@@ -70,7 +70,7 @@ int audio_init(int /*audioConfiguration*/, const POPUS_MULTISTREAM_CONFIGURATION
              &opusStatus);
     if (opusStatus < 0 || g_decoder == nullptr)
     {
-        vita_debug_log("[Audio] opus_multistream_decoder_create fallo=%d", opusStatus);
+        vita_log::error("[Audio] opus_multistream_decoder_create fallo=%d", opusStatus);
         destroy_decoder();
         return VITA_AUDIO_ERROR_BAD_OPUS;
     }
@@ -78,12 +78,12 @@ int audio_init(int /*audioConfiguration*/, const POPUS_MULTISTREAM_CONFIGURATION
     g_port = sceAudioOutOpenPort(SCE_AUDIO_OUT_PORT_TYPE_MAIN, VITA_SAMPLES, SAMPLE_RATE, SCE_AUDIO_OUT_MODE_STEREO);
     if (g_port < 0)
     {
-        vita_debug_log("[Audio] sceAudioOutOpenPort fallo=0x%X", g_port);
+        vita_log::error("[Audio] sceAudioOutOpenPort fallo=0x%X", g_port);
         destroy_decoder();
         return VITA_AUDIO_ERROR_PORT;
     }
 
-    vita_debug_log("[Audio] Puerto abierto id=0x%X", g_port);
+    vita_log::info("[Audio] Puerto abierto id=0x%X", g_port);
     g_active = true;
     return VITA_AUDIO_INIT_OK;
 }
@@ -123,14 +123,14 @@ void audio_decode_and_play_sample(char* data, int length)
 
     if (decoded <= 0)
     {
-        vita_debug_log("[Audio] Error opus decode=%d", decoded);
+        vita_log::error("[Audio] Error opus decode=%d", decoded);
         return;
     }
 
     if (decoded != FRAME_SIZE)
     {
         // Opus delivered fewer samples than expected; To maintain timing, we ignore this fragment.
-        vita_debug_log("[Audio] Decode parcial=%d", decoded);
+        vita_log::info("[Audio] Decode parcial=%d", decoded);
         return;
     }
 
@@ -143,7 +143,7 @@ void audio_decode_and_play_sample(char* data, int length)
             int res = sceAudioOutOutput(g_port, g_buffer);
             if (res < 0)
             {
-                vita_debug_log("[Audio] sceAudioOutOutput fallo=0x%X", res);
+                vita_log::error("[Audio] sceAudioOutOutput fallo=0x%X", res);
             }
         }
     }

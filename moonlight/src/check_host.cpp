@@ -7,7 +7,6 @@
 // Centralized host discovery logic for PSVita and Windows
 
 #include <atomic>
-#include <borealis/core/logger.hpp>
 #include <cstdio>
 #include <thread>
 
@@ -15,7 +14,6 @@
 #include "../../../third_party/mdnsniff/udp_sniffer_win.h"
 #include "debug.hpp"
 #if defined(__PSV__) || defined(_WIN32)
-#include <borealis/core/logger.hpp>
 #include <borealis/core/thread.hpp>
 #include <borealis/core/view.hpp>
 
@@ -69,7 +67,7 @@ namespace
     extern "C" void vitaHostFoundCbLogger(int idx, const char* host, const char* pcname, const char* ip, int port)
     {
         MDNS_LOG("[mdns_log] CALLBACK VITA: idx=%d host=%s pcname=%s ip=%s port=%d\n", idx, host ? host : "(null)", pcname ? pcname : "(null)", ip ? ip : "(null)", port);
-        brls::Logger::info("[check_host] CALLBACK VITA LLAMADO: idx={} host={} pcname={} ip={} port={}", idx, host ? host : "(null)", pcname ? pcname : "(null)", ip ? ip : "(null)", port);
+        vita_log::info("[check_host] CALLBACK VITA LLAMADO: idx=%d host=%s pcname=%s ip=%s port=%d", idx, host ? host : "(null)", pcname ? pcname : "(null)", ip ? ip : "(null)", port);
         if (vitaHostFoundCb)
             vitaHostFoundCb(idx, host, pcname, ip, port);
     }
@@ -78,12 +76,12 @@ namespace
 void startVitaDiscovery(void (*hostFoundCb)(int, const char*, const char*, const char*, int))
 {
 
-    brls::Logger::info("[check_host] startVitaDiscovery: INICIO (estilo legacy)");
+    vita_log::info("[check_host] startVitaDiscovery: INICIO (estilo legacy)");
 #if defined(__PSV__)
-    vita_debug_log("[check_host] startVitaDiscovery: INICIO (VITALOG)\n");
+    vita_log::info("[check_host] startVitaDiscovery: INICIO (VITALOG)\n");
 #endif
     stopVitaDiscovery();
-    brls::Logger::info("[check_host] startVitaDiscovery: después de stopVitaDiscovery");
+    vita_log::info("[check_host] startVitaDiscovery: después de stopVitaDiscovery");
     static void* net_mem        = nullptr;
     static bool net_initialized = false;
     if (!net_initialized)
@@ -91,13 +89,13 @@ void startVitaDiscovery(void (*hostFoundCb)(int, const char*, const char*, const
         int ret = sceSysmoduleLoadModule(SCE_SYSMODULE_NET);
         if (ret < 0)
         {
-            brls::Logger::error("[check_host] ERROR: sceSysmoduleLoadModule fallo: 0x%08X", ret);
+            vita_log::error("[check_host] ERROR: sceSysmoduleLoadModule fallo: 0x%08X", ret);
             return;
         }
         net_mem = malloc(256 * 1024);
         if (!net_mem)
         {
-            brls::Logger::error("[check_host] ERROR: malloc para net_mem fallo");
+            vita_log::error("[check_host] ERROR: malloc para net_mem fallo");
             return;
         }
         SceNetInitParam netInitParam;
@@ -107,7 +105,7 @@ void startVitaDiscovery(void (*hostFoundCb)(int, const char*, const char*, const
         ret                 = sceNetInit(&netInitParam);
         if (ret < 0 && ret != 0x80410110)
         {
-            brls::Logger::error("[check_host] ERROR: sceNetInit fallo: 0x%08X", ret);
+            vita_log::error("[check_host] ERROR: sceNetInit fallo: 0x%08X", ret);
             free(net_mem);
             net_mem = nullptr;
             return;
@@ -118,7 +116,7 @@ void startVitaDiscovery(void (*hostFoundCb)(int, const char*, const char*, const
             char errbuf[64];
             snprintf(errbuf, sizeof(errbuf), "sceNetCtlInit fallo: hex=0x%08X dec=%d", (unsigned int)ret, ret);
             std::string errMsg = std::string("[check_host] ERROR: ") + errbuf;
-            brls::Logger::error("%s", errMsg.c_str());
+            vita_log::error("%s", errMsg.c_str());
             MDNS_LOG("[mdns_log] %s\n", errMsg.c_str());
             sceNetTerm();
             free(net_mem);
@@ -126,53 +124,53 @@ void startVitaDiscovery(void (*hostFoundCb)(int, const char*, const char*, const
             return;
         }
         net_initialized = true;
-        brls::Logger::info("[check_host] Red Vita inicializada correctamente (legacy)");
+        vita_log::info("[check_host] Red Vita inicializada correctamente (legacy)");
     }
     vitaDiscoveryStatus = 1;
     udp_sniffer_vita_init();
-    brls::Logger::info("[check_host] startVitaDiscovery: después de udp_sniffer_vita_init");
+    vita_log::info("[check_host] startVitaDiscovery: después de udp_sniffer_vita_init");
 #if defined(__PSV__)
-    vita_debug_log("[check_host] startVitaDiscovery: udp_sniffer_vita_init called\n");
+    vita_log::info("[check_host] startVitaDiscovery: udp_sniffer_vita_init called\n");
 #endif
     vitaHostFoundCb = hostFoundCb;
-    brls::Logger::info("[check_host] startVitaDiscovery: después de asignar vitaHostFoundCb");
+    vita_log::info("[check_host] startVitaDiscovery: después de asignar vitaHostFoundCb");
 #if defined(__PSV__)
-    vita_debug_log("[check_host] startVitaDiscovery: vitaHostFoundCb set to %p\n", (void*)vitaHostFoundCb);
+    vita_log::info("[check_host] startVitaDiscovery: vitaHostFoundCb set to %p\n", (void*)vitaHostFoundCb);
 #endif
     udp_sniffer_vita_set_callback(vitaHostFoundCbLogger);
-    brls::Logger::info("[check_host] startVitaDiscovery: después de udp_sniffer_vita_set_callback");
+    vita_log::info("[check_host] startVitaDiscovery: después de udp_sniffer_vita_set_callback");
 #if defined(__PSV__)
-    vita_debug_log("[check_host] startVitaDiscovery: udp_sniffer_vita_set_callback called\n");
+    vita_log::info("[check_host] startVitaDiscovery: udp_sniffer_vita_set_callback called\n");
 #endif
     vitaThreadActive = true;
-    brls::Logger::info("[check_host] startVitaDiscovery: antes de crear hilo");
+    vita_log::info("[check_host] startVitaDiscovery: antes de crear hilo");
 #if defined(__PSV__)
-    vita_debug_log("[check_host] startVitaDiscovery: about to create discovery thread\n");
+    vita_log::info("[check_host] startVitaDiscovery: about to create discovery thread\n");
 #endif
     vitaDiscoveryThread = sceKernelCreateThread("mdns_discovery", [](SceSize, void* argp) -> int
         {
     MDNS_LOG("[mdns_log] Hilo de descubrimiento mDNS iniciado (máximo 100 iteraciones o hasta cerrar pestaña)\n");
-    brls::Logger::info("[check_host] Hilo de descubrimiento mDNS iniciado (máximo 100 iteraciones o hasta cerrar pestaña)");
+    vita_log::info("[check_host] Hilo de descubrimiento mDNS iniciado (máximo 100 iteraciones o hasta cerrar pestaña)");
 #if defined(__PSV__)
-    vita_debug_log("[mdns_log] Hilo de descubrimiento mDNS (VITA) iniciado\n");
+    vita_log::debug("[mdns_log] Hilo de descubrimiento mDNS (VITA) iniciado\n");
 #endif
         int iter = 0;
         while (vitaDiscoveryStatus == 1 && iter < 100) {
             iter++;
             if (iter % 10 == 0) {
                 MDNS_LOG("[mdns_log] Descubrimiento mDNS: iteración %d\n", iter);
-                brls::Logger::info("[check_host] Descubrimiento mDNS: iteración %d", iter);
+                vita_log::info("[check_host] Descubrimiento mDNS: iteración %d", iter);
             }
             udp_sniffer_vita_poll();
             sceKernelDelayThread(1000 * 100); // 100ms
         }
         MDNS_LOG("[mdns_log] Saliendo del bucle de descubrimiento mDNS\n");
-        brls::Logger::info("[check_host] Saliendo del bucle de descubrimiento mDNS");
+        vita_log::info("[check_host] Saliendo del bucle de descubrimiento mDNS");
         udp_sniffer_vita_deinit();
         MDNS_LOG("[mdns_log] Hilo de descubrimiento mDNS finalizado\n");
-        brls::Logger::info("[check_host] Hilo de descubrimiento mDNS finalizado");
+        vita_log::info("[check_host] Hilo de descubrimiento mDNS finalizado");
 #if defined(__PSV__)
-    vita_debug_log("[mdns_log] Hilo de descubrimiento mDNS finalizado (VITA)\n");
+    vita_log::debug("[mdns_log] Hilo de descubrimiento mDNS finalizado (VITA)\n");
 #endif
         vitaDiscoveryStatus = 2;
         vitaThreadActive = false;
@@ -186,15 +184,15 @@ void startVitaDiscovery(void (*hostFoundCb)(int, const char*, const char*, const
             }
         });
         return 0; }, 0x10000100, 0x10000, 0, 0, NULL);
-    brls::Logger::info("[check_host] startVitaDiscovery: después de crear hilo");
+    vita_log::info("[check_host] startVitaDiscovery: después de crear hilo");
     if (vitaDiscoveryThread >= 0)
     {
-        brls::Logger::info("[check_host] startVitaDiscovery: hilo creado correctamente, iniciando...");
+        vita_log::info("[check_host] startVitaDiscovery: hilo creado correctamente, iniciando...");
         int startResult = sceKernelStartThread(vitaDiscoveryThread, 0, nullptr);
         if (startResult < 0)
         {
-            brls::Logger::error("[check_host] Error iniciando hilo mDNS (sceKernelStartThread): 0x{:08X}", startResult);
-            vita_debug_log("[check_host] Error start thread: 0x%08X\n", startResult);
+            vita_log::error("[check_host] Error iniciando hilo mDNS (sceKernelStartThread): 0x%08X", startResult);
+            vita_log::error("[check_host] Error start thread: 0x%08X\n", startResult);
             sceKernelDeleteThread(vitaDiscoveryThread);
             vitaDiscoveryThread = -1;
             udp_sniffer_vita_deinit();
@@ -215,12 +213,12 @@ void startVitaDiscovery(void (*hostFoundCb)(int, const char*, const char*, const
         }
         else
         {
-            brls::Logger::info("[check_host] startVitaDiscovery: hilo mDNS en ejecución (sceKernelStartThread=0x{:08X})", startResult);
+            vita_log::info("[check_host] startVitaDiscovery: hilo mDNS en ejecución (sceKernelStartThread=0x%08X)", startResult);
         }
     }
     else
     {
-        brls::Logger::error("[check_host] Error creando hilo de descubrimiento mDNS Vita");
+        vita_log::error("[check_host] Error creando hilo de descubrimiento mDNS Vita");
     }
 }
 

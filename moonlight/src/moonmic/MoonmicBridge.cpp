@@ -16,6 +16,7 @@
 
 #include "ConfigManager.hpp"
 #include "GameStreamClient.hpp"
+#include "debug.hpp"
 #include "model/HostStorage.hpp"
 
 extern "C"
@@ -113,7 +114,7 @@ MoonmicBridge::SunshineValidationInfo MoonmicBridge::buildSunshineValidation(con
     SunshineValidationInfo info;
     if (hostIp.empty())
     {
-        brls::Logger::warning("[MoonmicBridge] buildSunshineValidation called with empty host");
+        vita_log::warning("[MoonmicBridge] buildSunshineValidation called with empty host");
         return info;
     }
 
@@ -126,7 +127,7 @@ MoonmicBridge::SunshineValidationInfo MoonmicBridge::buildSunshineValidation(con
         {
             if (!GameStreamClient::instance().isConnected(host.ip))
             {
-                brls::Logger::info("[MoonmicBridge] Connecting to {} to populate Sunshine validation", host.name);
+                vita_log::info("[MoonmicBridge] Connecting to %s to populate Sunshine validation", host.name.c_str());
                 GameStreamClient::instance().connect(host);
             }
             keyDir = GameStreamClient::instance().getKeyDirFor(host.ip);
@@ -136,7 +137,7 @@ MoonmicBridge::SunshineValidationInfo MoonmicBridge::buildSunshineValidation(con
 
     if (keyDir.empty())
     {
-        brls::Logger::warning("[MoonmicBridge] No keyDir found for {} - PairStatus forced to 0", hostIp);
+        vita_log::warning("[MoonmicBridge] No keyDir found for %s - PairStatus forced to 0", hostIp.c_str());
         return info;
     }
 
@@ -158,7 +159,7 @@ MoonmicBridge::SunshineValidationInfo MoonmicBridge::buildSunshineValidation(con
     }
     else
     {
-        brls::Logger::warning("[MoonmicBridge] Unable to read uniqueid for {}", hostIp);
+        vita_log::warning("[MoonmicBridge] Unable to read uniqueid for %s", hostIp.c_str());
     }
 
     return info;
@@ -169,7 +170,7 @@ MoonmicBridge::HandshakeResult MoonmicBridge::sendResolutionHandshake(const std:
     HandshakeResult result;
     if (hostIp.empty() || port <= 0)
     {
-        brls::Logger::error("[MoonmicBridge] Invalid host or port for handshake: {}:{}", hostIp, port);
+        vita_log::error("[MoonmicBridge] Invalid host or port for handshake: %s:%d", hostIp.c_str(), port);
         return result;
     }
 
@@ -205,7 +206,7 @@ MoonmicBridge::HandshakeResult MoonmicBridge::sendResolutionHandshake(const std:
     int sock = socket(AF_INET, SOCK_DGRAM, 0);
     if (sock < 0)
     {
-        brls::Logger::error("[MoonmicBridge] Failed to create socket for handshake");
+        vita_log::error("[MoonmicBridge] Failed to create socket for handshake");
         return result;
     }
 
@@ -218,7 +219,7 @@ MoonmicBridge::HandshakeResult MoonmicBridge::sendResolutionHandshake(const std:
     int reuse = 1;
     if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse)) < 0)
     {
-        brls::Logger::warning("[MoonmicBridge] Failed to set SO_REUSEADDR (non-fatal)");
+        vita_log::warning("[MoonmicBridge] Failed to set SO_REUSEADDR (non-fatal)");
     }
 
     // Set receive timeout (more reliable than poll() on PS Vita)
@@ -227,7 +228,7 @@ MoonmicBridge::HandshakeResult MoonmicBridge::sendResolutionHandshake(const std:
     tv.tv_usec = 200000; // 200ms timeout
     if (setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) < 0)
     {
-        brls::Logger::warning("[MoonmicBridge] Failed to set SO_RCVTIMEO (non-fatal)");
+        vita_log::warning("[MoonmicBridge] Failed to set SO_RCVTIMEO (non-fatal)");
     }
 
     // Bind to ephemeral port (port 0) to ensure socket can receive replies
@@ -239,7 +240,7 @@ MoonmicBridge::HandshakeResult MoonmicBridge::sendResolutionHandshake(const std:
 
     if (bind(sock, (struct sockaddr*)&bind_addr, sizeof(bind_addr)) < 0)
     {
-        brls::Logger::error("[MoonmicBridge] Failed to bind socket for handshake");
+        vita_log::error("[MoonmicBridge] Failed to bind socket for handshake");
         close(sock);
         return result;
     }
@@ -249,18 +250,18 @@ MoonmicBridge::HandshakeResult MoonmicBridge::sendResolutionHandshake(const std:
     if (getsockname(sock, (struct sockaddr*)&assigned_addr, &addr_len) == 0)
     {
         uint16_t assigned_port = ntohs(assigned_addr.sin_port);
-        brls::Logger::info("[MoonmicBridge] Socket bound to ephemeral port {}", assigned_port);
+        vita_log::info("[MoonmicBridge] Socket bound to ephemeral port %d", assigned_port);
     }
 
     ssize_t sent = sendto(sock, &handshake, sizeof(handshake), 0, (struct sockaddr*)&addr, sizeof(addr));
     if (sent != sizeof(handshake))
     {
-        brls::Logger::error("[MoonmicBridge] Failed to send handshake packet");
+        vita_log::error("[MoonmicBridge] Failed to send handshake packet");
         close(sock);
         return result;
     }
 
-    brls::Logger::info("[MoonmicBridge] Handshake sent, waiting for ACK...");
+    vita_log::info("[MoonmicBridge] Handshake sent, waiting for ACK...");
 
     // Wait for ACK
     // Loop to handle potential PING packets arriving before the ACK
@@ -274,7 +275,7 @@ MoonmicBridge::HandshakeResult MoonmicBridge::sendResolutionHandshake(const std:
         auto now = std::chrono::steady_clock::now();
         if (std::chrono::duration_cast<std::chrono::milliseconds>(now - start_time).count() > 300)
         {
-            brls::Logger::info("[MoonmicBridge] Handshake timed out after loop");
+            vita_log::info("[MoonmicBridge] Handshake timed out after loop");
             break;
         }
 
@@ -291,7 +292,7 @@ MoonmicBridge::HandshakeResult MoonmicBridge::sendResolutionHandshake(const std:
                 magic = *(uint32_t*)buf;
             }
 
-            brls::Logger::info("[MoonmicBridge] Received {} bytes from {}:{}. Magic: 0x{:08X}", received,
+            vita_log::info("[MoonmicBridge] Received %d bytes from %s:%d, Magic: 0x%08X", received,
                 inet_ntoa(from_addr.sin_addr), ntohs(from_addr.sin_port), magic);
 
             // Check if it's a PING (12 bytes, magic 0x50494E47)
@@ -299,7 +300,7 @@ MoonmicBridge::HandshakeResult MoonmicBridge::sendResolutionHandshake(const std:
             {
                 if (magic == 0x50494E47)
                 { // "PING"
-                    brls::Logger::info("[MoonmicBridge] Received early PING from host, ignoring...");
+                    vita_log::info("[MoonmicBridge] Received early PING from host, ignoring...");
                     continue; // Continue waiting for ACK
                 }
             }
@@ -309,8 +310,8 @@ MoonmicBridge::HandshakeResult MoonmicBridge::sendResolutionHandshake(const std:
                 moonmic_handshake_t* ack = (moonmic_handshake_t*)buf;
                 if (ack->magic == MOONMIC_HANDSHAKE_ACK)
                 {
-                    brls::Logger::info("[MoonmicBridge] Resolution handshake to {}:{} - ACK: RECEIVED, Mismatch: {}, Current: {}x{}",
-                        hostIp, port,
+                    vita_log::info("[MoonmicBridge] Resolution handshake to %s:%d - ACK: RECEIVED, Mismatch: %s, Current: %dx%d",
+                        hostIp.c_str(), port,
                         (ack->display_width != target_width || ack->display_height != target_height) ? "YES" : "NO",
                         ack->display_width, ack->display_height);
 
@@ -324,12 +325,12 @@ MoonmicBridge::HandshakeResult MoonmicBridge::sendResolutionHandshake(const std:
                 }
                 else
                 {
-                    brls::Logger::info("[MoonmicBridge] Received packet with wrong magic. Expected 0x{:08X} (ACK), Got 0x{:08X}", MOONMIC_HANDSHAKE_ACK, ack->magic);
+                    vita_log::info("[MoonmicBridge] Received packet with wrong magic. Expected 0x%08X (ACK), Got 0x%08X", MOONMIC_HANDSHAKE_ACK, ack->magic);
                 }
             }
             else
             {
-                brls::Logger::info("[MoonmicBridge] Packet too small for handshake: {} < {}", received, sizeof(moonmic_handshake_t));
+                vita_log::info("[MoonmicBridge] Packet too small for handshake: %d < %d", received, (int)sizeof(moonmic_handshake_t));
             }
         }
         else
@@ -342,7 +343,7 @@ MoonmicBridge::HandshakeResult MoonmicBridge::sendResolutionHandshake(const std:
         }
     }
 
-    brls::Logger::info("[MoonmicBridge] Resolution handshake to {}:{} - ACK: TIMEOUT, Mismatch: NO, Current: 0x0", hostIp, port);
+    vita_log::info("[MoonmicBridge] Resolution handshake to %s:%d - ACK: TIMEOUT, Mismatch: NO, Current: 0x0", hostIp.c_str(), port);
     close(sock);
     return result;
 }

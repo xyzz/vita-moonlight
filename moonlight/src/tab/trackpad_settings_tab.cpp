@@ -150,7 +150,7 @@ void TrackpadSettingsTab::applyTrackpadSettingsLive()
     // Clear trackpad state to ensure it uses the new cache in the next frame
     g_touchInput->dropTouch(TOUCHSCREEN_MODE_TRACKPAD);
 
-    vita_debug_log(
+    vita_log::info(
         "[TRACKPAD] Settings applied live (pointer=%d deadzone=%d scroll=%d invert=%d)",
         settings.trackpad_pointer_speed,
         settings.trackpad_dead_zone,

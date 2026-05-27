@@ -238,8 +238,19 @@ int main(int argc, char* argv[])
         startupCfg.load();
         VideoSettings vs = startupCfg.getVideoSettings();
         brls::Application::setSwapInterval(vs.swap_interval);
-        // Always limit UI menus to 60 FPS to prevent 100% CPU usage when VSync (swap_interval) is off
-        brls::Application::setLimitedFPS(60);
+        // When vsync is enabled (swap_interval > 0), hardware limits FPS to refresh rate
+        // When vsync is disabled (swap_interval = 0), use software limiter to prevent 100% CPU
+        if (vs.swap_interval == 0)
+        {
+            brls::Application::setLimitedFPS(61);
+            vita_log::info("[Main] Vsync OFF: software limiter set to 61 FPS (compensates overhead)");
+        }
+        else
+        {
+            brls::Application::setLimitedFPS(0); // Disable software limiter when vsync is enabled
+            vita_log::info("[Main] Vsync ON: hardware limits FPS to refresh rate (swapInterval=%d)", vs.swap_interval);
+        }
+        vita_log::info("[Main] FPS status enabled: %d", brls::Application::getFPSStatus());
     }
 
     brls::Application::getPlatform()->setThemeVariant(brls::ThemeVariant::DARK);

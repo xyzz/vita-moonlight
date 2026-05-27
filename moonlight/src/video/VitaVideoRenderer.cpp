@@ -184,17 +184,67 @@ void VitaVideoRenderer::drawNVG(NVGcontext* vg, float viewportW, float viewportH
     if (g_stats.frames_decoded == 0)
         return;
 
-    // Force single buffer mode for complete frame rendering (like legacy)
-    // This prevents vertical tearing/partitioning by ensuring the entire frame
-    // is drawn at once without buffering delays
+    int displayIdx = 0;
     if (!single_frame_buffer)
     {
-        VITA_DEBUG_LOG("[Video][NVG] Forcing single buffer mode to prevent frame partitioning");
-        single_frame_buffer = true;
+        int bufferMode = g_video_settings_snapshot.buffer_mode;
+        if (bufferMode == 2)
+        {
+            // Triple-buffering: Atomic Exchange
+            int current_display = __atomic_load_n(&frame_display_idx, __ATOMIC_ACQUIRE);
+            if (__atomic_load_n(&frame_ready_flag, __ATOMIC_ACQUIRE))
+            {
+                int old_ready   = __atomic_exchange_n(&frame_ready_idx, current_display, __ATOMIC_SEQ_CST);
+                current_display = old_ready;
+                __atomic_store_n(&frame_display_idx, current_display, __ATOMIC_RELEASE);
+                __atomic_store_n(&frame_ready_flag, false, __ATOMIC_RELEASE);
+            }
+            displayIdx = current_display;
+
+            // Triple-buffering collision check: ensure display, write, and ready are all distinct
+            int current_write = __atomic_load_n(&frame_write_idx, __ATOMIC_ACQUIRE);
+            int current_ready = __atomic_load_n(&frame_ready_idx, __ATOMIC_ACQUIRE);
+            if (displayIdx == current_write || displayIdx == current_ready || current_write == current_ready)
+            {
+                static uint32_t collision_counter = 0;
+                if ((collision_counter++ % 181) == 0)
+                {
+                    VITA_DEBUG_LOG("[Video][WARN][DIAG] COLLISION DETECTED in Triple Buffer: display=%d write=%d ready=%d",
+                        displayIdx, current_write, current_ready);
+                }
+            }
+        }
+        else
+        {
+            // Double-buffering rotation/swap
+            if (__atomic_load_n(&frame_ready_flag, __ATOMIC_ACQUIRE))
+            {
+                int ready = __atomic_load_n(&frame_ready_idx, __ATOMIC_ACQUIRE);
+                __atomic_store_n(&frame_display_idx, ready, __ATOMIC_RELEASE);
+                __atomic_store_n(&frame_ready_flag, false, __ATOMIC_RELEASE);
+            }
+            displayIdx = __atomic_load_n(&frame_display_idx, __ATOMIC_ACQUIRE);
+
+            // Double-buffering collision check
+            int current_write = __atomic_load_n(&frame_write_idx, __ATOMIC_ACQUIRE);
+            if (displayIdx == current_write)
+            {
+                static uint32_t collision_counter = 0;
+                if ((collision_counter++ % 181) == 0)
+                {
+                    VITA_DEBUG_LOG("[Video][WARN][DIAG] COLLISION DETECTED in Double Buffer: display=%d write=%d",
+                        displayIdx, current_write);
+                }
+            }
+        }
+    }
+    else
+    {
+        // Single buffering loads the latest active decoded texture index atomically
+        displayIdx = __atomic_load_n(&frame_display_idx, __ATOMIC_ACQUIRE);
     }
 
-    // No atomic exchange in single-buffer mode - all indices are the same (0)
-    const GxmTexture* tex = frame_textures[0];
+    const GxmTexture* tex = frame_textures[displayIdx];
     if (!tex)
         return;
 
@@ -235,12 +285,72 @@ void VitaVideoRenderer::drawNVG(NVGcontext* vg, float viewportW, float viewportH
     if (texW == 0 || texH == 0)
         return;
 
-    // Disable image caching for complete frame rendering (like legacy)
-    // This prevents frame partitioning by ensuring the texture is drawn directly
-    int useImageId = nvgxmCreateImageFromHandle(vg, const_cast<SceGxmTexture*>(gxmTex));
+    // Use image caching for better performance (reduces micro-stuttering)
+    int foundIdx = -1;
+    for (int i = 0; i < imageCacheSize; i++)
+    {
+        if (imageCache[i].tex == tex)
+        {
+            foundIdx = i;
+            break;
+        }
+    }
+
+    int useImageId = -1;
+    if (foundIdx >= 0)
+    {
+        if (imageCache[foundIdx].width != (int)texW || imageCache[foundIdx].height != (int)texH || imageCache[foundIdx].format != currentFmt || imageCache[foundIdx].data != currentData)
+        {
+            nvgDeleteImage(vg, imageCache[foundIdx].imageId);
+            int newId = nvgxmCreateImageFromHandle(vg, const_cast<SceGxmTexture*>(gxmTex));
+            if (newId > 0)
+            {
+                imageCache[foundIdx].imageId = newId;
+                imageCache[foundIdx].width   = (int)texW;
+                imageCache[foundIdx].height  = (int)texH;
+                imageCache[foundIdx].data    = currentData;
+                imageCache[foundIdx].format  = currentFmt;
+                useImageId                   = newId;
+            }
+        }
+        else
+        {
+            useImageId = imageCache[foundIdx].imageId;
+        }
+    }
+    else
+    {
+        int newId = nvgxmCreateImageFromHandle(vg, const_cast<SceGxmTexture*>(gxmTex));
+        if (newId > 0)
+        {
+            if (imageCacheSize < 4)
+            {
+                int idx                 = imageCacheSize++;
+                imageCache[idx].tex     = tex;
+                imageCache[idx].imageId = newId;
+                imageCache[idx].width   = (int)texW;
+                imageCache[idx].height  = (int)texH;
+                imageCache[idx].data    = currentData;
+                imageCache[idx].format  = currentFmt;
+                useImageId              = newId;
+            }
+            else
+            {
+                nvgDeleteImage(vg, imageCache[0].imageId);
+                imageCache[0].tex     = tex;
+                imageCache[0].imageId = newId;
+                imageCache[0].width   = (int)texW;
+                imageCache[0].height  = (int)texH;
+                imageCache[0].data    = currentData;
+                imageCache[0].format  = currentFmt;
+                useImageId            = newId;
+            }
+        }
+    }
+
     if (useImageId <= 0)
     {
-        VITA_DEBUG_LOG("[Video][DRAW NVG][ERR] Failed to create image for tex=%p", tex);
+        VITA_DEBUG_LOG("[Video][DRAW NVG][ERR] Failed to get/create image for tex=%p", tex);
         return;
     }
 
@@ -251,15 +361,12 @@ void VitaVideoRenderer::drawNVG(NVGcontext* vg, float viewportW, float viewportH
     if (dw <= 0 || dh <= 0)
         return;
 
-    // Draw complete frame at once (like legacy draw_streaming)
+    // Draw complete frame at once
     NVGpaint paint = nvgImagePattern(vg, (float)ox, (float)oy, (float)dw, (float)dh, 0.0f, useImageId, alpha);
     nvgBeginPath(vg);
     nvgRect(vg, (float)ox, (float)oy, (float)dw, (float)dh);
     nvgFillPaint(vg, paint);
     nvgFill(vg);
-
-    // Delete image immediately after drawing (no caching)
-    nvgDeleteImage(vg, useImageId);
 
     g_stats.frames_presented++;
     onFramePresented();
@@ -345,8 +452,17 @@ void VitaVideoRenderer::onFramePresented()
             uint32_t estRttVar = 0;
             if (!g_session_stopping && LiGetEstimatedRttInfo(&estRtt, &estRttVar))
             {
-                VITA_DEBUG_LOG("[PERF][DECODE] Latency (min/avg/max): %u/%u/%u ms (frames in window: %u) - RTT: %u ms (var: %u)",
-                    g_decode_min_ms, avg, g_decode_max_ms, g_decode_count, estRtt, estRttVar);
+                // Log warning if RTT variance is high or FPS is low
+                if (estRttVar > 5 || g_decode_count < 55)
+                {
+                    VITA_DEBUG_LOG("[PERF][DECODE] WARNING: Latency (min/avg/max): %u/%u/%u ms (frames in window: %u) - RTT: %u ms (var: %u)",
+                        g_decode_min_ms, avg, g_decode_max_ms, g_decode_count, estRtt, estRttVar);
+                }
+                else
+                {
+                    VITA_DEBUG_LOG("[PERF][DECODE] Latency (min/avg/max): %u/%u/%u ms (frames in window: %u) - RTT: %u ms (var: %u)",
+                        g_decode_min_ms, avg, g_decode_max_ms, g_decode_count, estRtt, estRttVar);
+                }
             }
             else
             {

@@ -150,6 +150,15 @@
             },
             "saved": "V-Sync guardado"
         },
+        "buffer_mode": {
+            "title": "Modo de Buffer",
+            "options": {
+                "0": "Simple (Latencia Mínima)",
+                "1": "Doble",
+                "2": "Triple"
+            },
+            "saved": "Modo de buffer guardado"
+        },
         "motion_controls_title": "Giroscopio",
         "double_tap_sprint_title": "Doble tap para correr",
         "touchscreen_mode": {

@@ -95,6 +95,16 @@ struct ffmpeg_perf_counters
     uint32_t dropped_decode_units;
     uint32_t dropped_stale_frames;
     uint32_t adaptive_drop_interval;
+    uint64_t publish_total_us;
+    uint32_t publish_max_us;
+    uint64_t publish_direct_total_us;
+    uint32_t publish_direct_max_us;
+    uint64_t publish_sw_total_us;
+    uint32_t publish_sw_max_us;
+    uint64_t slots_mutex_total_us;
+    uint32_t slots_mutex_max_us;
+    uint64_t vfh_push_total_us;
+    uint32_t vfh_push_max_us;
 };
 
 static ffmpeg_perf_counters g_perf = { 0 };
@@ -119,66 +129,74 @@ static void perf_report_if_due()
         return;
     }
 
-    uint32_t denom        = elapsedMs ? elapsedMs : 1;
-    uint32_t submitFps    = (uint32_t)(((uint64_t)g_perf.submit_calls * 1000ULL) / denom);
-    uint32_t decodedFps   = (uint32_t)(((uint64_t)g_perf.decoded_frames * 1000ULL) / denom);
-    uint32_t publishedFps = (uint32_t)(((uint64_t)g_perf.published_frames * 1000ULL) / denom);
-    uint32_t swsAvgUs     = g_perf.sws_calls ? (uint32_t)(g_perf.sws_total_us / g_perf.sws_calls) : 0;
-    uint32_t submitAvgUs  = g_perf.submit_calls ? (uint32_t)(g_perf.submit_total_us / g_perf.submit_calls) : 0;
-    uint32_t lockAvgUs    = g_perf.submit_calls ? (uint32_t)(g_perf.lock_wait_total_us / g_perf.submit_calls) : 0;
-    uint32_t drainAvgUs   = g_perf.submit_calls ? (uint32_t)(g_perf.drain_total_us / g_perf.submit_calls) : 0;
-    uint32_t copyAvgUs    = g_perf.submit_calls ? (uint32_t)(g_perf.copy_total_us / g_perf.submit_calls) : 0;
-    uint32_t sendAvgUs    = g_perf.submit_calls ? (uint32_t)(g_perf.send_total_us / g_perf.submit_calls) : 0;
-    uint32_t recvAvgUs    = g_perf.submit_calls ? (uint32_t)(g_perf.recv_total_us / g_perf.submit_calls) : 0;
+    uint32_t denom          = elapsedMs ? elapsedMs : 1;
+    uint32_t submitFps      = (uint32_t)(((uint64_t)g_perf.submit_calls * 1000ULL) / denom);
+    uint32_t decodedFps     = (uint32_t)(((uint64_t)g_perf.decoded_frames * 1000ULL) / denom);
+    uint32_t publishedFps   = (uint32_t)(((uint64_t)g_perf.published_frames * 1000ULL) / denom);
+    uint32_t swsAvgUs       = g_perf.sws_calls ? (uint32_t)(g_perf.sws_total_us / g_perf.sws_calls) : 0;
+    uint32_t submitAvgUs    = g_perf.submit_calls ? (uint32_t)(g_perf.submit_total_us / g_perf.submit_calls) : 0;
+    uint32_t lockAvgUs      = g_perf.submit_calls ? (uint32_t)(g_perf.lock_wait_total_us / g_perf.submit_calls) : 0;
+    uint32_t drainAvgUs     = g_perf.submit_calls ? (uint32_t)(g_perf.drain_total_us / g_perf.submit_calls) : 0;
+    uint32_t copyAvgUs      = g_perf.submit_calls ? (uint32_t)(g_perf.copy_total_us / g_perf.submit_calls) : 0;
+    uint32_t sendAvgUs      = g_perf.submit_calls ? (uint32_t)(g_perf.send_total_us / g_perf.submit_calls) : 0;
+    uint32_t recvAvgUs      = g_perf.submit_calls ? (uint32_t)(g_perf.recv_total_us / g_perf.submit_calls) : 0;
+    uint32_t publishAvgUs   = g_perf.published_frames ? (uint32_t)(g_perf.publish_total_us / g_perf.published_frames) : 0;
+    uint32_t pubDirectAvgUs = g_perf.published_frames ? (uint32_t)(g_perf.publish_direct_total_us / g_perf.published_frames) : 0;
+    uint32_t pubSwAvgUs     = g_perf.published_frames ? (uint32_t)(g_perf.publish_sw_total_us / g_perf.published_frames) : 0;
+    uint32_t slotsMtxAvgUs  = g_perf.published_frames ? (uint32_t)(g_perf.slots_mutex_total_us / g_perf.published_frames) : 0;
+    uint32_t vfhPushAvgUs   = g_perf.published_frames ? (uint32_t)(g_perf.vfh_push_total_us / g_perf.published_frames) : 0;
 
-    VITA_DEBUG_LOG("[PERF][VIDEO] window_ms=%u submit_fps=%u decoded_fps=%u presented_fps=%u submit_calls=%u decoded=%u published=%u sws_calls=%u sws_avg_us=%u sws_max_us=%u submit_avg_us=%u submit_max_us=%u lock_avg_us=%u lock_max_us=%u drain_avg_us=%u drain_max_us=%u copy_avg_us=%u copy_max_us=%u send_avg_us=%u send_max_us=%u recv_avg_us=%u recv_max_us=%u drop_units=%u drop_stale=%u drop_every=%u",
-        elapsedMs,
-        submitFps,
-        decodedFps,
-        g_stats.current_fps,
-        g_perf.submit_calls,
-        g_perf.decoded_frames,
-        g_perf.published_frames,
-        g_perf.sws_calls,
-        swsAvgUs,
-        g_perf.sws_max_us,
-        submitAvgUs,
-        g_perf.submit_max_us,
-        lockAvgUs,
-        g_perf.lock_wait_max_us,
-        drainAvgUs,
-        g_perf.drain_max_us,
-        copyAvgUs,
-        g_perf.copy_max_us,
-        sendAvgUs,
-        g_perf.send_max_us,
-        recvAvgUs,
-        g_perf.recv_max_us,
-        g_perf.dropped_decode_units,
-        g_perf.dropped_stale_frames,
-        g_perf.adaptive_drop_interval);
+    // Main pipeline timing log
+    VITA_DEBUG_LOG("[PERF][VIDEO] win=%ums submit=%u/s dec=%u/s pub=%u/s present=%u/s",
+        elapsedMs, submitFps, decodedFps, publishedFps, g_stats.current_fps);
+    // Per-frame breakdown (all values in microseconds)
+    VITA_DEBUG_LOG("[PERF][VIDEO] submit_avg=%u/%umax lock=%u/%umax drain=%u/%umax copy=%u/%umax send=%u/%umax recv=%u/%umax",
+        submitAvgUs, g_perf.submit_max_us,
+        lockAvgUs, g_perf.lock_wait_max_us,
+        drainAvgUs, g_perf.drain_max_us,
+        copyAvgUs, g_perf.copy_max_us,
+        sendAvgUs, g_perf.send_max_us,
+        recvAvgUs, g_perf.recv_max_us);
+    VITA_DEBUG_LOG("[PERF][VIDEO] pub_avg=%u/%umax dr=%u/%umax sw=%u/%umax slots_mtx=%u/%umax vfh=%u/%umax sws=%u/%umax drop=%u stale=%u",
+        publishAvgUs, g_perf.publish_max_us,
+        pubDirectAvgUs, g_perf.publish_direct_max_us,
+        pubSwAvgUs, g_perf.publish_sw_max_us,
+        slotsMtxAvgUs, g_perf.slots_mutex_max_us,
+        vfhPushAvgUs, g_perf.vfh_push_max_us,
+        swsAvgUs, g_perf.sws_max_us,
+        g_perf.dropped_decode_units, g_perf.dropped_stale_frames);
 
-    g_perf.window_start_ms      = nowMs;
-    g_perf.submit_calls         = 0;
-    g_perf.decoded_frames       = 0;
-    g_perf.published_frames     = 0;
-    g_perf.sws_calls            = 0;
-    g_perf.sws_total_us         = 0;
-    g_perf.sws_max_us           = 0;
-    g_perf.submit_total_us      = 0;
-    g_perf.submit_max_us        = 0;
-    g_perf.lock_wait_total_us   = 0;
-    g_perf.lock_wait_max_us     = 0;
-    g_perf.drain_total_us       = 0;
-    g_perf.drain_max_us         = 0;
-    g_perf.copy_total_us        = 0;
-    g_perf.copy_max_us          = 0;
-    g_perf.send_total_us        = 0;
-    g_perf.send_max_us          = 0;
-    g_perf.recv_total_us        = 0;
-    g_perf.recv_max_us          = 0;
-    g_perf.dropped_decode_units = 0;
-    g_perf.dropped_stale_frames = 0;
+    g_perf.window_start_ms         = nowMs;
+    g_perf.submit_calls            = 0;
+    g_perf.decoded_frames          = 0;
+    g_perf.published_frames        = 0;
+    g_perf.sws_calls               = 0;
+    g_perf.sws_total_us            = 0;
+    g_perf.sws_max_us              = 0;
+    g_perf.submit_total_us         = 0;
+    g_perf.submit_max_us           = 0;
+    g_perf.lock_wait_total_us      = 0;
+    g_perf.lock_wait_max_us        = 0;
+    g_perf.drain_total_us          = 0;
+    g_perf.drain_max_us            = 0;
+    g_perf.copy_total_us           = 0;
+    g_perf.copy_max_us             = 0;
+    g_perf.send_total_us           = 0;
+    g_perf.send_max_us             = 0;
+    g_perf.recv_total_us           = 0;
+    g_perf.recv_max_us             = 0;
+    g_perf.dropped_decode_units    = 0;
+    g_perf.dropped_stale_frames    = 0;
+    g_perf.publish_total_us        = 0;
+    g_perf.publish_max_us          = 0;
+    g_perf.publish_direct_total_us = 0;
+    g_perf.publish_direct_max_us   = 0;
+    g_perf.publish_sw_total_us     = 0;
+    g_perf.publish_sw_max_us       = 0;
+    g_perf.slots_mutex_total_us    = 0;
+    g_perf.slots_mutex_max_us      = 0;
+    g_perf.vfh_push_total_us       = 0;
+    g_perf.vfh_push_max_us         = 0;
 }
 
 #ifdef BOREALIS_USE_GXM
@@ -466,13 +484,33 @@ static void dr_texture_attach(dr_texture* tex, AVFrame* frame)
 static void reset_global_slots()
 {
     std::lock_guard<std::mutex> slotLock(g_frame_slots_mutex);
-    frame_textures[0]   = nullptr;
-    frame_textures[1]   = nullptr;
-    frame_textures[2]   = nullptr;
-    frame_display_idx   = 0;
-    frame_ready_idx     = 0;
-    frame_write_idx     = 0;
-    single_frame_buffer = true;
+    frame_textures[0] = nullptr;
+    frame_textures[1] = nullptr;
+    frame_textures[2] = nullptr;
+
+    int bufferMode = g_video_settings_snapshot.buffer_mode;
+    if (bufferMode == 2)
+    {
+        frame_display_idx   = 0;
+        frame_ready_idx     = 1;
+        frame_write_idx     = 2;
+        single_frame_buffer = false;
+    }
+    else if (bufferMode == 1)
+    {
+        frame_display_idx   = 0;
+        frame_ready_idx     = 0;
+        frame_write_idx     = 1;
+        single_frame_buffer = false;
+    }
+    else
+    {
+        frame_display_idx   = 0;
+        frame_ready_idx     = 0;
+        frame_write_idx     = 0;
+        single_frame_buffer = true;
+    }
+    __atomic_store_n(&frame_ready_flag, false, __ATOMIC_RELEASE);
 }
 
 static void free_decode_unit(PDECODE_UNIT unit)
@@ -1253,22 +1291,32 @@ static bool publish_frame(FFmpegVideoContext* ctx, AVFrame* frame, uint64_t ptsU
         return false;
     }
 
+    uint32_t publishStartUs = perf_now_us();
+
     static uint32_t s_publish_log_counter = 0;
-    if ((s_publish_log_counter++ % 1200) == 0)
+    bool verbosePublishLog                = ((s_publish_log_counter++ % 1200) == 0);
+    if (verbosePublishLog)
     {
-        VITA_DEBUG_LOG("[FFMPEG] publish_frame: pts=%llu format=%d %dx%d", ptsUs, frame->format, frame->width, frame->height);
+        VITA_DEBUG_LOG("[FFMPEG] publish_frame: pts=%llu format=%d %dx%d direct_render=%d",
+            ptsUs, frame->format, frame->width, frame->height,
+            ctx->decoder.use_direct_render ? 1 : 0);
     }
 
-    bool published = false;
+    bool published       = false;
+    uint32_t pubDirectUs = 0, pubSwUs = 0;
 #ifdef BOREALIS_USE_GXM
     if (ctx->decoder.use_direct_render)
     {
-        published = publish_direct_frame(ctx, frame);
+        uint32_t t0 = perf_now_us();
+        published   = publish_direct_frame(ctx, frame);
+        pubDirectUs = perf_now_us() - t0;
     }
 #endif
     if (!published)
     {
-        published = publish_sw_frame(ctx, frame);
+        uint32_t t0 = perf_now_us();
+        published   = publish_sw_frame(ctx, frame);
+        pubSwUs     = perf_now_us() - t0;
     }
 
     if (!published || !ctx->current_frame.texture)
@@ -1276,47 +1324,73 @@ static bool publish_frame(FFmpegVideoContext* ctx, AVFrame* frame, uint64_t ptsU
         return false;
     }
 
+    uint32_t slotsMtxStartUs = perf_now_us();
     {
         std::lock_guard<std::mutex> slotLock(g_frame_slots_mutex);
-        frame_textures[0]   = nullptr;
-        frame_textures[1]   = nullptr;
-        frame_textures[2]   = nullptr;
-        frame_display_idx   = 0;
-        frame_ready_idx     = 0;
-        frame_write_idx     = 0;
-        single_frame_buffer = true;
 
+        // Mapeo persistente 1:1 de texturas físicas para evitar invalidez de la caché de imágenes de Nanovg
+#ifdef BOREALIS_USE_GXM
         if (ctx->using_direct_memory)
         {
-#ifdef BOREALIS_USE_GXM
-            // Use dedicated dr_textures for double-buffering so NVG re-creates image ids
-            dr_texture* front   = reinterpret_cast<dr_texture*>(ctx->dr_textures[ctx->dr_front_idx]);
-            dr_texture* back    = reinterpret_cast<dr_texture*>(ctx->dr_textures[ctx->dr_back_idx]);
-            frame_textures[0]   = front ? &front->impl : ctx->current_frame.texture;
-            frame_textures[1]   = back ? &back->impl : ctx->current_frame.texture;
-            frame_display_idx   = 0;
-            frame_ready_idx     = 1;
-            frame_write_idx     = 1;
-            single_frame_buffer = false;
-#else
-            frame_textures[0]   = ctx->current_frame.texture;
-            frame_textures[1]   = ctx->current_frame.texture;
-            frame_display_idx   = 0;
-            frame_ready_idx     = 0;
-            frame_write_idx     = 0;
-            single_frame_buffer = true;
-#endif
+            for (int i = 0; i < 3; ++i)
+            {
+                dr_texture* tex   = reinterpret_cast<dr_texture*>(ctx->dr_textures[i]);
+                GxmTexture* gxm_t = tex ? &tex->impl : nullptr;
+                __atomic_store_n(&frame_textures[i], gxm_t, __ATOMIC_RELEASE);
+            }
         }
         else
         {
-            frame_textures[0]   = ctx->current_frame.texture;
-            frame_textures[1]   = ctx->current_frame.texture;
-            frame_display_idx   = 0;
-            frame_ready_idx     = 0;
-            frame_write_idx     = 0;
+            __atomic_store_n(&frame_textures[0], ctx->sw_textures[0], __ATOMIC_RELEASE);
+            __atomic_store_n(&frame_textures[1], ctx->sw_textures[1], __ATOMIC_RELEASE);
+            __atomic_store_n(&frame_textures[2], ctx->sw_textures[2], __ATOMIC_RELEASE);
+        }
+#else
+        __atomic_store_n(&frame_textures[0], ctx->sw_textures[0], __ATOMIC_RELEASE);
+        __atomic_store_n(&frame_textures[1], ctx->sw_textures[1], __ATOMIC_RELEASE);
+        __atomic_store_n(&frame_textures[2], ctx->sw_textures[2], __ATOMIC_RELEASE);
+#endif
+
+        int active_idx = 0;
+#ifdef BOREALIS_USE_GXM
+        if (ctx->using_direct_memory)
+        {
+            active_idx = ctx->dr_front_idx;
+        }
+        else
+        {
+            active_idx = ctx->sw_last_present_idx;
+        }
+#else
+        active_idx = ctx->sw_last_present_idx;
+#endif
+
+        int bufferMode = g_video_settings_snapshot.buffer_mode;
+        if (bufferMode == 0)
+        {
+            // Single Buffering: Immediate presentation of the latest active decoded texture slot
+            __atomic_store_n(&frame_display_idx, active_idx, __ATOMIC_RELEASE);
+            __atomic_store_n(&frame_ready_idx, active_idx, __ATOMIC_RELEASE);
+            __atomic_store_n(&frame_write_idx, active_idx, __ATOMIC_RELEASE);
             single_frame_buffer = true;
         }
+        else if (bufferMode == 1)
+        {
+            // Double Buffering: Post the decoded frame as ready for the renderer to swap
+            __atomic_store_n(&frame_ready_idx, active_idx, __ATOMIC_RELEASE);
+            __atomic_store_n(&frame_ready_flag, true, __ATOMIC_RELEASE);
+            single_frame_buffer = false;
+        }
+        else
+        {
+            // Triple Buffering: Lock-free atomic exchange
+            int old_ready = __atomic_exchange_n(&frame_ready_idx, active_idx, __ATOMIC_SEQ_CST);
+            __atomic_store_n(&frame_write_idx, old_ready, __ATOMIC_RELEASE);
+            __atomic_store_n(&frame_ready_flag, true, __ATOMIC_RELEASE);
+            single_frame_buffer = false;
+        }
     }
+    uint32_t slotsMtxUs = perf_now_us() - slotsMtxStartUs;
 
     uint32_t texW  = ctx->current_frame.width > 0 ? (uint32_t)ctx->current_frame.width : image_scaling.texture_width;
     uint32_t texH  = ctx->current_frame.height > 0 ? (uint32_t)ctx->current_frame.height : image_scaling.texture_height;
@@ -1330,8 +1404,36 @@ static bool publish_frame(FFmpegVideoContext* ctx, AVFrame* frame, uint64_t ptsU
     }
 #endif
 
-    ctx->last_pts_us = ptsUs;
+    ctx->last_pts_us    = ptsUs;
+    uint32_t vfhStartUs = perf_now_us();
     VideoFrameHolder::instance().pushTexture(ctx->current_frame.texture, texW, texH, ptsMs);
+    uint32_t vfhUs = perf_now_us() - vfhStartUs;
+
+    uint32_t publishTotalUs = perf_now_us() - publishStartUs;
+
+    g_perf.publish_total_us += publishTotalUs;
+    if (publishTotalUs > g_perf.publish_max_us)
+        g_perf.publish_max_us = publishTotalUs;
+    g_perf.publish_direct_total_us += pubDirectUs;
+    if (pubDirectUs > g_perf.publish_direct_max_us)
+        g_perf.publish_direct_max_us = pubDirectUs;
+    g_perf.publish_sw_total_us += pubSwUs;
+    if (pubSwUs > g_perf.publish_sw_max_us)
+        g_perf.publish_sw_max_us = pubSwUs;
+    g_perf.slots_mutex_total_us += slotsMtxUs;
+    if (slotsMtxUs > g_perf.slots_mutex_max_us)
+        g_perf.slots_mutex_max_us = slotsMtxUs;
+    g_perf.vfh_push_total_us += vfhUs;
+    if (vfhUs > g_perf.vfh_push_max_us)
+        g_perf.vfh_push_max_us = vfhUs;
+
+    if (verbosePublishLog)
+    {
+        VITA_DEBUG_LOG("[FFMPEG][PUB] total=%uus direct=%uus sw=%uus slots_mtx=%uus vfh=%uus using_dm=%d",
+            publishTotalUs, pubDirectUs, pubSwUs, slotsMtxUs, vfhUs,
+            ctx->using_direct_memory ? 1 : 0);
+    }
+
     VitaSession::onFrameDecoded();
     return true;
 }

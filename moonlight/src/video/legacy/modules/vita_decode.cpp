@@ -410,10 +410,47 @@ extern "C" int vitavideo_submit_decode_unit(PDECODE_UNIT decodeUnit)
 
     if (!single_frame_buffer)
     {
-        // Triple-buffer: lock-free atomic exchange. Promote write to ready, grab old ready as the new write buffer.
-        int write_idx = __atomic_load_n(&frame_write_idx, __ATOMIC_ACQUIRE);
-        write_idx     = __atomic_exchange_n(&frame_ready_idx, write_idx, __ATOMIC_SEQ_CST);
-        __atomic_store_n(&frame_write_idx, write_idx, __ATOMIC_RELEASE);
+        int bufferMode = g_video_settings_snapshot.buffer_mode;
+        if (bufferMode == 2)
+        {
+            // Triple-buffering lock-free swap via atomic exchange
+            int current_write = __atomic_load_n(&frame_write_idx, __ATOMIC_ACQUIRE);
+            int old_ready     = __atomic_exchange_n(&frame_ready_idx, current_write, __ATOMIC_SEQ_CST);
+            __atomic_store_n(&frame_write_idx, old_ready, __ATOMIC_RELEASE);
+            __atomic_store_n(&frame_ready_flag, true, __ATOMIC_RELEASE);
+
+            static uint32_t decode_diag_counter = 0;
+            if ((decode_diag_counter++ % 181) == 0)
+            {
+                VITA_DEBUG_LOG("[Video][DIAG] Triple Swap - Decoded to %d, Published to ready_idx=%d, Next write_idx=%d (Mode: Triple Exchange)",
+                    current_write, current_write, old_ready);
+            }
+        }
+        else
+        {
+            // Double-buffering rotation (0 -> 1 -> 0)
+            int current_write = __atomic_load_n(&frame_write_idx, __ATOMIC_ACQUIRE);
+            __atomic_store_n(&frame_ready_idx, current_write, __ATOMIC_RELEASE);
+            int next_write = (current_write + 1) % 2;
+            __atomic_store_n(&frame_write_idx, next_write, __ATOMIC_RELEASE);
+            __atomic_store_n(&frame_ready_flag, true, __ATOMIC_RELEASE);
+
+            static uint32_t decode_diag_counter = 0;
+            if ((decode_diag_counter++ % 181) == 0)
+            {
+                VITA_DEBUG_LOG("[Video][DIAG] Double Swap - Decoded to %d, Published to ready_idx=%d, Next write_idx=%d (Mode: Double Rotation)",
+                    current_write, current_write, next_write);
+            }
+        }
+    }
+    else
+    {
+        static uint32_t single_diag_counter = 0;
+        if ((single_diag_counter++ % 181) == 0)
+        {
+            VITA_DEBUG_LOG("[Video][DIAG] Buffer Swap - Mode: Single (display=%d ready=%d write=%d)",
+                frame_display_idx, frame_ready_idx, frame_write_idx);
+        }
     }
 
     if (g_stats.frames_decoded == 0)

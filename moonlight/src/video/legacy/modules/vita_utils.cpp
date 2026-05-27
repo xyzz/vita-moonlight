@@ -81,10 +81,8 @@ int vita_pacer_thread_main(SceSize args, void* argp)
         {
             fps_window_frames = frame_count;
             frame_count       = 0; // Reset frame_count for new 1s window
-            if (logCounter % 10 == 0)
-            { // Log every 10 seconds (~10x 1000ms)
-                VITA_DEBUG_LOG("[Video][PACER][FPS] fps_window=%u need_drop=%d", fps_window_frames, need_drop);
-            }
+            // Log every second for detailed FPS monitoring
+            VITA_DEBUG_LOG("[Video][PACER][FPS] fps_window=%u need_drop=%d logCounter=%u", fps_window_frames, need_drop, logCounter);
             logCounter++;
             last_fps_reset_ms = now;
         }

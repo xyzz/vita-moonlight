@@ -146,11 +146,8 @@ SessionMainView::SessionMainView(const HostInfo& host, const RemoteAppInfo& app)
     if (targetFps > 60)
         targetFps = 60;
 
-    // On PS Vita GXM, hardware swap buffers is non-blocking on the main thread (it runs asynchronously in a worker thread).
-    // Therefore, we must ALWAYS enable the software rate limiter to prevent the main loop from running at uncontrolled
-    // speeds (150+ FPS) and overwriting GXM buffers before they are scanned out, which causes severe screen tearing.
-    brls::Application::setLimitedFPS(targetFps);
-    brls::Application::setSwapInterval(videoSettings.swap_interval);
+    // FPS and swapInterval are already configured in main.cpp
+    // No need to reconfigure here - main.cpp handles both UI and streaming
     brls::Application::setFPSStatus(true); // Enable FPS status for logging
     vita_log::info("[SessionMainView] Init render config (cfg_fps=%d -> swapInterval=%d)", targetFps, videoSettings.swap_interval);
 

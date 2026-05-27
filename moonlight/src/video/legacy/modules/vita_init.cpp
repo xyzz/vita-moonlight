@@ -12,6 +12,7 @@
 #include <borealis/core/application.hpp>
 #include <memory>
 
+#include "ConfigManager.hpp"
 #include "network/NetworkOptimizations.hpp"
 #include "video/pixel_format/pixel_format.hpp"
 #include "vita_globals.hpp"
@@ -335,12 +336,38 @@ extern "C" int vitavideo_setup(int videoFormat, int width, int height, int redra
             }
         }
 
-        frame_display_idx               = 0;
-        frame_ready_idx                 = 0;
-        frame_write_idx                 = 0;
-        single_frame_buffer             = true;
-        legacy_single_immediate_present = true;
-        VITA_DEBUG_LOG("[Video][INIT] single buffer (display=%d ready=%d write=%d) - minimal latency mode", frame_display_idx, frame_ready_idx, frame_write_idx);
+        // Use buffer mode from settings: 0 = Single, 1 = Double, 2 = Triple
+        ConfigManager config;
+        config.load();
+        int bufferMode                  = config.getVideoSettings().buffer_mode;
+        single_frame_buffer             = (bufferMode == 0);
+        legacy_single_immediate_present = (bufferMode == 0);
+
+        if (bufferMode == 2)
+        {
+            // Triple buffering starts with: GPU owning 0, shared ready is 1, decoder writes to 2
+            frame_display_idx = 0;
+            frame_ready_idx   = 1;
+            frame_write_idx   = 2;
+        }
+        else if (bufferMode == 1)
+        {
+            // Double buffering starts with display=0, ready=0, write=1
+            frame_display_idx = 0;
+            frame_ready_idx   = 0;
+            frame_write_idx   = 1;
+        }
+        else
+        {
+            // Single buffering uses buffer 0 for everything
+            frame_display_idx = 0;
+            frame_ready_idx   = 0;
+            frame_write_idx   = 0;
+        }
+
+        const char* bufferModeStr = (bufferMode == 0) ? "single" : (bufferMode == 1) ? "double"
+                                                                                     : "triple";
+        VITA_DEBUG_LOG("[Video][INIT] %s buffer mode (display=%d ready=%d write=%d)", bufferModeStr, frame_display_idx, frame_ready_idx, frame_write_idx);
         VITA_DEBUG_LOG("[Video][INIT] tex0=%p tex1=%p tex2=%p", gxm_texture_get_datap(frame_textures[0]), gxm_texture_get_datap(frame_textures[1]), gxm_texture_get_datap(frame_textures[2]));
         VITA_DEBUG_LOG("[Video] Framebuffer inicializado");
 

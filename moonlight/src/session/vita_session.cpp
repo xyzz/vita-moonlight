@@ -181,7 +181,7 @@ bool VitaSession::start()
         vita_log::error("[VitaSession] Fallo al inicializar VideoManager");
         return false;
     }
-    vita_log::info("[VitaSession] Decodificador inicializado: %s", VideoManager::instance()->getRenderMode());
+    vita_log::info("[VitaSession] Decodificador inicializado: %s", VideoManager::instance()->getRenderMode().c_str());
     LiInitializeVideoCallbacks(&m_video_callbacks);
     m_video_callbacks = VideoManager::instance()->getDecoderCallbacks();
 
@@ -210,7 +210,7 @@ bool VitaSession::internalStart()
     }
     vita_log::info("[VitaSession] LiStartConnection ok (%dx%d@%d fps bitrate=%dK formats=0x%X)", m_config.width, m_config.height, m_config.fps, m_config.bitrate, m_config.supportedVideoFormats);
     VideoManager::instance()->startVideo();
-    vita_log::info("[VitaSession] Video iniciado con decodificador: %s", VideoManager::instance()->getRenderMode());
+    vita_log::info("[VitaSession] Video iniciado con decodificador: %s", VideoManager::instance()->getRenderMode().c_str());
     m_is_active     = true;
     m_is_terminated = false;
     return true;

@@ -69,7 +69,7 @@ void HostsTab::requestGlobalRefresh()
         for (size_t i = 0; i < initialCount; ++i) {
             brls::Application::popActivity(brls::TransitionAnimation::NONE);
         }
-        vita_log::info("[HostsTab::requestGlobalRefresh] Popped %zu activities", initialCount);
+        vita_log::info("[HostsTab::requestGlobalRefresh] Popped %u activities", (unsigned)initialCount);
         // Push a fresh MainActivity
         brls::Application::pushActivity(new MainActivity(), brls::TransitionAnimation::NONE);
         vita_log::info("[HostsTab::requestGlobalRefresh] New MainActivity pushed");

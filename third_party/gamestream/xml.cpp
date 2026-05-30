@@ -208,7 +208,7 @@ int xml_search(const Data& data, const std::string node, std::string* result) {
         return GS_INVALID;
     }
     XML_ParserFree(parser);
-    vita_log::info("[xml_search] (safe) Nodo '%s' => '%s' (len=%zu)", node.c_str(), result->c_str(), result->size());
+    vita_log::info("[xml_search] (safe) Nodo '%s' => '%s' (len=%u)", node.c_str(), result->c_str(), (unsigned)result->size());
     return GS_OK;
 }
 

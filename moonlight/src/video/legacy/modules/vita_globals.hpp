@@ -109,6 +109,10 @@ extern std::mutex g_frame_slots_mutex;
 // Single buffer mode (no triple/double buffering). When active, all indices are the same.
 extern bool single_frame_buffer;
 
+// End-to-end latency: decoder writes timestamp when frame is published,
+// renderer reads it when frame is presented to measure pipeline delay
+extern uint32_t frame_publish_timestamp_us;
+
 extern image_scaling_settings image_scaling;
 
 extern bool active_video_thread;

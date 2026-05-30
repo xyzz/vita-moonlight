@@ -2,21 +2,18 @@
 #include "VitaVideoRenderer.hpp"
 
 #include <borealis/extern/nanovg/nanovg.h>
-#include <borealis/extern/nanovg/nanovg_gxm.h>
 #include <psp2/gxm.h>
+#include <psp2/kernel/processmgr.h>
+#include <psp2/kernel/threadmgr.h>
 
 #include <borealis/core/application.hpp>
 
 #include "legacy/modules/vita_globals.hpp"
 
-// Override default buffering for lower latency
-// Keep DISPLAY_BUFFER_COUNT at 3 to prevent vertical tearing
-// Reduce MAX_PENDING_SWAPS from 2 to 1 for lower latency
-#define DISPLAY_BUFFER_COUNT 3
+// Override display queue depth BEFORE including GXM headers that define it.
+// This reduces displayQueueMaxPendingCount from 2 to 1, saving ~16.6ms.
 #define MAX_PENDING_SWAPS 1
-
-#include <borealis/extern/nanovg/nanovg_gxm_utils.h>
-#include <psp2/gxm.h>
+#include <borealis/extern/nanovg/nanovg_gxm.h>
 #include <stdlib.h>
 
 #include <mutex>
@@ -37,6 +34,11 @@ bool is_yuv_gxm_format(uint32_t fmt)
 {
     return fmt == (uint32_t)SCE_GXM_TEXTURE_FORMAT_YUV420P3_CSC0 || fmt == (uint32_t)SCE_GXM_TEXTURE_FORMAT_YVU420P2_CSC0;
 }
+
+uint32_t s_e2e_sum_us = 0;
+uint32_t s_e2e_min_us = 999999;
+uint32_t s_e2e_max_us = 0;
+uint32_t s_e2e_count  = 0;
 }
 
 VitaVideoRenderer& VitaVideoRenderer::instance()
@@ -247,6 +249,27 @@ void VitaVideoRenderer::drawNVG(NVGcontext* vg, float viewportW, float viewportH
     const GxmTexture* tex = frame_textures[displayIdx];
     if (!tex)
         return;
+
+    // Only measure E2E latency for genuinely NEW frames.
+    // Without this guard, redrawing the same (stale) frame would keep
+    // accumulating ever-growing deltas, reporting false multi-second latency.
+    static uint32_t s_last_measured_ts = 0;
+    uint32_t publishTimeUs             = __atomic_load_n(&frame_publish_timestamp_us, __ATOMIC_ACQUIRE);
+    if (publishTimeUs > 0 && publishTimeUs != s_last_measured_ts)
+    {
+        s_last_measured_ts = publishTimeUs;
+        uint32_t nowUs     = sceKernelGetProcessTimeLow();
+        if (nowUs >= publishTimeUs)
+        {
+            uint32_t diffUs = nowUs - publishTimeUs;
+            s_e2e_sum_us += diffUs;
+            if (diffUs < s_e2e_min_us)
+                s_e2e_min_us = diffUs;
+            if (diffUs > s_e2e_max_us)
+                s_e2e_max_us = diffUs;
+            s_e2e_count++;
+        }
+    }
 
     const SceGxmTexture* gxmTex = &tex->gxm_tex;
     const void* currentData     = sceGxmTextureGetData(const_cast<SceGxmTexture*>(gxmTex));
@@ -473,6 +496,19 @@ void VitaVideoRenderer::onFramePresented()
             g_decode_max_ms = 0;
             g_decode_sum_ms = 0;
             g_decode_count  = 0;
+        }
+
+        if (s_e2e_count > 0)
+        {
+            uint32_t e2eAvgUs = s_e2e_sum_us / s_e2e_count;
+            uint32_t e2eMinUs = s_e2e_min_us == 999999 ? 0 : s_e2e_min_us;
+            uint32_t e2eMaxUs = s_e2e_max_us;
+            VITA_DEBUG_LOG("[PERF][RENDER] End-to-End Latency (min/avg/max): %.2f/%.2f/%.2f ms (frames: %u)",
+                (float)e2eMinUs / 1000.0f, (float)e2eAvgUs / 1000.0f, (float)e2eMaxUs / 1000.0f, s_e2e_count);
+            s_e2e_sum_us = 0;
+            s_e2e_min_us = 999999;
+            s_e2e_max_us = 0;
+            s_e2e_count  = 0;
         }
 
         last_fps_window_ms    = now;

@@ -160,10 +160,10 @@ bool MicrophoneManager::startInternal()
     std::string devicename = sunInfo.devicename;
 
     vita_log::info("[MicrophoneManager] Sunshine validation result: PairStatus=%d", pair_status);
-    vita_log::info("[MicrophoneManager] uniqueid='%s' len=%zu", uniqueid.c_str(), uniqueid.length());
-    vita_log::info("[MicrophoneManager] devicename='%s' len=%zu", devicename.c_str(), devicename.length());
+    vita_log::info("[MicrophoneManager] uniqueid='%s' len=%u", uniqueid.c_str(), (unsigned)uniqueid.length());
+    vita_log::info("[MicrophoneManager] devicename='%s' len=%u", devicename.c_str(), (unsigned)devicename.length());
 
-    bridge.loadConfig(); // Force reload from device.ini to pick up any changes
+    bridge.loadConfig();
     auto [target_width, target_height] = bridge.getTargetResolution();
 
     moonmic_config_t config = {
@@ -172,13 +172,13 @@ bool MicrophoneManager::startInternal()
         .sample_rate = static_cast<uint32_t>(sample_rate_),
         .channels    = static_cast<uint8_t>(channels_),
         .bitrate     = static_cast<uint32_t>(bitrate_),
-        .raw_mode    = raw_mode, // Set based on UI toggle
-        .auto_start  = true, // Start capturing immediately
-        .gain        = settings.microphone_gain, // Gain multiplier from config
+        .raw_mode    = raw_mode,
+        .auto_start  = true,
+        .gain        = settings.microphone_gain,
 
         .uniqueid            = uniqueid.c_str(),
         .devicename          = devicename.c_str(),
-        .sunshine_https_port = 47984, // Default Sunshine port
+        .sunshine_https_port = 47984,
         .pair_status         = pair_status,
 
         .target_display_width  = target_width,

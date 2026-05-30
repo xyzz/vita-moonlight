@@ -19,7 +19,7 @@ GridView::GridView()
 
 void GridView::setItems(const std::vector<std::string>& names, const std::vector<std::string>& icons)
 {
-    vita_log::info("[GridView] setItems llamado, names.size()=%zu", names.size());
+    vita_log::info("[GridView] setItems llamado, names.size()=%u", (unsigned)names.size());
     this->itemNames = names;
     this->itemIcons = icons;
     reload();
@@ -44,7 +44,7 @@ void GridView::setItemIcon(int index, const std::string& iconPath)
 
 void GridView::reload()
 {
-    vita_log::info("[GridView] reload llamado, itemNames.size()=%zu", itemNames.size());
+    vita_log::info("[GridView] reload llamado, itemNames.size()=%u", (unsigned)itemNames.size());
 
     this->clearViews();
     itemViews.clear();

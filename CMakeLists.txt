@@ -164,7 +164,8 @@ target_compile_definitions(${PROJECT_NAME} PRIVATE BUILD_FFMPEG=1 USE_MBEDTLS)
 
 # Envolver LiRequestIdrFrame para redirigir a optimizaciones de red
 if (PLATFORM_PSV)
-    target_link_options(${PROJECT_NAME} PRIVATE -Wl,--wrap=LiRequestIdrFrame)
+    target_link_options(${PROJECT_NAME} PRIVATE -Wl,--wrap=LiRequestIdrFrame -Wl,-z,noexecstack -Wl,--allow-multiple-definition)
+    target_compile_options(${PROJECT_NAME} PRIVATE -pthread)
 endif()
 
 if (WIN32)
@@ -186,7 +187,7 @@ elseif (PLATFORM_PSV)
         DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}.velf
         COMMENT "Creating ${PROJECT_NAME}.self"
     )
-    add_custom_target(${PROJECT_NAME}.self ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}.self)
+    add_custom_target(${PROJECT_NAME}_self_target ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}.self)
     set(PSV_ASSETS_FILES ${CMAKE_SOURCE_DIR}/psv/sce_sys sce_sys)
     if (NOT USE_LIBROMFS)
         list(APPEND PSV_ASSETS_FILES ${CMAKE_SOURCE_DIR}/resources resources)
@@ -197,12 +198,16 @@ elseif (PLATFORM_PSV)
     if (USE_VITA_SHARK)
         list(APPEND PSV_ASSETS_FILES "${CMAKE_BINARY_DIR}/vendor/SceShaccCg" module)
     endif ()
-    vita_create_vpk(${PROJECT_NAME}.vpk ${PSN_TITLE_ID} ${PROJECT_NAME}.self
+    vita_create_vpk(${PROJECT_NAME}.vpk ${PSN_TITLE_ID} ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}.self
             VERSION ${PSN_VERSION}
             NAME ${TITLE}
             FILE ${PSV_ASSETS_FILES}
-
     )
+    if(TARGET ${PROJECT_NAME}.vpk-vpk)
+        add_dependencies(${PROJECT_NAME}.vpk-vpk ${PROJECT_NAME}_self_target)
+    else()
+        add_dependencies(${PROJECT_NAME}.vpk ${PROJECT_NAME}_self_target)
+    endif()
 endif ()
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/third_party/inih)
@@ -235,7 +240,7 @@ if(PLATFORM_PSV)
         ${CRYPTO_LIBS}
         -lopus
         -lbz2
-        -lpthread
+        -Wl,--whole-archive -lpthread -Wl,--no-whole-archive
         -lSceDisplay_stub
         -lSceCtrl_stub
         -lSceTouch_stub

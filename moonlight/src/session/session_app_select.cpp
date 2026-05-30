@@ -435,7 +435,7 @@ void SessionAppSelect::populateAppList()
     vita_log::info("[SessionAppSelect] Llamando a GameStreamClient::getAppList para host: %s (ip: %s)", host.name.c_str(), host.ip.c_str());
     std::vector<RemoteAppInfo> apps;
     GameStreamClient::instance().getAppList(this->host.ip, [&apps](const std::vector<RemoteAppInfo>& a){ apps = a; });
-    vita_log::info("[SessionAppSelect] getAppList devolvió %zu apps", apps.size());
+    vita_log::info("[SessionAppSelect] getAppList devolvió %u apps", (unsigned)apps.size());
         for (const auto& app : apps) {
             vita_log::info("[SessionAppSelect] App recibida: id='%s', name='%s', iconUrl='%s'", app.id.c_str(), app.name.c_str(), app.iconUrl.c_str());
         }

@@ -126,6 +126,11 @@ int ffmpeg_decoder_init(FFmpegDecoderContext* ctx)
             VITA_DEBUG_LOG("[FFMPEG] Vita hardware codec detected: %s", codec->name);
         }
         VITA_DEBUG_LOG("[FFMPEG] ffmpeg_decoder_init: H264 on GXM: direct_render=%d", ctx->use_direct_render ? 1 : 0);
+        // Force low-delay decoding: prevent the decoder from buffering frames internally.
+        // Without this, h264_vita retains 1 frame before outputting, adding ~16.67ms of latency
+        // that Legacy (direct SceAvcdec) doesn't have.
+        ctx->avctx->flags |= AV_CODEC_FLAG_LOW_DELAY;
+        // h264_vita must stay single-threaded; multiple threads corrupt its decoder state.
         ctx->avctx->thread_count = ctx->is_vita_hw ? 1 : 2;
         ctx->avctx->thread_type  = ctx->is_vita_hw ? 0 : FF_THREAD_SLICE;
         av_dict_set(&opts, "refcounted_frames", "1", 0);

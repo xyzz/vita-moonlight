@@ -1,22 +1,16 @@
-// VitaVideoRenderer.cpp - Unified implementation (shared + NVG + vita2d)
 #include "VitaVideoRenderer.hpp"
 
 #include <borealis/extern/nanovg/nanovg.h>
+#include <borealis/extern/nanovg/nanovg_gxm.h>
 #include <psp2/gxm.h>
 #include <psp2/kernel/processmgr.h>
 #include <psp2/kernel/threadmgr.h>
-
-#include <borealis/core/application.hpp>
-
-#include "legacy/modules/vita_globals.hpp"
-
-// Override display queue depth BEFORE including GXM headers that define it.
-// This reduces displayQueueMaxPendingCount from 2 to 1, saving ~16.6ms.
-#define MAX_PENDING_SWAPS 1
-#include <borealis/extern/nanovg/nanovg_gxm.h>
 #include <stdlib.h>
 
+#include <borealis/core/application.hpp>
 #include <mutex>
+
+#include "legacy/modules/vita_globals.hpp"
 
 namespace
 {
@@ -149,31 +143,11 @@ void VitaVideoRenderer::drawNVG(NVGcontext* vg, float viewportW, float viewportH
     if (!tex)
         return;
 
-    // Only measure E2E latency for genuinely NEW frames.
-    // Without this guard, redrawing the same (stale) frame would keep
-    // accumulating ever-growing deltas, reporting false multi-second latency.
-    static uint32_t s_last_measured_ts = 0;
-    uint32_t publishTimeUs             = __atomic_load_n(&frame_publish_timestamp_us, __ATOMIC_ACQUIRE);
-    if (publishTimeUs > 0 && publishTimeUs != s_last_measured_ts)
-    {
-        s_last_measured_ts = publishTimeUs;
-        uint32_t nowUs     = sceKernelGetProcessTimeLow();
-        if (nowUs >= publishTimeUs)
-        {
-            uint32_t diffUs = nowUs - publishTimeUs;
-            s_e2e_sum_us += diffUs;
-            if (diffUs < s_e2e_min_us)
-                s_e2e_min_us = diffUs;
-            if (diffUs > s_e2e_max_us)
-                s_e2e_max_us = diffUs;
-            s_e2e_count++;
-        }
-    }
-
-    const SceGxmTexture* gxmTex = &tex->gxm_tex;
-    const void* currentData     = sceGxmTextureGetData(const_cast<SceGxmTexture*>(gxmTex));
-    uint32_t currentFmt         = (uint32_t)sceGxmTextureGetFormat(const_cast<SceGxmTexture*>(gxmTex));
-    bool isYuvTexture           = is_yuv_gxm_format(currentFmt);
+    SceGxmTexture gxmTexSnapshot = tex->gxm_tex;
+    const SceGxmTexture* gxmTex  = &gxmTexSnapshot;
+    const void* currentData      = sceGxmTextureGetData(const_cast<SceGxmTexture*>(gxmTex));
+    uint32_t currentFmt          = (uint32_t)sceGxmTextureGetFormat(const_cast<SceGxmTexture*>(gxmTex));
+    bool isYuvTexture            = is_yuv_gxm_format(currentFmt);
     if (currentFmt != (uint32_t)SCE_GXM_TEXTURE_FORMAT_U8U8U8U8_ABGR && !isYuvTexture)
     {
         static uint32_t yuvFallbackLogCounter = 0;
@@ -207,7 +181,8 @@ void VitaVideoRenderer::drawNVG(NVGcontext* vg, float viewportW, float viewportH
     if (texW == 0 || texH == 0)
         return;
 
-    // Use image caching for better performance (reduces micro-stuttering)
+    // nvgxmCreateImageFromHandle copies the texture descriptor, so update the
+    // cached descriptor when FFmpeg rotates a new VRAM frame into the same slot.
     int foundIdx = -1;
     for (int i = 0; i < imageCacheSize; i++)
     {
@@ -221,7 +196,8 @@ void VitaVideoRenderer::drawNVG(NVGcontext* vg, float viewportW, float viewportH
     int useImageId = -1;
     if (foundIdx >= 0)
     {
-        if (imageCache[foundIdx].width != (int)texW || imageCache[foundIdx].height != (int)texH || imageCache[foundIdx].format != currentFmt || imageCache[foundIdx].data != currentData)
+        bool needRecreate = (imageCache[foundIdx].width != (int)texW || imageCache[foundIdx].height != (int)texH || imageCache[foundIdx].format != currentFmt);
+        if (needRecreate)
         {
             nvgDeleteImage(vg, imageCache[foundIdx].imageId);
             int newId = nvgxmCreateImageFromHandle(vg, const_cast<SceGxmTexture*>(gxmTex));
@@ -234,6 +210,17 @@ void VitaVideoRenderer::drawNVG(NVGcontext* vg, float viewportW, float viewportH
                 imageCache[foundIdx].format  = currentFmt;
                 useImageId                   = newId;
             }
+        }
+        else if (imageCache[foundIdx].data != currentData)
+        {
+            NVGXMtexture* nvgTex = nvgxmImageHandle(vg, imageCache[foundIdx].imageId);
+            if (nvgTex)
+            {
+                nvgTex->tex               = *gxmTex;
+                nvgTex->data              = (uint8_t*)currentData;
+                imageCache[foundIdx].data = currentData;
+            }
+            useImageId = imageCache[foundIdx].imageId;
         }
         else
         {
@@ -319,6 +306,24 @@ extern "C" void ffmpeg_increment_presented_frames(void);
 
 void VitaVideoRenderer::onFramePresented()
 {
+    // Count each published frame once across both presentation paths.
+    {
+        static uint32_t s_last_measured_ts = 0;
+        uint32_t publishTimeUs             = __atomic_load_n(&frame_publish_timestamp_us, __ATOMIC_ACQUIRE);
+        if (publishTimeUs > 0 && publishTimeUs != s_last_measured_ts)
+        {
+            s_last_measured_ts = publishTimeUs;
+            uint32_t nowUs     = sceKernelGetProcessTimeLow();
+            uint32_t diffUs    = nowUs - publishTimeUs;
+            s_e2e_sum_us += diffUs;
+            if (diffUs < s_e2e_min_us)
+                s_e2e_min_us = diffUs;
+            if (diffUs > s_e2e_max_us)
+                s_e2e_max_us = diffUs;
+            s_e2e_count++;
+        }
+    }
+
     // Only process ffmpeg deferred releases when in ffmpeg mode.
     // In legacy mode, the deferred list is always empty but we'd still
     // pay for a mutex lock+unlock on every single frame for nothing.

@@ -359,10 +359,10 @@ extern "C" int vitavideo_setup(int videoFormat, int width, int height, int redra
         }
         else
         {
-            // Single buffering uses buffer 0 for everything
+            // Ping-pong avoids writing into the texture currently sampled by GXM.
             frame_display_idx = 0;
             frame_ready_idx   = 0;
-            frame_write_idx   = 0;
+            frame_write_idx   = 1;
         }
 
         const char* bufferModeStr = (bufferMode == 0) ? "single" : (bufferMode == 1) ? "double"

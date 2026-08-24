@@ -31,20 +31,15 @@ extern "C"
 #include "video/VitaVideoRenderer.hpp"
 
 #ifdef BOREALIS_USE_GXM
+#include <borealis/extern/nanovg/nanovg_gxm_utils.h>
 #include <psp2/display.h>
 #include <psp2/gxm.h>
 #include <psp2/kernel/processmgr.h>
 #include <psp2/kernel/threadmgr.h>
 #include <psp2/videodec.h>
-
-// Override default buffering for lower latency
-// Keep DISPLAY_BUFFER_COUNT at 3 to prevent vertical tearing
-// Reduce MAX_PENDING_SWAPS from 2 to 1 for lower latency
-#define DISPLAY_BUFFER_COUNT 3
-#define MAX_PENDING_SWAPS 1
-
-#include <borealis/extern/nanovg/nanovg_gxm_utils.h>
 #endif
+
+extern "C" void vita_video_frame_published(void);
 
 static FFmpegVideoContext* g_ffmpeg_context = nullptr;
 static std::mutex g_ffmpeg_mutex;
@@ -1323,7 +1318,7 @@ static bool publish_frame(FFmpegVideoContext* ctx, AVFrame* frame, uint64_t ptsU
     {
         std::lock_guard<std::mutex> slotLock(g_frame_slots_mutex);
 
-        // Mapeo persistente 1:1 de texturas físicas para evitar invalidez de la caché de imágenes de Nanovg
+        // Keep a stable one-to-one texture mapping for NanoVG's image cache.
 #ifdef BOREALIS_USE_GXM
         if (ctx->using_direct_memory)
         {
@@ -1387,6 +1382,9 @@ static bool publish_frame(FFmpegVideoContext* ctx, AVFrame* frame, uint64_t ptsU
         __atomic_store_n(&frame_publish_timestamp_us, perf_now_us(), __ATOMIC_RELEASE);
     }
     uint32_t slotsMtxUs = perf_now_us() - slotsMtxStartUs;
+
+    // Wake the render loop now instead of letting it sleep out its frame budget.
+    vita_video_frame_published();
 
     uint32_t texW  = ctx->current_frame.width > 0 ? (uint32_t)ctx->current_frame.width : image_scaling.texture_width;
     uint32_t texH  = ctx->current_frame.height > 0 ? (uint32_t)ctx->current_frame.height : image_scaling.texture_height;

@@ -1,5 +1,6 @@
 #include <psp2/gxm.h>
 #include <psp2/kernel/clib.h>
+#include <psp2/kernel/processmgr.h>
 #include <psp2/kernel/sysmem.h>
 #include <psp2/kernel/threadmgr.h>
 #include <psp2/sysmodule.h>
@@ -28,6 +29,8 @@ extern gs::SpsContext* g_sps_ctx;
 
 // Global pixel format processor (modular RGBA/YUV handling)
 PixelFormat::IPixelProcessor* g_pixelProcessor = nullptr;
+
+extern "C" void vita_video_frame_published(void);
 
 typedef struct ScePafInit
 {
@@ -114,9 +117,8 @@ extern "C" int vitavideo_submit_decode_unit(PDECODE_UNIT decodeUnit)
     static const uint64_t texture_guard_sig_tail = 0xA55AA55AA55AA55AULL;
     static const uint64_t texture_guard_sig_head = 0xDEADBEEFCAFEBABEULL;
     static const uint8_t texture_guard_fill      = 0xD6;
-    // Destino actual (single buffer) => FRAME_BACK() == FRAME_FRONT() mientras single_frame_buffer=true
-    uint8_t* texBack         = (uint8_t*)gxm_texture_get_datap(FRAME_BACK());
-    unsigned int strideBytes = gxm_texture_get_stride(FRAME_BACK());
+    uint8_t* texBack                             = (uint8_t*)gxm_texture_get_datap(FRAME_BACK());
+    unsigned int strideBytes                     = gxm_texture_get_stride(FRAME_BACK());
     if (!strideBytes)
         strideBytes = image_scaling.texture_width * 4;
     // Force no physical fallback in RGBA mode (stable debugging)
@@ -407,7 +409,6 @@ extern "C" int vitavideo_submit_decode_unit(PDECODE_UNIT decodeUnit)
 
     // (Already decoded directly into BACK texture)
 
-    if (!single_frame_buffer)
     {
         int bufferMode = g_video_settings_snapshot.buffer_mode;
         if (bufferMode == 2)
@@ -425,7 +426,7 @@ extern "C" int vitavideo_submit_decode_unit(PDECODE_UNIT decodeUnit)
                     current_write, current_write, old_ready);
             }
         }
-        else
+        else if (bufferMode == 1)
         {
             // Double-buffering rotation (0 -> 1 -> 0)
             int current_write = __atomic_load_n(&frame_write_idx, __ATOMIC_ACQUIRE);
@@ -441,16 +442,30 @@ extern "C" int vitavideo_submit_decode_unit(PDECODE_UNIT decodeUnit)
                     current_write, current_write, next_write);
             }
         }
-    }
-    else
-    {
-        static uint32_t single_diag_counter = 0;
-        if ((single_diag_counter++ % 181) == 0)
+        else
         {
-            VITA_DEBUG_LOG("[Video][DIAG] Buffer Swap - Mode: Single (display=%d ready=%d write=%d)",
-                frame_display_idx, frame_ready_idx, frame_write_idx);
+            // Single buffer (ping-pong): immediately promote write slot to display.
+            // write_idx alternates between slot 0 and slot 1 so the AVCDEC decoder
+            // never writes to the slot the GPU is currently reading.
+            int current_write = __atomic_load_n(&frame_write_idx, __ATOMIC_ACQUIRE);
+            __atomic_store_n(&frame_display_idx, current_write, __ATOMIC_RELEASE);
+            __atomic_store_n(&frame_ready_idx, current_write, __ATOMIC_RELEASE);
+            int next_write = (current_write == 1) ? 0 : 1;
+            __atomic_store_n(&frame_write_idx, next_write, __ATOMIC_RELEASE);
+
+            static uint32_t single_diag_counter = 0;
+            if ((single_diag_counter++ % 181) == 0)
+            {
+                VITA_DEBUG_LOG("[Video][DIAG] Single Ping-Pong - Decoded to %d, display->%d, Next write->%d",
+                    current_write, current_write, next_write);
+            }
         }
     }
+
+    __atomic_store_n(&frame_publish_timestamp_us, (uint32_t)sceKernelGetProcessTimeLow(), __ATOMIC_RELEASE);
+
+    // Wake the render loop now instead of letting it sleep out its frame budget.
+    vita_video_frame_published();
 
     if (g_stats.frames_decoded == 0)
         VITA_DEBUG_LOG("[Video][DBG] primer frame decodificado");

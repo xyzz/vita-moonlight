@@ -105,6 +105,7 @@ int ffmpeg_decoder_init(FFmpegDecoderContext* ctx)
 
         enum AVPixelFormat requestedPixFmt = ctx->is_vita_hw ? AV_PIX_FMT_VITA_NV12 : AV_PIX_FMT_YUV420P;
         ctx->avctx->pix_fmt                = requestedPixFmt;
+        ctx->avctx->flags |= AV_CODEC_FLAG_LOW_DELAY;
 
         VITA_DEBUG_LOG("[FFMPEG] Requested pixel format mode=%d, using pix_fmt=%d (is_vita_hw=%d)",
             requestedPixelMode, (int)requestedPixFmt, ctx->is_vita_hw ? 1 : 0);

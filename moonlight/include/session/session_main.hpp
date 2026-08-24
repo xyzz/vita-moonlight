@@ -24,6 +24,8 @@ class SessionMainView : public brls::Box
     HostInfo host;
     RemoteAppInfo app;
     std::unique_ptr<VitaStreamOverlayView> overlayStatsView;
+    brls::VoidEvent::Subscription prePresentSub;
+    bool prePresentSubscribed = false;
     BRLS_BIND(brls::Label, title, "title");
     BRLS_BIND(brls::Label, appLabel, "appLabel");
     BRLS_BIND(brls::Label, info, "info");

@@ -261,6 +261,7 @@ if(PLATFORM_PSV)
         -lSceShellSvc_stub
         -lSceGxm_stub
         -lScePgf_stub
+        -lvita2d
         -lfreetype
         -lpng
         -ljpeg

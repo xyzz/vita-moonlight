@@ -12,7 +12,11 @@ prepare() {
 
 build() {
   cd curl-${pkgver}
-  mkdir build && cd build
+  mkdir -p build && cd build
+  pkg_config_arg=()
+  if [ -n "${VITA_PKG_CONFIG_EXECUTABLE:-}" ]; then
+    pkg_config_arg+=("-DPKG_CONFIG_EXECUTABLE=${VITA_PKG_CONFIG_EXECUTABLE}")
+  fi
   cmake .. -DCMAKE_TOOLCHAIN_FILE=$VITASDK/share/vita.toolchain.cmake \
     -DCMAKE_INSTALL_PREFIX=$prefix \
     -DCMAKE_BUILD_TYPE=Release \
@@ -26,11 +30,12 @@ build() {
     -DENABLE_CURL_MANUAL=OFF \
     -DCURL_USE_MBEDTLS=ON \
     -DCURL_USE_OPENSSL=OFF \
-    -DCURL_CA_BUNDLE="vs0:data/external/cert/CA_LIST.cer"
-  make -j$(nproc)
+    -DCURL_CA_BUNDLE="vs0:data/external/cert/CA_LIST.cer" \
+    "${pkg_config_arg[@]}"
+  cmake --build . --parallel "${VITA_BUILD_JOBS:-$(nproc)}"
 }
 
 package () {
   cd curl-${pkgver}/build
-  make DESTDIR=$pkgdir install
+  DESTDIR="$pkgdir" cmake --install .
 }

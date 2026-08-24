@@ -1,18 +1,13 @@
 pkgname=ffmpeg
-pkgver=n6.0
-pkgrel=3
-url="https://ffmpeg.org/"
-source=("${pkgname}-${pkgver}.tar.gz::https://github.com/FFmpeg/FFmpeg/archive/refs/tags/${pkgver}.tar.gz" "ffmpeg.patch")
-sha256sums=('SKIP' 'SKIP')
+pkgver=6.0.vita
+pkgrel=1
+url="https://github.com/AorsiniYT/FFmpeg-vita"
+source=("FFmpeg-vita.tar.gz::https://github.com/AorsiniYT/FFmpeg-vita/archive/refs/heads/vita_6.0.tar.gz")
+sha256sums=('SKIP')
 depends=('mbedtls')
 
-prepare() {
-  cd FFmpeg-${pkgver}
-  patch --strip=1 --input=${srcdir}/ffmpeg.patch
-}
-
 build() {
-  cd FFmpeg-${pkgver}
+  cd FFmpeg-vita-vita_6.0
   ./configure --prefix=$VITASDK/arm-vita-eabi \
         --enable-vita \
         --target-os=vita \
@@ -20,7 +15,8 @@ build() {
         --disable-runtime-cpudetect \
         --disable-armv5te \
         --cross-prefix=$VITASDK/bin/arm-vita-eabi- \
-        --extra-ldflags=" -L$VITASDK/lib " \
+        --extra-ldflags="-L$VITASDK/arm-vita-eabi/lib" \
+        --extra-libs="-lpthread" \
         --disable-shared \
         --enable-static \
         --disable-programs \
@@ -44,15 +40,17 @@ build() {
         --disable-sdl2 \
         --disable-xlib \
         --disable-avdevice \
+        --disable-avfilter \
+        --extra-cflags='-Wno-error=incompatible-pointer-types' \
         --enable-mbedtls --enable-version3 \
         --enable-pthreads
 
   sed 's/#define HAVE_GETADDRINFO 1/#define HAVE_GETADDRINFO 0/g' -i config.h
 
-  make -j12
+  make -j"${VITA_BUILD_JOBS:-$(nproc)}"
 }
 
 package () {
-  cd FFmpeg-${pkgver}
+  cd FFmpeg-vita-vita_6.0
   make DESTDIR=$pkgdir install
 }

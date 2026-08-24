@@ -19,17 +19,22 @@ prepare() {
 
 build() {
   cd "SDL-${gitrev}"
-  mkdir build && cd build
+  mkdir -p build && cd build
+  pkg_config_arg=()
+  if [ -n "${VITA_PKG_CONFIG_EXECUTABLE:-}" ]; then
+    pkg_config_arg+=("-DPKG_CONFIG_EXECUTABLE=${VITA_PKG_CONFIG_EXECUTABLE}")
+  fi
   cmake .. -DCMAKE_TOOLCHAIN_FILE=$VITASDK/share/vita.toolchain.cmake \
     -DCMAKE_INSTALL_PREFIX=$prefix \
     -DCMAKE_BUILD_TYPE=Release \
     -DVIDEO_VITA_PVR=ON \
-    -DSDL_TEST=OFF
-  make -j12
+    -DSDL_TEST=OFF \
+    "${pkg_config_arg[@]}"
+  cmake --build . --parallel "${VITA_BUILD_JOBS:-$(nproc)}"
 }
 
 package () {
   cd "SDL-${gitrev}"
   cd build
-  make DESTDIR=$pkgdir install
+  DESTDIR="$pkgdir" cmake --install .
 }

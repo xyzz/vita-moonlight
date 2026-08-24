@@ -12,7 +12,7 @@ prepare() {
 
 build() {
   cd $pkgname-$pkgver
-  mkdir build && cd build
+  mkdir -p build && cd build
   cmake .. \
     -DCMAKE_TOOLCHAIN_FILE=$VITASDK/share/vita.toolchain.cmake \
     -DCMAKE_INSTALL_PREFIX=$prefix \
@@ -20,10 +20,10 @@ build() {
     -DENABLE_PROGRAMS=OFF \
     -DENABLE_TESTING=OFF \
     -DMBEDTLS_FATAL_WARNINGS=OFF
-  make -j$(nproc) mbedtls
+  cmake --build . --parallel "${VITA_BUILD_JOBS:-$(nproc)}" --target mbedtls
 }
 
 package () {
   cd $pkgname-$pkgver/build
-  make DESTDIR=$pkgdir install
+  DESTDIR="$pkgdir" cmake --install .
 }

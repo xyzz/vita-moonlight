@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# MSYS2 has no Unix ownership to virtualize, but vita-makepkg still expects
+# fakeroot to relaunch itself with -F and a non-empty FAKEROOTKEY.
+set -e
+if [ "${1:-}" = "--" ]; then
+    shift
+fi
+[ "$#" -gt 0 ] || exit 2
+export FAKEROOTKEY="msys2-vita-makepkg"
+exec "$@"

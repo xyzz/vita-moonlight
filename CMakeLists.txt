@@ -152,7 +152,10 @@ if(WIN32)
     link_directories(${CMAKE_SOURCE_DIR}/openssl-mingw/lib)
     add_definitions(-DOPENSSL_NO_SECURE_MEMORY)
 elseif(PLATFORM_PSV)
-    include_directories(SYSTEM $ENV{VITASDK}/arm-vita-eabi/include)
+    # The Vita GCC toolchain already adds arm-vita-eabi/include after the
+    # libstdc++ headers. Re-adding the same directory with -isystem moves it
+    # ahead of libstdc++'s #include_next chain; GCC 15 then fails to resolve
+    # headers such as <stdlib.h> from <cstdlib>.
     link_directories($ENV{VITASDK}/arm-vita-eabi/lib)
 endif()
 
@@ -314,8 +317,6 @@ if(PLATFORM_PSV)
         endif()
         if (EXISTS "${FFMPEG_LIB_DIR}/liblzma.a")
             list(APPEND FFMPEG_LIBS "${FFMPEG_LIB_DIR}/liblzma.a")
-        else()
-            list(APPEND FFMPEG_LIBS lzma)
         endif()
         list(APPEND FFMPEG_LIBS pthread)
         list(APPEND FFMPEG_LIBS

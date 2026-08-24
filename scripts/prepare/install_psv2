@@ -1,51 +1,59 @@
-#!/bin/bash
+#!/usr/bin/env bash
+set -euo pipefail
 
-set -e
+pvr_psp2_version="3.9"
 
-# Instala unzip si no está presente
-sudo apt update
-sudo apt install -y unzip wget
+if [ -z "${VITASDK:-}" ]; then
+    VITASDK=/usr/local/vitasdk
+fi
+export VITASDK="${VITASDK%/}"
 
-pvr_psp2_version=3.9
+for tool in curl unzip sed find cp mktemp; do
+    if ! command -v "$tool" >/dev/null 2>&1; then
+        echo "ERROR: required host tool '$tool' is missing." >&2
+        exit 2
+    fi
+done
 
-# Crea directorios temporales
-mkdir -p /tmp/vita/include
-mkdir -p /tmp/vita/lib
-mkdir -p /tmp/vita/share/sdl2/suprx
-
-# Descarga e instala los headers de PVR_PSP2
-wget -O /tmp/PVR_PSP2.zip "https://github.com/GrapheneCt/PVR_PSP2/archive/refs/tags/v${pvr_psp2_version}.zip"
-unzip /tmp/PVR_PSP2.zip -d /tmp
-cp -r /tmp/PVR_PSP2-${pvr_psp2_version}/include/* /tmp/vita/include
-rm /tmp/PVR_PSP2.zip
-rm -rf /tmp/PVR_PSP2-${pvr_psp2_version}
-
-# Corrige el include guard de khrplatform.h
-sed -i -e 's/__drvkhrplatform_h_/__khrplatform_h_/' /tmp/vita/include/KHR/khrplatform.h
-
-# Descarga e instala las librerías stub
-wget -O /tmp/vitasdk_stubs.zip "https://github.com/GrapheneCt/PVR_PSP2/releases/download/v${pvr_psp2_version}/vitasdk_stubs.zip"
-unzip /tmp/vitasdk_stubs.zip -d /tmp/pvr_psp2_stubs
-find /tmp/pvr_psp2_stubs -type f -name "*.a" -exec cp {} /tmp/vita/lib \;
-rm /tmp/vitasdk_stubs.zip
-rm -rf /tmp/pvr_psp2_stubs
-
-# Descarga e instala los archivos .suprx
-wget -O /tmp/PSVita_Release.zip "https://github.com/GrapheneCt/PVR_PSP2/releases/download/v${pvr_psp2_version}/PSVita_Release.zip"
-unzip /tmp/PSVita_Release.zip -d /tmp/PSVita_Release
-rm -f /tmp/PSVita_Release/libGLESv1_CM.suprx
-rm -f /tmp/PSVita_Release/libpvr2d.suprx
-mv /tmp/PSVita_Release/*.suprx /tmp/vita/share/sdl2/suprx/
-rm -rf /tmp/PSVita_Release.zip
-rm -rf /tmp/PSVita_Release
-
-# Copia los archivos al VITASDK
-if [ -z "$VITASDK" ]; then
-    export VITASDK="/usr/local/vitasdk"
-    echo "La variable de entorno VITASDK no estaba definida. Usando /usr/local/vitasdk"
+if [ ! -d "$VITASDK/arm-vita-eabi" ]; then
+    echo "ERROR: VitaSDK sysroot not found at $VITASDK/arm-vita-eabi" >&2
+    exit 3
 fi
 
-cp -rv /tmp/vita/* "$VITASDK/arm-vita-eabi"
-rm -rf /tmp/vita
+workdir="$(mktemp -d "${TMPDIR:-/tmp}/pvr-psp2.XXXXXX")"
+trap 'rm -rf "$workdir"' EXIT
+stage="$workdir/stage"
+mkdir -p "$stage/include" "$stage/lib" "$stage/share/sdl2/suprx"
 
-echo "Instalación de PVR_PSP2 para PSVita completada."
+fetch() {
+    local url="$1" output="$2"
+    echo "[PVR] Downloading $(basename "$output")..."
+    curl --fail --location --retry 3 --output "$output" "$url"
+}
+
+fetch "https://github.com/GrapheneCt/PVR_PSP2/archive/refs/tags/v${pvr_psp2_version}.zip" "$workdir/PVR_PSP2.zip"
+unzip -q "$workdir/PVR_PSP2.zip" -d "$workdir"
+cp -R "$workdir/PVR_PSP2-${pvr_psp2_version}/include/." "$stage/include/"
+sed -i -e 's/__drvkhrplatform_h_/__khrplatform_h_/' "$stage/include/KHR/khrplatform.h"
+
+fetch "https://github.com/GrapheneCt/PVR_PSP2/releases/download/v${pvr_psp2_version}/vitasdk_stubs.zip" "$workdir/vitasdk_stubs.zip"
+mkdir -p "$workdir/stubs"
+unzip -q "$workdir/vitasdk_stubs.zip" -d "$workdir/stubs"
+while IFS= read -r -d '' lib; do
+    cp "$lib" "$stage/lib/"
+done < <(find "$workdir/stubs" -type f -name '*.a' -print0)
+
+fetch "https://github.com/GrapheneCt/PVR_PSP2/releases/download/v${pvr_psp2_version}/PSVita_Release.zip" "$workdir/PSVita_Release.zip"
+mkdir -p "$workdir/runtime"
+unzip -q "$workdir/PSVita_Release.zip" -d "$workdir/runtime"
+while IFS= read -r -d '' suprx; do
+    case "$(basename "$suprx")" in
+        libGLESv1_CM.suprx|libpvr2d.suprx) continue ;;
+    esac
+    cp "$suprx" "$stage/share/sdl2/suprx/"
+done < <(find "$workdir/runtime" -type f -name '*.suprx' -print0)
+
+echo "[PVR] Installing into $VITASDK/arm-vita-eabi..."
+cp -R "$stage/." "$VITASDK/arm-vita-eabi/"
+
+echo "[PVR] PVR_PSP2 v${pvr_psp2_version} installed successfully."

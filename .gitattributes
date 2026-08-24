@@ -1,0 +1,6 @@
+*.sh text eol=lf
+VITABUILD text eol=lf
+/makefast text eol=lf
+/makepsv text eol=lf
+/scripts/prepare/install_psv2 text eol=lf
+/scripts/msys2/fakeroot text eol=lf

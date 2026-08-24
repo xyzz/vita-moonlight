@@ -7,7 +7,27 @@
 
 # moonlight-common-c static library (con opción de OpenSSL/MbedTLS)
 # La opción USE_MBEDTLS debe ser definida en el CMakeLists.txt principal si se desea usar MbedTLS
+if(CMAKE_SYSTEM_NAME STREQUAL "Vita" OR PLATFORM_PSV)
+    if(DEFINED BUILD_SHARED_LIBS)
+        set(_MOONLIGHT_BUILD_SHARED_LIBS_WAS_DEFINED TRUE)
+        set(_MOONLIGHT_BUILD_SHARED_LIBS_SAVED "${BUILD_SHARED_LIBS}")
+    else()
+        set(_MOONLIGHT_BUILD_SHARED_LIBS_WAS_DEFINED FALSE)
+    endif()
+    set(BUILD_SHARED_LIBS OFF)
+endif()
+
 add_subdirectory(moonlight-common-c)
+
+if(CMAKE_SYSTEM_NAME STREQUAL "Vita" OR PLATFORM_PSV)
+    if(_MOONLIGHT_BUILD_SHARED_LIBS_WAS_DEFINED)
+        set(BUILD_SHARED_LIBS "${_MOONLIGHT_BUILD_SHARED_LIBS_SAVED}")
+    else()
+        unset(BUILD_SHARED_LIBS)
+    endif()
+    unset(_MOONLIGHT_BUILD_SHARED_LIBS_WAS_DEFINED)
+    unset(_MOONLIGHT_BUILD_SHARED_LIBS_SAVED)
+endif()
 
 
 # h264bitstream static library

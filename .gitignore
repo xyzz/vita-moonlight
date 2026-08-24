@@ -24,3 +24,8 @@ temp/
 client.pem
 key.pem
 test/
+/scripts/prepare/*/src/
+/scripts/prepare/*/pkg/
+/scripts/prepare/*/*.tar.gz
+/scripts/prepare/*/*.tar.xz
+/scripts/prepare/*/*.zip

@@ -102,12 +102,12 @@ extern "C" int vitavideo_submit_decode_unit(PDECODE_UNIT decodeUnit);
 extern "C" void vitavideo_draw_fps();
 extern "C" void vitavideo_draw_indicators();
 
-// Access to the current texture (front) for future integration with Borealis renderer
+// Access to the current front texture.
 extern "C" struct GxmTexture* vitavideo_get_current_texture();
 
 // Scaling settings
 void vitavideo_update_scaling_settings(int width, int height);
 
-// Callbacks para Limelight
+// Limelight callbacks.
 // Note: renamed to _vita_new to avoid collision with legacy version in library/moonlight-legacy
 extern DECODER_RENDERER_CALLBACKS decoder_callbacks_vita_new;

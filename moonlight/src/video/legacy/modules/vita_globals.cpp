@@ -41,7 +41,7 @@ int need_drop            = 0;
 // Heuristics HEVC abort
 bool hevc_abort_flag = false;
 
-// Buffers YUV para ruta no-direct-output
+// YUV buffers for the non-direct-output path.
 uint8_t* decoder_yuv_raw       = NULL;
 uint8_t* decoder_yuv_buffer    = NULL;
 size_t decoder_yuv_buffer_size = 0;

@@ -20,9 +20,6 @@
 #include "model/HostStorage.hpp"
 #include "moonmic/MoonmicBridge.hpp"
 
-// ConnectionManager compatibility shim removed; callers should use
-// GameStreamClient::getAppList() and GameStreamClient::connect() directly.
-
 // Directory creation is centralized in ConfigManager (ensureDirExists / ensureKeyDirExists)
 
 GameStreamClient& GameStreamClient::instance()
@@ -181,7 +178,7 @@ SERVER_DATA& GameStreamClient::serverData(const std::string& address)
     if (m_server_data.count(address) == 0)
     {
         vita_log::error("[GameStreamClient] No hay datos para servidor %s", address.c_str());
-        // This should be handled better, but for now we will return an invalid reference
+        // Keep the reference valid when no server data is available.
         static SERVER_DATA empty;
         return empty;
     }
@@ -859,7 +856,7 @@ RemoteAppInfo GameStreamClient::activeAppInfo(const std::string& address) const
     {
         info.id      = std::to_string(it->second.appId);
         info.name    = it->second.appName;
-        info.iconUrl = ""; // placeholder
+        info.iconUrl = "";
     }
     return info;
 }

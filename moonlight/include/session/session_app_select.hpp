@@ -7,7 +7,7 @@
 
 #include <memory>
 
-#include "GameStreamClient.hpp" // Para RemoteAppInfo
+#include "GameStreamClient.hpp"
 #include "borealis.hpp"
 #include "model/HostStorage.hpp"
 #include "view/grid_view.hpp"

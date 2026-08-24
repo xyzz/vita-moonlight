@@ -113,8 +113,7 @@ void TouchInputManager::handleTrackpad()
     // - TAP (< 100ms): press and release the button
     // - SWIPE (> 100ms): just move the mouse WITHOUT pressing button
 
-    // OPTIMIZED: Use member variables (cache) instead of reading from disk every frame
-    // Las variables se actualizan solo desde applyTrackpadSettingsLive() → setTrackpadSettings()
+    // Settings are cached by setTrackpadSettings() to avoid disk access per frame.
     int tapMoveThreshold     = trackpadDeadZone;
     bool twoFingerRightClick = trackpadTwoFingerRightClick;
     bool twoFingerScroll     = trackpadTwoFingerScroll;

@@ -408,7 +408,7 @@ extern "C" void vita_netopt_try_invalidate_ref_range(unsigned startFrame, unsign
     else
     {
         g_rfi_overflows++;
-        // Overflow -> forzar IDR (similar a legacy queueFrameInvalidationTuple)
+        // Force an IDR on overflow, matching legacy queue invalidation.
         vita_netopt_force_idr();
         g_rfi_count = 0; // reset list
     }

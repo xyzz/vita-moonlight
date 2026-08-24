@@ -28,7 +28,6 @@ extern "C"
 #include "legacy/modules/vita_globals.hpp"
 #include "network/NetworkOptimizations.hpp"
 #include "session/vita_session.hpp"
-#include "video/VideoFrameHolder.hpp"
 #include "video/VitaVideoRenderer.hpp"
 
 #ifdef BOREALIS_USE_GXM
@@ -106,8 +105,6 @@ struct ffmpeg_perf_counters
     uint32_t publish_sw_max_us;
     uint64_t slots_mutex_total_us;
     uint32_t slots_mutex_max_us;
-    uint64_t vfh_push_total_us;
-    uint32_t vfh_push_max_us;
 };
 
 static ffmpeg_perf_counters g_perf = { 0 };
@@ -147,7 +144,6 @@ static void perf_report_if_due()
     uint32_t pubDirectAvgUs = g_perf.published_frames ? (uint32_t)(g_perf.publish_direct_total_us / g_perf.published_frames) : 0;
     uint32_t pubSwAvgUs     = g_perf.published_frames ? (uint32_t)(g_perf.publish_sw_total_us / g_perf.published_frames) : 0;
     uint32_t slotsMtxAvgUs  = g_perf.published_frames ? (uint32_t)(g_perf.slots_mutex_total_us / g_perf.published_frames) : 0;
-    uint32_t vfhPushAvgUs   = g_perf.published_frames ? (uint32_t)(g_perf.vfh_push_total_us / g_perf.published_frames) : 0;
 
     // Main pipeline timing log
     VITA_DEBUG_LOG("[PERF][VIDEO] win=%ums submit=%u/s dec=%u/s pub=%u/s present=%u/s",
@@ -160,12 +156,11 @@ static void perf_report_if_due()
         copyAvgUs, g_perf.copy_max_us,
         sendAvgUs, g_perf.send_max_us,
         recvAvgUs, g_perf.recv_max_us);
-    VITA_DEBUG_LOG("[PERF][VIDEO] pub_avg=%u/%umax dr=%u/%umax sw=%u/%umax slots_mtx=%u/%umax vfh=%u/%umax sws=%u/%umax drop=%u stale=%u",
+    VITA_DEBUG_LOG("[PERF][VIDEO] pub_avg=%u/%umax dr=%u/%umax sw=%u/%umax slots_mtx=%u/%umax sws=%u/%umax drop=%u stale=%u",
         publishAvgUs, g_perf.publish_max_us,
         pubDirectAvgUs, g_perf.publish_direct_max_us,
         pubSwAvgUs, g_perf.publish_sw_max_us,
         slotsMtxAvgUs, g_perf.slots_mutex_max_us,
-        vfhPushAvgUs, g_perf.vfh_push_max_us,
         swsAvgUs, g_perf.sws_max_us,
         g_perf.dropped_decode_units, g_perf.dropped_stale_frames);
 
@@ -198,8 +193,6 @@ static void perf_report_if_due()
     g_perf.publish_sw_max_us       = 0;
     g_perf.slots_mutex_total_us    = 0;
     g_perf.slots_mutex_max_us      = 0;
-    g_perf.vfh_push_total_us       = 0;
-    g_perf.vfh_push_max_us         = 0;
 }
 
 #ifdef BOREALIS_USE_GXM
@@ -1290,7 +1283,6 @@ static bool publish_frame(FFmpegVideoContext* ctx, AVFrame* frame, uint64_t ptsU
         ctx->current_frame.has_frame     = false;
         ctx->current_frame.direct_memory = false;
         ctx->using_direct_memory         = false;
-        VideoFrameHolder::instance().clear();
         return false;
     }
 
@@ -1408,11 +1400,7 @@ static bool publish_frame(FFmpegVideoContext* ctx, AVFrame* frame, uint64_t ptsU
     }
 #endif
 
-    ctx->last_pts_us = ptsUs;
-    // VideoFrameHolder push removed: frame_textures[] persistent mapping is used directly
-    // by VitaVideoRenderer::drawNVG. The VFH mutex lock was wasted work.
-    uint32_t vfhUs = 0;
-
+    ctx->last_pts_us        = ptsUs;
     uint32_t publishTotalUs = perf_now_us() - publishStartUs;
 
     g_perf.publish_total_us += publishTotalUs;
@@ -1427,14 +1415,10 @@ static bool publish_frame(FFmpegVideoContext* ctx, AVFrame* frame, uint64_t ptsU
     g_perf.slots_mutex_total_us += slotsMtxUs;
     if (slotsMtxUs > g_perf.slots_mutex_max_us)
         g_perf.slots_mutex_max_us = slotsMtxUs;
-    g_perf.vfh_push_total_us += vfhUs;
-    if (vfhUs > g_perf.vfh_push_max_us)
-        g_perf.vfh_push_max_us = vfhUs;
-
     if (verbosePublishLog)
     {
-        VITA_DEBUG_LOG("[FFMPEG][PUB] total=%uus direct=%uus sw=%uus slots_mtx=%uus vfh=%uus using_dm=%d",
-            publishTotalUs, pubDirectUs, pubSwUs, slotsMtxUs, vfhUs,
+        VITA_DEBUG_LOG("[FFMPEG][PUB] total=%uus direct=%uus sw=%uus slots_mtx=%uus using_dm=%d",
+            publishTotalUs, pubDirectUs, pubSwUs, slotsMtxUs,
             ctx->using_direct_memory ? 1 : 0);
     }
 
@@ -1515,9 +1499,6 @@ extern "C"
             return -1;
         }
 
-        // Ensure renderer isn't holding the texture handle before we free anything
-        // Clear any pending frame so the renderer won't use it and wait for GPU to finish.
-        VideoFrameHolder::instance().clear();
         wait_for_borealis_gxm_idle();
 
         memset(context, 0, sizeof(*context));
@@ -1596,8 +1577,6 @@ extern "C"
         VitaVideoRenderer::instance().destroyImage(nullptr);
 #endif
 
-        // Ensure the renderer won't use textures about to be freed.
-        VideoFrameHolder::instance().clear();
         reset_global_slots();
         context->current_frame.texture       = nullptr;
         context->current_frame.width         = 0;
@@ -1620,7 +1599,6 @@ extern "C"
 #ifdef BOREALIS_USE_GXM
         VitaVideoRenderer::instance().destroyImage(nullptr);
 #endif
-        VideoFrameHolder::instance().clear();
         reset_global_slots();
         // Wait with a timeout in a loop to avoid deadlock. Decodes increment and
         // decrement g_active_decodes; wait until it reaches zero or timeout.

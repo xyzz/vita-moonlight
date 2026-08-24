@@ -65,115 +65,14 @@ void VitaVideoRenderer::draw(struct NVGcontext* vg, float viewportW, float viewp
     }
 }
 
-void VitaVideoRenderer::draw(float viewportW, float viewportH)
+void VitaVideoRenderer::draw(float, float)
 {
-    // Non-NVG draw path — no longer supported without vita2d
-    // All rendering goes through drawNVG via Borealis
     static bool logged = false;
     if (!logged)
     {
         VITA_DEBUG_LOG("[Video][DRAW] Non-NVG draw path called, skipping (vita2d removed)");
         logged = true;
     }
-    return;
-    if (g_stats.frames_decoded == 0)
-    {
-        static bool logged = false;
-        if (!logged)
-        {
-            VITA_DEBUG_LOG("[Video][DRAW] primer frame aun no decodificado - skip");
-            logged = true;
-        }
-        return;
-    }
-
-    int displayIdx  = __atomic_load_n(&frame_display_idx, __ATOMIC_ACQUIRE);
-    int writeIdx    = __atomic_load_n(&frame_write_idx, __ATOMIC_ACQUIRE);
-    GxmTexture* tex = frame_textures[displayIdx];
-
-    if (!tex)
-    {
-        static bool logged = false;
-        if (!logged)
-        {
-            VITA_DEBUG_LOG("[Video][DRAW] FRAME_FRONT null");
-            logged = true;
-        }
-        return;
-    }
-
-    const SceGxmTexture* gxmTex = &tex->gxm_tex;
-    uint32_t currentFmt         = (uint32_t)sceGxmTextureGetFormat(const_cast<SceGxmTexture*>(gxmTex));
-    if (currentFmt != (uint32_t)SCE_GXM_TEXTURE_FORMAT_U8U8U8U8_ABGR)
-    {
-        static uint32_t nonRgbaDrawDropCounter = 0;
-        if ((nonRgbaDrawDropCounter++ % 120) == 0)
-        {
-            VITA_DEBUG_LOG("[Video][DRAW][SAFE] skip non-RGBA texture fmt=0x%08X", (unsigned)currentFmt);
-        }
-        return;
-    }
-
-    static uint32_t drawCounter = 0;
-    if (drawCounter < 120 || (drawCounter % 60) == 0)
-    {
-        unsigned stride = gxm_texture_get_stride(tex);
-        VITA_DEBUG_LOG("[Video][DRAW] frame=%u tex=%p stride=%u displayIdx=%d writeIdx=%d", drawCounter, tex, stride, displayIdx, writeIdx);
-    }
-    drawCounter++;
-
-    if (!image_scaling.enabled)
-        return;
-    int dw = fullscreenStretch ? (int)viewportW : image_scaling.display_width;
-    int dh = fullscreenStretch ? (int)viewportH : image_scaling.display_height;
-    int ox = fullscreenStretch ? 0 : image_scaling.offset_x;
-    int oy = fullscreenStretch ? 0 : image_scaling.offset_y;
-    if (dw <= 0 || dh <= 0)
-        return;
-    if (image_scaling.region_x2 <= image_scaling.region_x1 || image_scaling.region_y2 <= image_scaling.region_y1)
-        return;
-    if (image_scaling.texture_width == 0 || image_scaling.texture_height == 0)
-        return;
-
-    float srcX = image_scaling.region_x1;
-    float srcY = image_scaling.region_y1;
-    float srcW = image_scaling.region_x2 - image_scaling.region_x1;
-    float srcH = image_scaling.region_y2 - image_scaling.region_y1;
-
-    const float texW = (float)gxm_texture_get_width(tex);
-    const float texH = (float)gxm_texture_get_height(tex);
-    if (texW <= 0.f || texH <= 0.f)
-        return;
-
-    if (srcX < 0.f)
-    {
-        srcW += srcX;
-        srcX = 0.f;
-    }
-    if (srcY < 0.f)
-    {
-        srcH += srcY;
-        srcY = 0.f;
-    }
-    if (srcX >= texW || srcY >= texH)
-        return;
-    if (srcX + srcW > texW)
-        srcW = texW - srcX;
-    if (srcY + srcH > texH)
-        srcH = texH - srcY;
-    if (srcW <= 0.f || srcH <= 0.f)
-        return;
-
-    float scaleX = (float)dw / image_scaling.texture_width;
-    float scaleY = (float)dh / image_scaling.texture_height;
-    if (scaleX <= 0.f || scaleY <= 0.f)
-        return;
-
-    // vita2d_draw removed — use NVG path instead
-    // vita2d_draw_texture_tint_part_scale not available
-
-    g_stats.frames_presented++;
-    onFramePresented();
 }
 
 void VitaVideoRenderer::drawNVG(NVGcontext* vg, float viewportW, float viewportH, float alpha)

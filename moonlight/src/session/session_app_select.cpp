@@ -9,11 +9,11 @@
 #include <borealis/core/application.hpp>
 #include <borealis/core/thread.hpp>
 #include <chrono>
-#include <cstdio> // For snprintf
-#include <cstdlib> // For malloc/free
-#include <cstring> // To strcpy
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
 #include <set>
-#include <string> // Para std::string
+#include <string>
 #include <thread>
 
 #include "ConfigManager.hpp"

@@ -51,21 +51,13 @@ bool HostStorage::writeDeviceIni(const std::string& hostDir, const std::string& 
     // behavior and avoid inconsistencies, we omit writing the
     // uuid here. This prevents device.ini from being the source of truth for the
     // uniqueid and reduces risk of desynchronization.
-    // name: device name (local hostName, or something identifiable)
     fprintf(f, "name=%s\n", safeHostName.c_str());
-    // device type
     fprintf(f, "type=psvita\n");
-    // paired
     fprintf(f, "paired=%s\n", paired ? "true" : "false");
-    // internal: IP del host
     fprintf(f, "internal=%s\n", address);
-    // external: leave empty for now
     fprintf(f, "external=\n");
-    // port: external port used
     fprintf(f, "port=%d\n", port);
-    // prefer_external: default false
     fprintf(f, "prefer_external=false\n");
-    // microphone_port: microphone port (default MoonMic)
     fprintf(f, "microphone_port=48100\n");
 
     // mac: write only if a valid value was passed

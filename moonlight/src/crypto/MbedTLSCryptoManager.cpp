@@ -164,7 +164,7 @@ Data MbedTLSCryptoManager::signature(Data cert)
 bool MbedTLSCryptoManager::verify_signature(Data data, Data signature,
     Data cert)
 {
-    // TODO
+    // Signature verification is not implemented by the Vita backend.
     return true;
 }
 

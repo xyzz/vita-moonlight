@@ -68,7 +68,6 @@ extern "C"
     int ffmpeg_video_decode(FFmpegVideoContext* context, unsigned char* data, int size, int frame_type);
     void ffmpeg_video_render(FFmpegVideoContext* context);
 
-    // Callbacks para Limelight
     DECODER_RENDERER_CALLBACKS get_ffmpeg_video_callbacks(void);
     void ffmpeg_process_deferred_releases(void);
 

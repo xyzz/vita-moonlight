@@ -279,7 +279,6 @@ void RearTouchCalibrationCanvas::draw(NVGcontext* vg, float x, float y, float wi
 {
     nvgSave(vg);
 
-    // Fondo
     nvgBeginPath(vg);
     nvgRect(vg, x, y, width, height);
     nvgFillColor(vg, nvgRGBA(15, 18, 26, 240));

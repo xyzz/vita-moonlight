@@ -12,7 +12,6 @@ class HotkeyManager
 
     void setPauseCallback(const std::function<void()>& cb) { pauseCallback = cb; }
 
-    // Called from a central input hook (for now it will be invoked manually from views).
     void onButtonEvent(brls::ControllerButton button, bool pressed);
 
     void setComboWindowMs(int ms) { comboWindowMs = ms; }

@@ -149,8 +149,8 @@ bool VitaSession::start()
         LiInitializeStreamConfiguration(&m_config);
         m_config.width              = 960;
         m_config.height             = 544;
-        m_config.fps                = 60; // goal 60
-        m_config.bitrate            = 8000; // Kbps (placeholder; luego leer settings)
+        m_config.fps                = 60;
+        m_config.bitrate            = 8000;
         m_config.audioConfiguration = AUDIO_CONFIGURATION_STEREO;
         m_config.streamingRemotely  = STREAM_CFG_AUTO;
         m_config.packetSize         = 1024;
@@ -185,7 +185,6 @@ bool VitaSession::start()
     LiInitializeVideoCallbacks(&m_video_callbacks);
     m_video_callbacks = VideoManager::instance()->getDecoderCallbacks();
 
-    // Audio callbacks stub for now
     LiInitializeAudioCallbacks(&m_audio_callbacks);
     m_audio_callbacks.init                = audio_renderer_init;
     m_audio_callbacks.start               = audio_renderer_start;

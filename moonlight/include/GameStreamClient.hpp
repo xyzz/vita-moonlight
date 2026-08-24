@@ -26,9 +26,6 @@ struct RemoteAppInfo
 
 struct HostInfo; // forward
 
-// NOTE: ConnectionManager compatibility shim removed. Use GameStreamClient::getAppList
-// and GameStreamClient::connect directly.
-
 typedef std::function<void(const std::vector<RemoteAppInfo>&)> AppListCallback;
 typedef std::function<void(bool)> BoolCallback;
 
@@ -90,7 +87,7 @@ class GameStreamClient
     std::map<std::string, SERVER_DATA> m_server_data;
     std::map<std::string, STREAM_CONFIGURATION> m_last_stream_cfg; // address -> last released config
     std::map<std::string, std::vector<RemoteAppInfo>> m_app_lists;
-    std::map<std::string, std::string> m_key_dirs; // address -> keyDir usado en gs_init
+    std::map<std::string, std::string> m_key_dirs;
     struct ActiveStream
     {
         int appId;

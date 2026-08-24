@@ -25,7 +25,7 @@
 #include "modules/vita_globals.hpp"
 // The .cpp files are compiled separately via CMake
 
-// Callbacks para Limelight
+// Limelight callbacks.
 DECODER_RENDERER_CALLBACKS decoder_callbacks_vita_new = {
     .setup            = vitavideo_setup,
     .start            = vitavideo_start,

@@ -42,7 +42,6 @@ std::vector<std::pair<std::string, std::string>>& getDiscoveredHostsWin();
 #endif
 
 #include "check_host.hpp"
-// unified pairing removed: future integration in GameStreamClient (TODO)
 
 using namespace brls::literals;
 
@@ -94,7 +93,7 @@ AddHostTab::AddHostTab()
         searchLabel->setVisibility(brls::Visibility::VISIBLE);
 
     // Static texts (title) are already handled in XML with i18n.
-    // The placeholder can only be translated in C++.
+    // XML placeholders are not localized at runtime.
     // Manual translation and log testing
     std::string testKey         = "moonlight/settings/add_host_ip_placeholder";
     std::string testTranslation = brls::getStr(testKey);
@@ -224,7 +223,7 @@ AddHostTab::AddHostTab()
     this->startDeviceDiscovery();
 }
 
-// Callbacks para check_host
+// Discovery callbacks.
 
 // Static instances for discovery callbacks
 #if defined(__PSV__)

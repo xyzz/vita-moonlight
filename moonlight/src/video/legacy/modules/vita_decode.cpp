@@ -22,7 +22,6 @@ extern gs::SpsContext* g_sps_ctx;
 #include "debug.hpp"
 #include "network/NetworkOptimizations.hpp"
 #include "session/vita_session.hpp"
-#include "video/VideoFrameHolder.hpp"
 #include "video/pixel_format/pixel_format.hpp"
 #include "video/render_mode_cache.hpp"
 #include "vita_sceAvcInternal.hpp"
@@ -456,9 +455,6 @@ extern "C" int vitavideo_submit_decode_unit(PDECODE_UNIT decodeUnit)
     if (g_stats.frames_decoded == 0)
         VITA_DEBUG_LOG("[Video][DBG] primer frame decodificado");
 
-    // Note: VideoFrameHolder::pushTexture removed from legacy path.
-    // drawNVG reads FRAME_FRONT() directly, so the push was wasted work
-    // (mutex lock + atomic stores + validation on every frame for nothing).
     VitaSession::onFrameDecoded();
 
     uint64_t tPresentMs = monotonicMs_local();

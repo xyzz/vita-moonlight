@@ -184,7 +184,6 @@ extern "C" void vita_cleanup()
     VITA_DEBUG_LOG("[Video] soft cleanup completed (buffers freed, AVC termination done, full teardown deferred)");
 }
 
-// Stubs (placeholder)
 void vitavideo_draw_fps() { }
 void vitavideo_draw_indicators() { }
 

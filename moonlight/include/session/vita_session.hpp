@@ -6,17 +6,13 @@
 #include "borealis.hpp"
 #include "client.h"
 
-// Lightweight statistics structure (placeholder, expand later)
 struct VitaSessionStats
 {
-    uint64_t videoFrames           = 0; // frames decodificados (onFrameDecoded)
-    uint64_t videoBytes            = 0; // future: accumulate size AU
-    uint64_t lastFrameNumber       = 0; // not used yet (for drops network in Phase3)
+    uint64_t videoFrames           = 0;
     uint64_t firstFrameTimestampMs = 0;
-    // Ventana FPS
-    uint32_t windowFrames  = 0;
-    uint64_t windowStartMs = 0;
-    uint32_t fps           = 0; // calculated every ~1000ms
+    uint32_t windowFrames          = 0;
+    uint64_t windowStartMs         = 0;
+    uint32_t fps                   = 0;
 };
 
 // Mini snapshot for overlay (added without exposing VitaVideoStats directly)
@@ -103,7 +99,7 @@ class VitaSession
     bool m_poor          = false;
 
     int m_reconnect_attempts    = 0;
-    const int m_reconnect_limit = 1; // simple for now
+    const int m_reconnect_limit = 1;
 
     VitaSessionStats m_stats {};
     uint64_t m_startMonotonicMs = 0;

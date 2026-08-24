@@ -138,14 +138,12 @@ KeyboardSettingsTab::KeyboardSettingsTab()
 
     updateLayoutVisibility(videoSettings.keyboard_mode);
 
-    // Theme Preview (placeholder - implementation future)
     themePreviewCell->setDetailText(brls::getStr("moonlight/keyboard/theme_default"));
     themePreviewCell->registerClickAction([](brls::View* view)
         {
         brls::Application::notify(brls::getStr("moonlight/keyboard/theme_selection_future"));
         return true; });
 
-    // Theme Editor (placeholder - implementation future)
     themeEditorCell->setDetailText(brls::getStr("moonlight/keyboard/theme_not_available"));
     themeEditorCell->registerClickAction([](brls::View* view)
         {

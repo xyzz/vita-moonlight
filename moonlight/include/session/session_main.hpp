@@ -7,7 +7,6 @@
 
 #include "GameStreamClient.hpp" // RemoteAppInfo
 #include "model/HostStorage.hpp" // HostInfo
-#include "session/overlay/test_overlay_stream.hpp"
 #include "session/overlay/vita_pause_overlay.hpp"
 #include "session/overlay/vita_stream_overlay_view.hpp"
 
@@ -25,7 +24,6 @@ class SessionMainView : public brls::Box
     HostInfo host;
     RemoteAppInfo app;
     std::unique_ptr<VitaStreamOverlayView> overlayStatsView;
-    std::unique_ptr<TestOverlayStream> testOverlay;
     BRLS_BIND(brls::Label, title, "title");
     BRLS_BIND(brls::Label, appLabel, "appLabel");
     BRLS_BIND(brls::Label, info, "info");

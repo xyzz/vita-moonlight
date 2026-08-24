@@ -1,7 +1,6 @@
 #include "utils/overlay_utils.hpp"
 
 #include <borealis.hpp>
-#include <chrono>
 
 BaseOverlay::BaseOverlay()
 {
@@ -143,10 +142,6 @@ void BaseOverlay::willAppear(bool resetState)
 
 void BaseOverlay::draw(NVGcontext* vg, float x, float y, float width, float height, brls::Style style, brls::FrameContext* ctx)
 {
-    using namespace std::chrono;
-    auto t_start = high_resolution_clock::now();
-
-    // Dibujar panel background con alpha configurable
     nvgBeginPath(vg);
     nvgRoundedRect(vg, panelX, panelY, panelW, panelH, 8.0f);
     NVGcolor bgColor = nvgRGBA(18, 20, 24, (int)(panelAlpha * 255.0f));
@@ -178,7 +173,6 @@ void BaseOverlay::draw(NVGcontext* vg, float x, float y, float width, float heig
         nvgStrokeWidth(vg, 1.5f);
         nvgStroke(vg);
 
-        // Texto
         nvgFillColor(vg, textColor);
         nvgText(vg, btnX + 16, btnY + 36, buttonLabels[i].c_str(), nullptr);
 
@@ -191,15 +185,6 @@ void BaseOverlay::draw(NVGcontext* vg, float x, float y, float width, float heig
         nvgFontFaceId(vg, 0);
         nvgFillColor(vg, nvgRGBA(200, 200, 200, 255));
         nvgText(vg, panelX + btnXOffset, btnY + 20.0f, footerText.c_str(), nullptr);
-    }
-
-    auto t_end      = high_resolution_clock::now();
-    auto dur_us     = duration_cast<microseconds>(t_end - t_start).count();
-    uint64_t now_ms = duration_cast<milliseconds>(t_end.time_since_epoch()).count();
-    if (now_ms - this->lastDrawLogMs > 500)
-    {
-        this->lastDrawLogMs = now_ms;
-        // Optional: log draw time, but silent for now
     }
 
     Box::draw(vg, x, y, width, height, style, ctx);

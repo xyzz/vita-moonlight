@@ -3,9 +3,6 @@
 
     SPDX-License-Identifier: GPL-3.0-only
 */
-// check_host.cpp
-// Centralized host discovery logic for PSVita and Windows
-
 #include <atomic>
 #include <cstdio>
 #include <thread>
@@ -20,8 +17,6 @@
 #include "tab/add_host_tab.hpp"
 #include "tab/hosts_tab.hpp"
 #endif
-// --- No manual Vita network initialization required, udp_sniffer_vita handles it ---
-
 #if defined(__PSV__)
 #include <psp2/kernel/threadmgr.h>
 #include <psp2/net/net.h>
@@ -75,7 +70,7 @@ namespace
 
 void startVitaDiscovery(void (*hostFoundCb)(int, const char*, const char*, const char*, int))
 {
-
+    // Match the legacy client initialization order before starting discovery.
     vita_log::info("[check_host] startVitaDiscovery: INICIO (estilo legacy)");
 #if defined(__PSV__)
     vita_log::info("[check_host] startVitaDiscovery: INICIO (VITALOG)\n");

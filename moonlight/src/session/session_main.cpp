@@ -12,7 +12,6 @@
 #include "controller/ControllerInput.hpp"
 #include "controller/keyboard/keyboard_launcher.hpp"
 #include "debug.hpp"
-#include "session/overlay/ingame_overlay_view.hpp"
 #include "session/overlay/vita_pause_overlay.hpp"
 #include "session/vita_session.hpp"
 #include "video/VitaVideoRenderer.hpp"

@@ -44,7 +44,7 @@ add_library(inih STATIC
 )
 target_include_directories(inih PUBLIC inih)
 
-add_subdirectory(borealis/library)
+add_subdirectory("${BOREALIS_LIBRARY}" "${CMAKE_CURRENT_BINARY_DIR}/borealis")
 
 # gamestream static library
 add_subdirectory(gamestream)

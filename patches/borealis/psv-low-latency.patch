@@ -1,0 +1,146 @@
+diff --git a/library/include/borealis/core/application.hpp b/library/include/borealis/core/application.hpp
+index cfff62bf9edebb44efc387c49405fe6adea880c8..3bf5925bf311e1a4e67bdce059f03b1df5bcd727 100644
+--- a/library/include/borealis/core/application.hpp
++++ b/library/include/borealis/core/application.hpp
+@@ -219,6 +219,9 @@ class Application
+      */
+     static void setLimitedFPS(size_t fps);
+ 
++    /** Enable the platform low-latency presentation policy. */
++    static void setLowLatencyMode(bool enabled);
++
+     /**
+      * Set the swap interval
+      * Must be called after createWindow. On some platforms, it is impossible to set it back
+@@ -273,6 +276,8 @@ class Application
+     static GenericEvent* getGlobalFocusChangeEvent();
+     static VoidEvent* getGlobalHintsUpdateEvent();
+     static Event<InputType>* getGlobalInputTypeChangeEvent();
++    /** Fired after view drawing and before NanoVG flushes the frame. */
++    static VoidEvent* getPrePresentEvent();
+     static VoidEvent* getRunLoopEvent();
+     static VoidEvent* getExitEvent();
+     static VoidEvent* getExitDoneEvent();
+@@ -418,6 +423,7 @@ class Application
+     inline static GenericEvent globalFocusChangeEvent;
+     inline static VoidEvent globalHintsUpdateEvent;
+     inline static Event<InputType> globalInputTypeChangeEvent;
++    inline static VoidEvent prePresentEvent;
+     inline static VoidEvent runLoopEvent;
+     inline static VoidEvent exitEvent;
+     inline static VoidEvent exitDoneEvent;
+diff --git a/library/include/borealis/core/video.hpp b/library/include/borealis/core/video.hpp
+index c02cde7790aa7cecd63a87cc71a198883b81de55..4cd0f2876bb7306cf173164cf927b90ec267c8c7 100644
+--- a/library/include/borealis/core/video.hpp
++++ b/library/include/borealis/core/video.hpp
+@@ -64,6 +64,9 @@ class VideoContext
+ 
+     virtual NVGcontext* getNVGContext() = 0;
+ 
++    // Platforms may override this when presentation requires a different queue policy.
++    virtual void setLowLatencyMode(bool enabled) { (void)enabled; }
++
+     virtual void setSwapInterval(int interval) = 0;
+ 
+     virtual int getCurrentMonitorIndex() { return 0; }
+diff --git a/library/include/borealis/extern/nanovg/nanovg_gxm_utils.h b/library/include/borealis/extern/nanovg/nanovg_gxm_utils.h
+index 28a06ed63849d5f2f10d871960cbdb448b2ff68a..d442b231a44427c5e325c5aaa75482113c70b419 100644
+--- a/library/include/borealis/extern/nanovg/nanovg_gxm_utils.h
++++ b/library/include/borealis/extern/nanovg/nanovg_gxm_utils.h
+@@ -40,7 +40,7 @@ extern "C"
+ #define DISPLAY_WIDTH 960
+ #define DISPLAY_HEIGHT 544
+ #define DISPLAY_STRIDE 960
+-#define DISPLAY_BUFFER_COUNT 3
++#define DISPLAY_BUFFER_COUNT 2
+ #define MAX_PENDING_SWAPS (DISPLAY_BUFFER_COUNT - 1)
+ 
+ #define DISPLAY_COLOR_FORMAT SCE_GXM_COLOR_FORMAT_A8B8G8R8
+diff --git a/library/include/borealis/platforms/psv/psv_video.hpp b/library/include/borealis/platforms/psv/psv_video.hpp
+index 5ea4bb8aff4a584bb14dfd35f2ffadffa6bbaaa5..1b789d631098be208601e507330bd8579c689539 100644
+--- a/library/include/borealis/platforms/psv/psv_video.hpp
++++ b/library/include/borealis/platforms/psv/psv_video.hpp
+@@ -32,6 +32,7 @@ class PsvVideoContext : public VideoContext
+     void resetState() override;
+     void beginFrame() override;
+     void endFrame() override;
++    void setLowLatencyMode(bool enabled) override;
+     void setSwapInterval(int interval) override;
+     double getScaleFactor() override;
+     NVGcontext* getNVGContext() override;
+@@ -41,6 +42,7 @@ class PsvVideoContext : public VideoContext
+   private:
+     NVGcontext* nvgContext;
+     NVGXMwindow* window;
++    bool lowLatencyMode = false;
+ };
+ 
+ } // namespace brls
+diff --git a/library/lib/core/application.cpp b/library/lib/core/application.cpp
+index a45103da2747e71b2367e4ad59fab26e3c073849..49990a65897bd20e22055c64e09b98af915dd311 100644
+--- a/library/lib/core/application.cpp
++++ b/library/lib/core/application.cpp
+@@ -808,6 +808,7 @@ void Application::frame()
+ 
+     // End frame
+     nvgResetTransform(Application::getNVGContext()); // scale
++    prePresentEvent.fire();
+     nvgEndFrame(Application::getNVGContext());
+ 
+     Application::platform->getVideoContext()->endFrame();
+@@ -869,6 +870,11 @@ void Application::setLimitedFPS(size_t fps)
+     Application::limitedFrameTime = fps == 0 ? 0 : 1000000.0f / fps;
+ }
+ 
++void Application::setLowLatencyMode(bool enabled)
++{
++    Application::platform->getVideoContext()->setLowLatencyMode(enabled);
++}
++
+ void Application::setSwapInterval(int interval)
+ {
+     Application::platform->getVideoContext()->setSwapInterval(interval);
+@@ -1233,6 +1239,11 @@ Event<InputType>* Application::getGlobalInputTypeChangeEvent()
+     return &Application::globalInputTypeChangeEvent;
+ }
+ 
++VoidEvent* Application::getPrePresentEvent()
++{
++    return &Application::prePresentEvent;
++}
++
+ VoidEvent* Application::getRunLoopEvent()
+ {
+     return &Application::runLoopEvent;
+diff --git a/library/lib/platforms/psv/psv_video.cpp b/library/lib/platforms/psv/psv_video.cpp
+index 9352721f2a533ccd846378ca660b6ce7861b9de4..d3f798ec1824a885b2c97db647aa83fc88c48d42 100644
+--- a/library/lib/platforms/psv/psv_video.cpp
++++ b/library/lib/platforms/psv/psv_video.cpp
+@@ -87,10 +87,20 @@ void PsvVideoContext::beginFrame() {
+ 
+ void PsvVideoContext::endFrame() {
+     gxmEndFrame();
++
++    // Do not let the GPU queue frames ahead of a latency-sensitive stream.
++    if (lowLatencyMode && window && window->context) {
++        sceGxmFinish(window->context);
++    }
++
+     gxmDialogUpdate();
+     gxmSwapBuffer();
+ }
+ 
++void PsvVideoContext::setLowLatencyMode(bool enabled) {
++    lowLatencyMode = enabled;
++}
++
+ void PsvVideoContext::setSwapInterval(int interval) {
+     VideoContext::swapInterval = interval;
+     gxmSwapInterval(interval);
+@@ -109,4 +119,4 @@ NVGXMwindow* PsvVideoContext::getWindow()
+     return this->window;
+ }
+ 
+-}
+\ No newline at end of file
++}

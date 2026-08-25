@@ -1,7 +1,13 @@
 
 cmake_minimum_required(VERSION 3.10)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON CACHE BOOL "Generate compile_commands.json for LSPs" )
-set(BOREALIS_LIBRARY ${CMAKE_CURRENT_SOURCE_DIR}/third_party/borealis/library)
+
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/PrepareBorealis.cmake)
+prepare_borealis(MOONLIGHT_BOREALIS_SOURCE
+    SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/third_party/borealis"
+    PATCH "${CMAKE_CURRENT_SOURCE_DIR}/patches/borealis/psv-low-latency.patch"
+)
+set(BOREALIS_LIBRARY "${MOONLIGHT_BOREALIS_SOURCE}/library")
 
 include(${BOREALIS_LIBRARY}/cmake/commonOption.cmake)
 

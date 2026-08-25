@@ -23,6 +23,7 @@ dump-analysis/
 temp/
 client.pem
 key.pem
+/ip_vita.txt
 test/
 /scripts/prepare/*/src/
 /scripts/prepare/*/pkg/

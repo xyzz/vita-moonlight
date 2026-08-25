@@ -5,13 +5,7 @@ cd "$(dirname "$0")" || exit 1
 # shellcheck source=scripts/vita-host.sh
 source "scripts/vita-host.sh"
 
-if ! vita_host_init; then
-    exit 1
-fi
-
 IP_FILE="$(pwd)/ip_vita.txt"
-VITA_IP="192.168.0.192"
-[ -f "$IP_FILE" ] && VITA_IP="$(head -n1 "$IP_FILE" | tr -d '\r\n')"
 VITA_PORT=1337
 VITA_CONTROL_PORT=1338
 
@@ -31,16 +25,18 @@ for arg in "$@"; do
         --no-deploy|nodeploy) DO_DEPLOY=0; NONINTERACTIVE=1 ;;
         -h|--help)
             cat <<'EOF'
-Usage: ./makepsv [gxm|gl] [debug|release] [clean] [nodeploy]
+Usage: ./makepsv [--gxm|--gl] [--debug|--release] [--clean] [--no-deploy]
 
 Without arguments, an interactive menu is shown.
-Linux and Windows/MSYS2 are supported by the same script.
+Linux, WSL and Windows/MSYS2 are supported by the same script.
 EOF
             exit 0
             ;;
         *) echo "[!] Unknown option: $arg" >&2; exit 2 ;;
     esac
 done
+
+vita_host_init || exit 1
 
 if [ "$NONINTERACTIVE" -eq 0 ]; then
     echo
@@ -69,7 +65,7 @@ fi
 
 backend_suffix="gxm"
 [ "$USE_GXM" = "OFF" ] && backend_suffix="gl"
-BUILD_DIR="cmake-build-psv-${VITA_BUILD_SUFFIX}-${backend_suffix}"
+BUILD_DIR="$(vita_build_directory "$backend_suffix")"
 VPK_PATH="$BUILD_DIR/moonlight.vpk"
 
 if ! vita_require_tools cmake git make pkg-config curl sed grep find; then
@@ -87,14 +83,7 @@ echo "[+] Backend:     $backend_suffix"
 echo "[+] Build type:  $BUILD_TYPE"
 echo "[+] Build dir:   $BUILD_DIR"
 
-if [ "$BUILD_TYPE" = "Debug" ]; then
-    export CFLAGS="${CFLAGS:-} -O0 -g -fno-omit-frame-pointer -ffunction-sections -fdata-sections"
-    export CXXFLAGS="${CXXFLAGS:-} -O0 -g -fno-omit-frame-pointer -ffunction-sections -fdata-sections"
-else
-    export CFLAGS="${CFLAGS:-} -O2 -g0 -ffunction-sections -fdata-sections"
-    export CXXFLAGS="${CXXFLAGS:-} -O2 -g0 -ffunction-sections -fdata-sections"
-fi
-export LDFLAGS="${LDFLAGS:-} -Wl,--gc-sections"
+vita_set_build_flags "$BUILD_TYPE"
 
 if [ "$DO_CLEAN" -eq 1 ] && [ -d "$BUILD_DIR" ]; then
     echo "[+] Removing previous build directory..."
@@ -104,26 +93,7 @@ vita_reset_stale_cmake_cache "$BUILD_DIR" || exit 4
 
 configure_project() {
     echo "[+] Configuring Moonlight..."
-    local host_cmake_args=()
-    if [ -n "${VITA_PKG_CONFIG_EXECUTABLE:-}" ]; then
-        host_cmake_args+=("-DPKG_CONFIG_EXECUTABLE=$VITA_PKG_CONFIG_EXECUTABLE")
-    fi
-    cmake -S . -B "$BUILD_DIR" -G "$VITA_CMAKE_GENERATOR" \
-        -DPLATFORM_PSV=ON \
-        -DUSE_SYSTEM_CURL=ON \
-        -DUSE_SYSTEM_SDL2=ON \
-        -DMPV_NO_FB=ON \
-        -DSIMPLE_HIGHLIGHT=ON \
-        -DUSE_GXM="$USE_GXM" \
-        -DUSE_VITA_SHARK=OFF \
-        -DCMAKE_BUILD_TYPE="$BUILD_TYPE" \
-        -DCMAKE_TOOLCHAIN_FILE="$VITASDK/share/vita.toolchain.cmake" \
-        -DCMAKE_FIND_ROOT_PATH="$VITASDK/arm-vita-eabi" \
-        -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER \
-        -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY \
-        -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY \
-        -DCMAKE_FIND_ROOT_PATH_MODE_PACKAGE=ONLY \
-        "${host_cmake_args[@]}"
+    vita_configure_project . "$BUILD_DIR" "$BUILD_TYPE" "$USE_GXM"
 }
 
 build_project() {
@@ -146,8 +116,20 @@ find_vpk() {
 }
 
 deploy_to_vita() {
-    if ! vita_ping "$VITA_IP"; then
-        echo "[!] Vita is not reachable at $VITA_IP" >&2
+    if [ ! -f "$IP_FILE" ]; then
+        echo "[!] ip_vita.txt not found. Copy ip_vita.txt.example and set the Vita address." >&2
+        return 1
+    fi
+
+    local vita_ip
+    vita_ip="$(head -n1 "$IP_FILE" | tr -d '\r\n')"
+    if [ -z "$vita_ip" ]; then
+        echo "[!] ip_vita.txt is empty." >&2
+        return 1
+    fi
+
+    if ! vita_ping "$vita_ip"; then
+        echo "[!] Vita is not reachable at $vita_ip" >&2
         return 1
     fi
     if ! command -v nc >/dev/null 2>&1; then
@@ -159,9 +141,9 @@ deploy_to_vita() {
     title_id="$(vita_title_id)"
     vpk_name="moonlight.vpk"
     echo "[+] Uploading $VPK_PATH to ux0:/ABM/$vpk_name..."
-    curl -sSf -m 10 -Q "MKD ux0:/ABM" "ftp://${VITA_IP}:${VITA_PORT}/" 2>/dev/null || true
-    curl --ftp-method nocwd -T "$VPK_PATH" "ftp://${VITA_IP}:${VITA_PORT}/ux0:/ABM/$vpk_name" --connect-timeout 10 || return 1
-    echo "launch VITASHELL" | nc "$VITA_IP" "$VITA_CONTROL_PORT" >/dev/null 2>&1 || true
+    curl -sSf -m 10 -Q "MKD ux0:/ABM" "ftp://${vita_ip}:${VITA_PORT}/" 2>/dev/null || true
+    curl --ftp-method nocwd -T "$VPK_PATH" "ftp://${vita_ip}:${VITA_PORT}/ux0:/ABM/$vpk_name" --connect-timeout 10 || return 1
+    echo "launch VITASHELL" | nc "$vita_ip" "$VITA_CONTROL_PORT" >/dev/null 2>&1 || true
     echo "[+] VPK uploaded. TITLE_ID=${title_id:-unknown}"
 }
 

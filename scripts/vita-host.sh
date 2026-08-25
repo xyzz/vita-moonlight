@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Shared host helpers for VitaSDK builds on Linux and Windows/MSYS2.
+# Shared host helpers for VitaSDK builds on Linux, WSL and Windows/MSYS2.
 
 vita_host_init() {
     local uname_s
@@ -10,9 +10,8 @@ vita_host_init() {
             VITA_HOST="msys2"
             ;;
         Linux*)
-            if grep -qi microsoft /proc/version 2>/dev/null; then
-                echo "[!] WSL is intentionally unsupported by this project. Use MSYS2 on Windows." >&2
-                return 1
+            if grep -qisE 'microsoft|wsl' /proc/version /proc/sys/kernel/osrelease 2>/dev/null; then
+                VITA_HOST="wsl"
             else
                 VITA_HOST="linux"
             fi
@@ -52,9 +51,8 @@ vita_host_init() {
         esac
     fi
 
-    # CMake runs inside MSYS2/Linux, so the official POSIX target wrapper can
-    # be executed directly. It resets host pkg-config variables and confines
-    # package lookup to the Vita sysroot.
+    # All supported hosts run the POSIX VitaSDK tools directly. The wrapper
+    # resets host pkg-config variables and confines lookup to the Vita sysroot.
     if [ -x "$VITASDK/bin/arm-vita-eabi-pkg-config" ]; then
         VITA_PKG_CONFIG_EXECUTABLE="$VITASDK/bin/arm-vita-eabi-pkg-config"
         export VITA_PKG_CONFIG_EXECUTABLE
@@ -152,6 +150,56 @@ vita_reset_stale_cmake_cache() {
     fi
 }
 
+vita_set_build_flags() {
+    local build_type="$1"
+
+    if [ "$build_type" = "Debug" ]; then
+        export CFLAGS="${CFLAGS:-} -O0 -g -fno-omit-frame-pointer -ffunction-sections -fdata-sections"
+        export CXXFLAGS="${CXXFLAGS:-} -O0 -g -fno-omit-frame-pointer -ffunction-sections -fdata-sections"
+    else
+        export CFLAGS="${CFLAGS:-} -O2 -g0 -ffunction-sections -fdata-sections"
+        export CXXFLAGS="${CXXFLAGS:-} -O2 -g0 -ffunction-sections -fdata-sections"
+    fi
+    export LDFLAGS="${LDFLAGS:-} -Wl,--gc-sections"
+}
+
+vita_configure_project() {
+    local source_dir="$1"
+    local build_dir="$2"
+    local build_type="$3"
+    local use_gxm="$4"
+    local host_cmake_args=()
+
+    if [ -n "${VITA_PKG_CONFIG_EXECUTABLE:-}" ]; then
+        host_cmake_args+=("-DPKG_CONFIG_EXECUTABLE=$VITA_PKG_CONFIG_EXECUTABLE")
+    fi
+
+    cmake -S "$source_dir" -B "$build_dir" -G "$VITA_CMAKE_GENERATOR" \
+        -DPLATFORM_PSV=ON \
+        -DSIMPLE_HIGHLIGHT=ON \
+        -DUSE_GXM="$use_gxm" \
+        -DUSE_VITA_SHARK=OFF \
+        -DCMAKE_BUILD_TYPE="$build_type" \
+        -DCMAKE_TOOLCHAIN_FILE="$VITASDK/share/vita.toolchain.cmake" \
+        -DCMAKE_FIND_ROOT_PATH="$VITASDK/arm-vita-eabi" \
+        -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER \
+        -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY \
+        -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY \
+        -DCMAKE_FIND_ROOT_PATH_MODE_PACKAGE=ONLY \
+        "${host_cmake_args[@]}"
+}
+
+vita_build_directory() {
+    local backend="$1"
+    local name="cmake-build-psv-${VITA_BUILD_SUFFIX}-${backend}"
+
+    if [ -n "${VITA_BUILD_ROOT:-}" ]; then
+        printf '%s/%s\n' "${VITA_BUILD_ROOT%/}" "$name"
+    else
+        printf '%s\n' "$name"
+    fi
+}
+
 vita_require_tools() {
     local missing=0 tool
     for tool in "$@"; do
@@ -204,6 +252,8 @@ vita_open_dir() {
     local path="$1"
     if [ "$VITA_HOST" = "msys2" ]; then
         explorer.exe "$(cygpath -w "$path")" >/dev/null 2>&1 || true
+    elif [ "$VITA_HOST" = "wsl" ] && command -v explorer.exe >/dev/null 2>&1; then
+        explorer.exe "$(wslpath -w "$path")" >/dev/null 2>&1 || true
     elif command -v xdg-open >/dev/null 2>&1; then
         xdg-open "$path" >/dev/null 2>&1 || true
     fi

@@ -1,7 +1,7 @@
 [submodule "third_party/borealis"]
 	path = third_party/borealis
 	url = https://github.com/xfangfang/borealis.git
-	branch = vita
+	branch = wiliwili
 [submodule "third_party/inih"]
 	path = third_party/inih
 	url = https://github.com/benhoyt/inih

@@ -1,12 +1,5 @@
-
-
-# ENET ahora es gestionado por moonlight-common-c como submódulo y no debe ser compilado aquí
-
-
-
-
-# moonlight-common-c static library (con opción de OpenSSL/MbedTLS)
-# La opción USE_MBEDTLS debe ser definida en el CMakeLists.txt principal si se desea usar MbedTLS
+# ENet is provided by moonlight-common-c.
+# moonlight-common-c uses the crypto backend selected by the root project.
 if(CMAKE_SYSTEM_NAME STREQUAL "Vita" OR PLATFORM_PSV)
     if(DEFINED BUILD_SHARED_LIBS)
         set(_MOONLIGHT_BUILD_SHARED_LIBS_WAS_DEFINED TRUE)
@@ -49,13 +42,16 @@ add_subdirectory("${BOREALIS_LIBRARY}" "${CMAKE_CURRENT_BINARY_DIR}/borealis")
 # gamestream static library
 add_subdirectory(gamestream)
 
-# moonmic - Microphone capture and transmission library
+# Only the Vita client library belongs in this build. Host tools are built from
+# the moonmic project itself.
+set(BUILD_CLIENT ON CACHE BOOL "Build Moonmic client library" FORCE)
+set(BUILD_HOST OFF CACHE BOOL "Build Moonmic host application" FORCE)
 add_subdirectory(moonmic)
 
 # moonbeam - Connection diagnostic tester library
 add_subdirectory(moonbeam)
 
-# mdnsniff portable library (Vita y Windows)
+# mdnsniff portable library
 add_library(mdnsniff STATIC
     mdnsniff/udp_sniffer_vita.c
     mdnsniff/udp_sniffer_win.c
@@ -63,7 +59,7 @@ add_library(mdnsniff STATIC
 )
 target_include_directories(mdnsniff PUBLIC mdnsniff mdnsniff/common)
 
-# Enlazar stubs de Vita solo si se compila para PSVita
+# Link Vita stubs only for Vita builds.
 if(CMAKE_SYSTEM_NAME STREQUAL "Vita" OR PLATFORM_PSV)
     target_link_libraries(mdnsniff PUBLIC SceSysmodule_stub SceNet_stub SceNetCtl_stub SceCtrl_stub SceDisplay_stub)
 endif()

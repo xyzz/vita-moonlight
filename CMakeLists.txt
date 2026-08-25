@@ -1,6 +1,5 @@
-
 cmake_minimum_required(VERSION 3.10)
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON CACHE BOOL "Generate compile_commands.json for LSPs" )
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON CACHE BOOL "Generate compile_commands.json for LSPs" FORCE)
 
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/PrepareBorealis.cmake)
 prepare_borealis(MOONLIGHT_BOREALIS_SOURCE
@@ -16,29 +15,18 @@ cmake_dependent_option(USE_SYSTEM_FMT "" OFF "NOT USE_SHARED_LIB" ON)
 cmake_dependent_option(USE_SYSTEM_TINYXML2 "" OFF "NOT USE_SHARED_LIB" ON)
 cmake_dependent_option(USE_SYSTEM_TWEENY "" OFF "NOT USE_SHARED_LIB" ON)
 
-## Soporte solo para Windows y PSVita
-
 include(${BOREALIS_LIBRARY}/cmake/toolchain.cmake)
 
 project(moonlight)
 
-# Asegurar que la exportación de compile_commands esté activada para LSPs
-# (esto fuerza la variable activa en la configuración actual, no solo en la cache).
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+# Keep editor tooling independent of the active host-specific build directory.
+add_custom_target(export-compile-commands ALL
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${CMAKE_BINARY_DIR}/compile_commands.json
+        ${CMAKE_SOURCE_DIR}/compile_commands.json
+    COMMENT "Copying compile_commands.json to the repository root"
+)
 
-# Copiar compile_commands.json al raíz del fuente para que editores/LSP lo
-# encuentren sin necesidad de configurar rutas a la carpeta de build.
-if(CMAKE_EXPORT_COMPILE_COMMANDS)
-    add_custom_target(export-compile-commands ALL
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            ${CMAKE_BINARY_DIR}/compile_commands.json
-            ${CMAKE_SOURCE_DIR}/compile_commands.json
-        COMMENT "Copiando compile_commands.json a la raíz del repo"
-    )
-endif()
-
-## Forzar rutas de OpenSSL para MinGW/Windows y PS Vita (antes de cualquier add_subdirectory o find_package)
-message(STATUS "CMAKE_CXX_COMPILER_ID: ${CMAKE_CXX_COMPILER_ID}")
 if(WIN32)
   set(OPENSSL_ROOT_DIR "${CMAKE_SOURCE_DIR}/openssl-mingw" CACHE PATH "" FORCE)
   set(OPENSSL_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/openssl-mingw/include" CACHE PATH "" FORCE)
@@ -46,7 +34,7 @@ if(WIN32)
   set(OPENSSL_SSL_LIBRARY "${CMAKE_SOURCE_DIR}/openssl-mingw/lib/libssl.a" CACHE FILEPATH "" FORCE)
   set(OPENSSL_LIBRARIES "${OPENSSL_CRYPTO_LIBRARY};${OPENSSL_SSL_LIBRARY}" CACHE STRING "" FORCE)
 elseif(PLATFORM_PSV)
-  # Para PS Vita, usar OpenSSL del sistema (igual que moonlight-legacy)
+  # VitaSDK provides OpenSSL for dependencies such as curl.
   set(OPENSSL_ROOT_DIR "$ENV{VITASDK}/arm-vita-eabi" CACHE PATH "" FORCE)
   set(OPENSSL_INCLUDE_DIR "$ENV{VITASDK}/arm-vita-eabi/include" CACHE PATH "" FORCE)
   set(OPENSSL_CRYPTO_LIBRARY "$ENV{VITASDK}/arm-vita-eabi/lib/libcrypto.a" CACHE FILEPATH "" FORCE)
@@ -68,7 +56,6 @@ if (USE_LIBROMFS)
     add_libromfs(${PROJECT_NAME} ${PROJECT_RESOURCES})
 endif ()
 
-# Always use MbedTLS instead of OpenSSL
 set(USE_MBEDTLS ON CACHE BOOL "Use MbedTLS instead of OpenSSL" FORCE)
 
 add_subdirectory(third_party)
@@ -80,54 +67,25 @@ if(PLATFORM_PSV)
     endif()
 endif()
 
-# Build ffmpeg module as an independent target and link it into the exe.
-# Exclude its sources from the global MAIN_SRC glob below so we don't compile
-# the same files twice into the executable.
-# Note: ffmpeg sources are built as part of the global source tree now
-# (we avoid internal CMakeLists under moonlight/src/video to simplify maintenance)
-
 find_package(Threads REQUIRED)
 list(APPEND APP_PLATFORM_LIB ${CMAKE_THREAD_LIBS_INIT})
-
-# setting src and include
 
 list(APPEND APP_PLATFORM_INCLUDE ${CMAKE_CURRENT_SOURCE_DIR}/moonlight/include)
 list(APPEND APP_PLATFORM_INCLUDE ${CMAKE_CURRENT_SOURCE_DIR}/moonlight/src/video)
 
-# Option to enable/disable building the bundled FFmpeg integration
-set(BUILD_FFMPEG ON)
-
-# Collect main sources: glob all and exclude ffmpeg subtree if BUILD_FFMPEG is OFF.
-file(GLOB_RECURSE _ALL_SRC RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} moonlight/*.cpp)
+file(GLOB_RECURSE _ALL_SRC CONFIGURE_DEPENDS RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} moonlight/*.cpp)
 set(MAIN_SRC)
-
-# NOTE: wiliwili builds FFmpeg externally for PSVita and links precompiled
-# static archives from the VITASDK sysroot. To avoid mixing in-tree FFmpeg
-# sources with prebuilt FFmpeg archives (which may use different compile
-# flags for ABI/FPU), exclude the FFmpeg subtree from the global source
-# glob. When BUILD_FFMPEG is enabled we prefer linking the prebuilt
-# archives under $VITASDK/arm-vita-eabi/lib; if those archives are missing
-# the user must either install/build FFmpeg for Vita in the sysroot or
-# disable BUILD_FFMPEG.
-# Exclude nothing, compile everything including FFmpeg module
-
 foreach(_f IN LISTS _ALL_SRC)
     list(APPEND MAIN_SRC "${CMAKE_CURRENT_SOURCE_DIR}/${_f}")
 endforeach()
 
-# If BUILD_FFMPEG is enabled, prefer linking prebuilt FFmpeg archives from the
-# VITASDK sysroot. Warn if the archives are missing. Note: we still compile
-# our integration glue (moonlight/src/video/ffmpeg/*.cpp) from source because
-# those implement the `ffmpeg_video_*` functions used by the project.
-if(NOT EXISTS "$ENV{VITASDK}/arm-vita-eabi/lib/libavcodec.a")
-    message(WARNING "No FFmpeg static libs found in VITASDK sysroot; please install/build FFmpeg for Vita into $ENV{VITASDK}/arm-vita-eabi/lib.")
-else()
-    message(STATUS "Prebuilt FFmpeg libs found in VITASDK sysroot; linking against them.")
+if(PLATFORM_PSV)
+    if(NOT EXISTS "$ENV{VITASDK}/arm-vita-eabi/lib/libavcodec.a")
+        message(FATAL_ERROR "FFmpeg-vita is missing from the VitaSDK sysroot. Run scripts/prepare/install_all.sh first.")
+    endif()
+    message(STATUS "FFmpeg-vita found in the VitaSDK sysroot")
 endif()
-# Nota: NetworkOptimizations.cpp añadido en moonlight/src/network/ queda incluido por el GLOB anterior.
-# Si se desea desactivar en runtime se expone vita_netopt_set_enabled().
 add_definitions(-DVITA_NETOPT_ENABLED)
-# vita.cpp se movió a video/legacy/vita.cpp y ya entra en el glob
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/moonlight/src/video/legacy)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/moonlight/src/video/ffmpeg)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/moonlight/src/video/ffmpeg/modules)
@@ -150,7 +108,6 @@ elseif (PLATFORM_PSV)
     add_definitions(-DUSE_MBEDTLS_CRYPTO)
 endif ()
 
-# Configuración de curl y OpenSSL para MinGW/Windows y PS Vita
 if(WIN32)
     include_directories(SYSTEM /usr/x86_64-w64-mingw32/include)
     link_directories(/usr/x86_64-w64-mingw32/lib)
@@ -168,10 +125,8 @@ endif()
 program_target(${PROJECT_NAME} "${MAIN_SRC}")
 set_target_properties(${PROJECT_NAME} PROPERTIES CXX_STANDARD 17)
 
-# Expose BUILD_FFMPEG macro to sources so we can guard FFmpeg-specific code
-target_compile_definitions(${PROJECT_NAME} PRIVATE BUILD_FFMPEG=1 USE_MBEDTLS)
+target_compile_definitions(${PROJECT_NAME} PRIVATE USE_MBEDTLS)
 
-# Envolver LiRequestIdrFrame para redirigir a optimizaciones de red
 if (PLATFORM_PSV)
     target_link_options(${PROJECT_NAME} PRIVATE -Wl,--wrap=LiRequestIdrFrame -Wl,-z,noexecstack -Wl,--allow-multiple-definition)
     target_compile_options(${PROJECT_NAME} PRIVATE -pthread)
@@ -219,14 +174,9 @@ elseif (PLATFORM_PSV)
     endif()
 endif ()
 
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/third_party/inih)
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/third_party/moonlight-common-c/reedsolomon)
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/third_party/moonlight-common-c/src)
-
 target_include_directories(${PROJECT_NAME} PRIVATE moonlight ${APP_PLATFORM_INCLUDE} ${CMAKE_SOURCE_DIR}/third_party ${CMAKE_SOURCE_DIR}/third_party/moonlight-common-c/reedsolomon ${CMAKE_SOURCE_DIR}/third_party/moonlight-common-c/src)
 
-# Incluye los headers principales, crypto y gamestream para todo el proyecto
-target_include_directories(${PROJECT_NAME} PUBLIC
+target_include_directories(${PROJECT_NAME} PRIVATE
     moonlight/include
     moonlight/src
     moonlight/src/crypto
@@ -236,9 +186,8 @@ target_compile_options(${PROJECT_NAME} PRIVATE -ffunction-sections -fdata-sectio
 target_link_libraries(${PROJECT_NAME} PRIVATE borealis ${APP_PLATFORM_LIB} inih mdnsniff gamestream moonmic moonbeam)
 
 if(PLATFORM_PSV)
-    # Enlaza todas las librerías de PSVita necesarias (igual que moonlight-legacy)
-    # curl del sysroot puede venir con backend OpenSSL (openssl.c.obj), incluso
-    # cuando BUILD_FFMPEG=ON. Enlazamos ssl+crypto para cubrir ambos casos.
+    # The sysroot curl package uses OpenSSL, while the application crypto
+    # backend uses mbedTLS.
     set(CRYPTO_LIBS -lssl -lcrypto)
     target_link_libraries(${PROJECT_NAME} PRIVATE
         -lSceVshBridge_stub
@@ -271,7 +220,6 @@ if(PLATFORM_PSV)
         -lfreetype
         -lpng
         -ljpeg
-        -lz
         -lc
         inih
         mdnsniff
@@ -292,21 +240,6 @@ if(PLATFORM_PSV)
     elseif (EXISTS "$ENV{VITASDK}/arm-vita-eabi/lib/libmbedcrypto.a")
         target_link_libraries(${PROJECT_NAME} PRIVATE -lmbedtls -lmbedx509 -lmbedcrypto)
     endif()
-    include_directories(
-    include/
-    moonlight/include
-    moonlight/src
-    third_party/moonlight-common-c/src/
-    third_party/moonlight-common-c/reedsolomon/
-    third_party/gamestream/
-    third_party/h264bitstream/
-    third_party/enet/include/
-    third_party/inih/
-    third_party/mdnsniff/
-)
-    # Si FFmpeg-vita está instalado en el sysroot, enlazar sus bibliotecas para
-    # resolver símbolos usados por los sources FFmpeg que ahora se compilan
-    # dentro del árbol global de fuentes.
     if (EXISTS "$ENV{VITASDK}/arm-vita-eabi/lib/libavcodec.a")
         message(STATUS "Linking FFmpeg libs from VITASDK sysroot (absolute paths)")
         set(FFMPEG_LIB_DIR "$ENV{VITASDK}/arm-vita-eabi/lib")
@@ -337,13 +270,8 @@ if(PLATFORM_PSV)
     endif()
 endif()
 
-# Enlace de librerías para Windows (sin expat/XML, usando inih, emparejamiento requiere OpenSSL)
 if(WIN32)
- # Asegura que el linker busque en la ruta de MinGW para expat y otras libs
     target_link_directories(${PROJECT_NAME} PRIVATE /usr/x86_64-w64-mingw32/lib)
-    #
-    # El orden de las librerías es crítico en MinGW/Windows
-    # Enlazamos contra los import libraries (.dll.a) de OpenSSL y curl
     target_link_libraries(${PROJECT_NAME} PRIVATE
         borealis
         ${APP_PLATFORM_LIB}
@@ -368,7 +296,6 @@ if(WIN32)
         ${CMAKE_SOURCE_DIR}/openssl-mingw/lib/libcrypto.a
         ${CMAKE_SOURCE_DIR}/openssl-mingw/lib/libcurl.dll.a
     )
-    # Copia las DLLs de OpenSSL y libcurl al directorio de salida tras compilar
     add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
             "${CMAKE_SOURCE_DIR}/openssl-mingw/bin/libssl-1_1-x64.dll"
@@ -390,5 +317,3 @@ if(WIN32)
             $<TARGET_FILE_DIR:${PROJECT_NAME}>
     )
 endif()
-
-# (La exportación de compile_commands.json ya se fuerza más arriba)

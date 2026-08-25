@@ -5,20 +5,6 @@ cd "$(dirname "$0")" || exit 1
 # shellcheck source=scripts/vita-host.sh
 source "scripts/vita-host.sh"
 
-vita_host_init || exit 1
-
-IP_FILE="$(pwd)/ip_vita.txt"
-if [ ! -f "$IP_FILE" ]; then
-    echo "[makefast] ip_vita.txt not found." >&2
-    exit 1
-fi
-PSVITAIP="$(head -n1 "$IP_FILE" | tr -d '\r\n')"
-TITLEID="$(vita_title_id)"
-if [ -z "$TITLEID" ]; then
-    echo "[makefast] Could not read PSN_TITLE_ID from CMakeLists.txt." >&2
-    exit 1
-fi
-
 BUILD_TYPE="Release"
 USE_GXM="ON"
 DO_DEPLOY=1
@@ -29,13 +15,21 @@ for arg in "$@"; do
         gl|--gl) USE_GXM="OFF" ;;
         gxm|--gxm) USE_GXM="ON" ;;
         nodeploy|--no-deploy) DO_DEPLOY=0 ;;
-        *) echo "[makefast] Ignoring unknown argument: $arg" ;;
+        -h|--help)
+            cat <<'EOF'
+Usage: ./makefast [--gxm|--gl] [--debug|--release] [--no-deploy]
+EOF
+            exit 0
+            ;;
+        *) echo "[makefast] Unknown option: $arg" >&2; exit 2 ;;
     esac
 done
 
+vita_host_init || exit 1
+
 backend_suffix="gxm"
 [ "$USE_GXM" = "OFF" ] && backend_suffix="gl"
-BUILD_DIR="cmake-build-psv-${VITA_BUILD_SUFFIX}-${backend_suffix}"
+BUILD_DIR="$(vita_build_directory "$backend_suffix")"
 EBOOT_PATH="$BUILD_DIR/moonlight.self"
 
 vita_require_tools cmake git make pkg-config curl sed grep || exit 2
@@ -45,38 +39,11 @@ vita_print_environment
 echo "[makefast] Build dir: $BUILD_DIR"
 echo "[makefast] Build type: $BUILD_TYPE"
 
-if [ "$BUILD_TYPE" = "Debug" ]; then
-    export CFLAGS="${CFLAGS:-} -O0 -g -fno-omit-frame-pointer -ffunction-sections -fdata-sections"
-    export CXXFLAGS="${CXXFLAGS:-} -O0 -g -fno-omit-frame-pointer -ffunction-sections -fdata-sections"
-else
-    export CFLAGS="${CFLAGS:-} -O2 -g0 -ffunction-sections -fdata-sections"
-    export CXXFLAGS="${CXXFLAGS:-} -O2 -g0 -ffunction-sections -fdata-sections"
-fi
-export LDFLAGS="${LDFLAGS:-} -Wl,--gc-sections"
+vita_set_build_flags "$BUILD_TYPE"
 
 vita_reset_stale_cmake_cache "$BUILD_DIR" || exit 3
 
-host_cmake_args=()
-if [ -n "${VITA_PKG_CONFIG_EXECUTABLE:-}" ]; then
-    host_cmake_args+=("-DPKG_CONFIG_EXECUTABLE=$VITA_PKG_CONFIG_EXECUTABLE")
-fi
-
-cmake -S . -B "$BUILD_DIR" -G "$VITA_CMAKE_GENERATOR" \
-    -DPLATFORM_PSV=ON \
-    -DUSE_SYSTEM_CURL=ON \
-    -DUSE_SYSTEM_SDL2=ON \
-    -DMPV_NO_FB=ON \
-    -DSIMPLE_HIGHLIGHT=ON \
-    -DUSE_GXM="$USE_GXM" \
-    -DUSE_VITA_SHARK=OFF \
-    -DCMAKE_BUILD_TYPE="$BUILD_TYPE" \
-    -DCMAKE_TOOLCHAIN_FILE="$VITASDK/share/vita.toolchain.cmake" \
-    -DCMAKE_FIND_ROOT_PATH="$VITASDK/arm-vita-eabi" \
-    -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER \
-    -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY \
-    -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY \
-    -DCMAKE_FIND_ROOT_PATH_MODE_PACKAGE=ONLY \
-    "${host_cmake_args[@]}" || exit 3
+vita_configure_project . "$BUILD_DIR" "$BUILD_TYPE" "$USE_GXM" || exit 3
 
 cmake --build "$BUILD_DIR" --parallel "$VITA_BUILD_JOBS" || exit 4
 
@@ -87,6 +54,22 @@ fi
 
 echo "[makefast] Build successful: $EBOOT_PATH"
 [ "$DO_DEPLOY" -eq 0 ] && exit 0
+
+IP_FILE="$(pwd)/ip_vita.txt"
+if [ ! -f "$IP_FILE" ]; then
+    echo "[makefast] ip_vita.txt not found. Copy ip_vita.txt.example and set the Vita address." >&2
+    exit 6
+fi
+PSVITAIP="$(head -n1 "$IP_FILE" | tr -d '\r\n')"
+if [ -z "$PSVITAIP" ]; then
+    echo "[makefast] ip_vita.txt is empty." >&2
+    exit 6
+fi
+TITLEID="$(vita_title_id)"
+if [ -z "$TITLEID" ]; then
+    echo "[makefast] Could not read PSN_TITLE_ID from CMakeLists.txt." >&2
+    exit 6
+fi
 
 if ! vita_ping "$PSVITAIP"; then
     echo "[makefast] Vita is not reachable at $PSVITAIP" >&2

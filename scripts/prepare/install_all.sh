@@ -20,7 +20,7 @@ Vita pixel formats used by the low-latency decoder path.
 Use --with-pvr only when the GLES/SDL2 backend is needed. The normal GXM
 backend does not require PVR_PSP2.
 
-Linux and Windows/MSYS2 are supported. WSL is intentionally not used.
+Linux, WSL and Windows/MSYS2 are supported.
 EOF
 }
 

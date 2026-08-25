@@ -3,11 +3,14 @@ set -euo pipefail
 
 ROOTDIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOTDIR"
+source "${ROOTDIR}/scripts/vita-host.sh"
+vita_host_init || exit 1
+BUILD_DIR="$(vita_build_directory "${VITA_BACKEND:-gxm}")"
 
 DUMP_SCRIPT="./dump_psp2core.sh"
 # Prefer the unstripped ELF produced by the build (contains DWARF).
-VELF_UNPACKED="${ROOTDIR}/cmake-build-psv/moonlight_vita"
-VELF_PKG="${ROOTDIR}/cmake-build-psv/moonlight.velf"
+VELF_UNPACKED="${BUILD_DIR}/moonlight_vita"
+VELF_PKG="${BUILD_DIR}/moonlight.velf"
 if [ -f "$VELF_UNPACKED" ]; then
     SYMFILE="$VELF_UNPACKED"
 elif [ -f "$VELF_PKG" ]; then
@@ -16,7 +19,6 @@ else
     SYMFILE=""
 fi
 
-VELF_PKG="${ROOTDIR}/cmake-build-psv/moonlight.velf"
 OUTDIR="dump-analysis"
 # Ensure single output dir (overwrite)
 rm -rf "$OUTDIR"

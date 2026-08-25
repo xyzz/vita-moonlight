@@ -6,21 +6,28 @@
 
 set -e
 
-# Configuración
-# Leer IP desde ip_vita.txt si existe, si no usar valor por defecto
-IP_FILE="$(dirname "$0")/ip_vita.txt"
-if [ -f "$IP_FILE" ]; then
-    FTP_HOST=$(head -n 1 "$IP_FILE" | tr -d '\r\n')
-else
-    FTP_HOST="192.168.0.192"
+ROOTDIR="$(cd "$(dirname "$0")" && pwd)"
+source "${ROOTDIR}/scripts/vita-host.sh"
+vita_host_init || exit 1
+BUILD_DIR="$(vita_build_directory "${VITA_BACKEND:-gxm}")"
+
+IP_FILE="${ROOTDIR}/ip_vita.txt"
+if [ ! -f "$IP_FILE" ]; then
+    echo "ip_vita.txt not found. Copy ip_vita.txt.example and set the Vita address." >&2
+    exit 1
+fi
+FTP_HOST="$(head -n 1 "$IP_FILE" | tr -d '\r\n')"
+if [ -z "$FTP_HOST" ]; then
+    echo "ip_vita.txt is empty." >&2
+    exit 1
 fi
 FTP_PORT="1337"
 FTP_USER="anonymous"
 FTP_PASS="anonymous"
 FTP_PATH="ux0:/data"
 LOCAL_TMP="psp2core_tmp.psp2dmp"
-PARSE_CORE="./reference/vita-parse-core/vita-parse-core"
-MOONLIGHT_BIN="./cmake-build-psv/moonlight.velf"
+PARSE_CORE="${ROOTDIR}/reference/vita-parse-core/vita-parse-core"
+MOONLIGHT_BIN="${BUILD_DIR}/moonlight.velf"
 
 # 1. Listar archivos psp2core-*.psp2dmp en la Vita
 FILE_LIST=$(curl -s --user "$FTP_USER:$FTP_PASS" "ftp://$FTP_HOST:$FTP_PORT/$FTP_PATH/" | grep 'psp2core-.*.psp2dmp' | awk '{print $NF}')

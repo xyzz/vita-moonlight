@@ -688,6 +688,7 @@ void ControllerInputManager::setGamepadType(GamepadType type)
     vita_log::info("[ControllerInput] Cambiando tipo de gamepad a %d (%s)",
         (int)type, (type == GAMEPAD_TYPE_PS4) ? "PS4" : "XBOX");
 
+    // Sunshine applies a new controller type only after a disconnect.
     vita_log::info("[ControllerInput] Desconectando controlador para cambio de tipo...");
     if (LiSendMultiControllerEvent(0, 0, 0, 0, 0, 0, 0, 0, 0) != 0)
     {
@@ -696,8 +697,12 @@ void ControllerInputManager::setGamepadType(GamepadType type)
 
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
-    uint8_t liType                = (type == GAMEPAD_TYPE_PS4) ? 0x02 : 0x01;
-    uint16_t capabilities         = 0x01 | 0x02; // ANALOG_TRIGGERS | RUMBLE
+    uint8_t liType        = (type == GAMEPAD_TYPE_PS4) ? 0x02 : 0x01;
+    uint16_t capabilities = LI_CCAP_ANALOG_TRIGGERS | LI_CCAP_RUMBLE;
+    if (type == GAMEPAD_TYPE_PS4)
+    {
+        capabilities |= LI_CCAP_TOUCHPAD;
+    }
     uint32_t supportedButtonFlags = 0xFFFFFFFF; // All buttons
 
     vita_log::info("[ControllerInput] Reconectando controlador con nuevo tipo (LI_CTYPE=%d)...", liType);
@@ -713,6 +718,25 @@ void ControllerInputManager::setGamepadType(GamepadType type)
     GamepadState zeroState = { 0 };
     sendGamepadState(zeroState);
 }
+
+void ControllerInputManager::setTouchscreenMode(int mode)
+{
+    if (mode < TOUCHSCREEN_MODE_OFF || mode > TOUCHSCREEN_MODE_TABLET)
+    {
+        mode = TOUCHSCREEN_MODE_TRACKPAD;
+    }
+
+    if (!touchManager || !touchManager->setTouchMode(mode, static_cast<int>(currentGamepadType)))
+    {
+        mode = TOUCHSCREEN_MODE_TRACKPAD;
+        if (touchManager)
+        {
+            touchManager->setTouchMode(mode, static_cast<int>(currentGamepadType));
+        }
+    }
+    touchscreenMode = mode;
+}
+
 void ControllerInputManager::setRearTouchEnabled(bool enabled)
 {
     if (rearTouchManager)

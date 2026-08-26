@@ -39,7 +39,7 @@ class ControllerInputManager
 
     void setInputEnabled(bool enabled);
 
-    void setTouchscreenMode(int mode) { touchscreenMode = mode; }
+    void setTouchscreenMode(int mode);
 
     bool setTouchscreenModeWithValidation(int newMode);
 

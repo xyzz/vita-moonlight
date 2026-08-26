@@ -1,4 +1,3 @@
-#include <psp2/kernel/processmgr.h>
 #include <psp2/kernel/threadmgr.h>
 
 #include <atomic>
@@ -17,7 +16,6 @@ bool s_active     = false;
 std::atomic<SceUID> s_frameSema { -1 };
 
 uint32_t s_frameBudgetUs = 0;
-uint32_t s_lastWakeUs    = 0;
 
 void pace_callback()
 {
@@ -28,16 +26,10 @@ void pace_callback()
     if (sema < 0)
         return;
 
-    uint32_t now     = (uint32_t)sceKernelGetProcessTimeLow();
-    uint32_t elapsed = now - s_lastWakeUs;
-
-    if (elapsed < s_frameBudgetUs)
-    {
-        SceUInt timeout = (SceUInt)(s_frameBudgetUs - elapsed);
-        sceKernelWaitSema(sema, 1, &timeout);
-    }
-
-    s_lastWakeUs = (uint32_t)sceKernelGetProcessTimeLow();
+    // Decoder publication drives normal rendering. The timeout only keeps UI
+    // input and animations responsive if the stream stalls.
+    SceUInt timeout = (SceUInt)(s_frameBudgetUs * 2);
+    sceKernelWaitSema(sema, 1, &timeout);
 }
 
 } // namespace
@@ -71,7 +63,6 @@ extern "C"
         }
 
         s_frameBudgetUs = (uint32_t)(1000000 / paceFps);
-        s_lastWakeUs    = (uint32_t)sceKernelGetProcessTimeLow();
 
         brls::Application::setLimitedFPS(0);
 
@@ -79,8 +70,8 @@ extern "C"
         s_subscribed = true;
         s_active     = true;
 
-        vita_log::info("[FramePacer] active: frame-driven wakeup, cap=%d fps (budget=%u us)",
-            paceFps, s_frameBudgetUs);
+        vita_log::info("[FramePacer] active: frame-driven wakeup, target=%d fps (idle=%u us)",
+            paceFps, s_frameBudgetUs * 2);
     }
 
     void vita_frame_pacer_stop(int restoreFps)

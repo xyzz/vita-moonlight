@@ -45,11 +45,7 @@ static FFmpegVideoContext* g_ffmpeg_context = nullptr;
 static std::mutex g_ffmpeg_mutex;
 static std::atomic<int> g_active_decodes { 0 };
 static std::atomic<bool> g_ffmpeg_stop_request { false };
-static uint32_t g_ffmpeg_submit_counter = 0;
-static unsigned g_ffmpeg_frame_index    = 0;
-
-// Defined in VideoManager.cpp with C++ linkage
-extern bool g_debug_log_enabled;
+static unsigned g_ffmpeg_frame_index = 0;
 
 static inline void wait_for_borealis_gxm_idle()
 {
@@ -1283,15 +1279,6 @@ static bool publish_frame(FFmpegVideoContext* ctx, AVFrame* frame, uint64_t ptsU
 
     uint32_t publishStartUs = perf_now_us();
 
-    static uint32_t s_publish_log_counter = 0;
-    bool verbosePublishLog                = g_debug_log_enabled && ((s_publish_log_counter++ % 1200) == 0);
-    if (verbosePublishLog)
-    {
-        VITA_DEBUG_LOG("[FFMPEG] publish_frame: pts=%llu format=%d %dx%d direct_render=%d",
-            (unsigned long long)ptsUs, frame->format, frame->width, frame->height,
-            ctx->decoder.use_direct_render ? 1 : 0);
-    }
-
     bool published       = false;
     uint32_t pubDirectUs = 0, pubSwUs = 0;
 #ifdef BOREALIS_USE_GXM
@@ -1413,13 +1400,6 @@ static bool publish_frame(FFmpegVideoContext* ctx, AVFrame* frame, uint64_t ptsU
     g_perf.slots_mutex_total_us += slotsMtxUs;
     if (slotsMtxUs > g_perf.slots_mutex_max_us)
         g_perf.slots_mutex_max_us = slotsMtxUs;
-    if (verbosePublishLog)
-    {
-        VITA_DEBUG_LOG("[FFMPEG][PUB] total=%uus direct=%uus sw=%uus slots_mtx=%uus using_dm=%d",
-            publishTotalUs, pubDirectUs, pubSwUs, slotsMtxUs,
-            ctx->using_direct_memory ? 1 : 0);
-    }
-
     VitaSession::onFrameDecoded();
     return true;
 }
@@ -1694,8 +1674,7 @@ extern "C"
         need_drop          = 0;
         g_stats.target_fps = redrawRate > 0 ? (uint32_t)redrawRate : 60;
         vita_netopt_set_target_fps(g_stats.target_fps);
-        g_ffmpeg_submit_counter = 0;
-        g_ffmpeg_frame_index    = 0;
+        g_ffmpeg_frame_index = 0;
 
         if (ffmpeg_decoder_init(&context->decoder) < 0)
         {
@@ -1892,12 +1871,6 @@ extern "C"
             }
         }
 
-        bool verboseDecodeLog = g_debug_log_enabled && ((g_ffmpeg_submit_counter % 600) == 0);
-        if (verboseDecodeLog)
-        {
-            VITA_DEBUG_LOG("[FFMPEG] submit_decode_unit: size=%d pts=%llu", decodeUnit->fullLength, (unsigned long long)decodeUnit->presentationTimeUs);
-        }
-
         uint32_t lockStartUs = perf_now_us();
         std::unique_lock<std::mutex> lock(g_ffmpeg_mutex);
         lockWaitUs = perf_now_us() - lockStartUs;
@@ -1939,10 +1912,6 @@ extern "C"
             while (true)
             {
                 int drain = avcodec_receive_frame(avctx, s_drain_frame);
-                if (verboseDecodeLog)
-                {
-                    VITA_DEBUG_LOG("[FFMPEG] avcodec_receive_frame drain ret=%d", drain);
-                }
                 if (drain == AVERROR(EAGAIN) || drain == AVERROR_EOF)
                 {
                     break;
@@ -1979,12 +1948,6 @@ extern "C"
         }
         drainUs = perf_now_us() - drainStartUs;
 
-        if (verboseDecodeLog)
-        {
-            VITA_DEBUG_LOG("[FFMPEG] after drain loop");
-            VITA_DEBUG_LOG("[FFMPEG] before av_new_packet size=%d", decodeUnit->fullLength);
-            VITA_DEBUG_LOG("[FFMPEG] pkt=%p avctx=%p frame=%p", pkt, avctx, frame);
-        }
         uint32_t copyStartUs = perf_now_us();
         if (av_new_packet(pkt, decodeUnit->fullLength + 256) < 0)
         {
@@ -1994,11 +1957,6 @@ extern "C"
             finalize_submit_metrics();
             return DR_NEED_IDR;
         }
-        if (verboseDecodeLog)
-        {
-            VITA_DEBUG_LOG("[FFMPEG] av_new_packet ok, pkt->data=%p", pkt->data);
-        }
-
         uint8_t* dst    = pkt->data;
         uint32_t offset = 0;
         PLENTRY entry   = decodeUnit->bufferList;
@@ -2008,12 +1966,7 @@ extern "C"
             {
                 if (g_sps_ctx)
                 {
-                    uint32_t before = offset;
                     g_sps_ctx->fix(entry, GS_SPS_BITSTREAM_FIXUP, dst, &offset);
-                    if (verboseDecodeLog)
-                    {
-                        VITA_DEBUG_LOG("[FFMPEG][SPS] Fix aplicado (in=%u out=%u)", entry->length, (unsigned)(offset - before));
-                    }
                 }
                 else
                 {
@@ -2046,10 +1999,6 @@ extern "C"
         int sendRes          = avcodec_send_packet(avctx, pkt);
         sendUs               = perf_now_us() - sendStartUs;
         av_packet_unref(pkt);
-        if (verboseDecodeLog)
-        {
-            VITA_DEBUG_LOG("[FFMPEG] after send_packet res=%d", sendRes);
-        }
         if (sendRes < 0 && sendRes != AVERROR(EAGAIN))
         {
             vita_log::error("[FFMPEG] send_packet error=0x%X", sendRes);
@@ -2069,10 +2018,6 @@ extern "C"
             while (true)
             {
                 int ret = avcodec_receive_frame(avctx, s_recv_frame);
-                if (verboseDecodeLog)
-                {
-                    VITA_DEBUG_LOG("[FFMPEG] avcodec_receive_frame ret=%d", ret);
-                }
                 if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF)
                 {
                     break;
@@ -2136,7 +2081,6 @@ extern "C"
             av_frame_unref(frame);
         }
 
-        g_ffmpeg_submit_counter++;
         process_pending_vram_frees_if_safe();
         finalize_submit_metrics();
         perf_report_if_due();

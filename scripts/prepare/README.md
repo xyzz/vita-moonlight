@@ -1,88 +1,93 @@
-# Prepare scripts — building Vita dependencies
+# Vita dependency setup
 
-This folder contains helper packaging manifests and scripts used to build
-and install PS Vita libraries required by the project: `mbedtls`, `ffmpeg`,
-`sdl2` and `curl`.
+`install_all.sh` installs the libraries required by Moonlight into the active
+VitaSDK sysroot. It supports native Linux, WSL and Windows/MSYS2.
 
-There are two main entry points you can use depending on your environment:
+The script installs standard packages through VDPM and builds the project-specific
+FFmpeg-vita package. This FFmpeg fork provides the `h264_vita` decoder and Vita
+pixel formats used by the low-latency video path.
 
-- `scripts/prepare/install_all.sh` — a convenience script that runs
-  `vita-makepkg` and installs the produced `*-arm.tar.xz` packages with
-  `vdpm`. It is intended to be run inside the same environment used by the
-  repository Dockerfiles (see below), or on a host that already has
-  `vita-makepkg`, `vdpm` and a correctly configured `$VITASDK`.
+## Requirements
 
-- Dockerfiles: `scripts/prepare/Dockerfile` and `scripts/prepare/gxm.Dockerfile`
-  reproduce the packaging environment used during development. Running the
-  container created from those Dockerfiles is the recommended way to build
-  packages reproducibly.
-
-Prerequisites
--------------
-
-- A VITASDK installation. The `VITASDK` environment variable must point to
-  the toolchain root (for example `/usr/local/vitasdk`).
-- `vita-makepkg` available in PATH and `vdpm` available in PATH (both are
-  included in the Dockerfiles used here).
-- Sufficient disk space and build toolchain (cmake, make, patch, etc.)
-
-Quick usage (host)
--------------------
-
-This runs the small orchestrator script on the host. It expects `VITASDK`,
-`vita-makepkg` and `vdpm` to be present in your environment.
+Set `VITASDK` before running the script:
 
 ```bash
-export VITASDK=/path/to/your/vitasdk
-cd /path/to/vita-moonlight
-scripts/prepare/install_all.sh --curl-backend=mbedtls
+export VITASDK=/usr/local/vitasdk
+export PATH="$VITASDK/bin:$PATH"
 ```
 
-By default the script builds `curl` with the `mbedtls` backend (this matches
-the default configuration used for `ffmpeg` in this repository). If you
-need `curl` compiled against OpenSSL instead, pass `--curl-backend=openssl`:
+The SDK must provide `vita-makepkg` and `vdpm`. The host also needs Bash, CMake,
+Make, Git, curl, unzip, bsdtar, pkg-config, fakeroot, patch and the standard Unix
+text utilities.
+
+### Linux and WSL
+
+On Debian or Ubuntu:
 
 ```bash
-scripts/prepare/install_all.sh --curl-backend=openssl
+sudo apt update
+sudo apt install build-essential cmake ninja-build git curl wget unzip \
+    libarchive-tools pkg-config fakeroot patch python3 bzip2 xz-utils
 ```
 
-This will create a temporary copy of the `scripts/prepare/curl` package,
-modify the `VITABUILD` to enable OpenSSL and then build and install the
-resulting package.
-
-Using Docker (recommended)
---------------------------
-
-The included Dockerfiles provide an environment with `vita-makepkg`, `vdpm`
-and the necessary build tools. A simple workflow is:
+For WSL, install VitaSDK inside the Linux distribution. A VitaSDK copied from
+Windows is not supported because its host tools target a different environment.
+When the repository is under `/mnt`, set `VITA_BUILD_ROOT` to a directory in the
+Linux filesystem to avoid slow incremental builds:
 
 ```bash
-# build the image (uses the default Dockerfile)
-docker build -t vita-builder -f scripts/prepare/Dockerfile .
-
-# run a shell in the container and share the repo (the container's entrypoint
-# will run commands you provide). This mounts the current repository into /src
-docker run --rm -it -v "$(pwd)":/src vita-builder \
-  "/src/scripts/prepare/install_all.sh --curl-backend=mbedtls"
+export VITA_BUILD_ROOT="$HOME/.cache/vita-moonlight-build"
 ```
 
-If you need the GXM-specific packages (GXM renderer), use `gxm.Dockerfile` to
-build the image and run the same command inside it.
+### Windows/MSYS2
 
-Notes and troubleshooting
--------------------------
+Use the MSYS2 `MSYS` shell:
 
-- If `vita-makepkg` fails, inspect the package folder (`scripts/prepare/<pkg>`)
-  and run `vita-makepkg` manually to view full logs.
-- Building with OpenSSL may require OpenSSL static archives or headers to be
-  discoverable by the Vita toolchain; ensure your environment or the Docker
-  image contains the required OpenSSL artifacts.
-- The script tries to run `./install_psv2` (if present in the repository root)
-  to install PVR/PVR_PSP2 stubs required by some SDL2 builds. If you rely on
-  GXM or PVR, keep `install_psv2` available and executable.
+```bash
+pacman -S --needed make git curl wget unzip libarchive cmake ninja pkgconf \
+    patch python diffutils sed grep findutils tar
+```
 
-If anything fails or you want the script to be more automated for your
-specific environment (for example apply more VITABUILD edits or pass custom
-cmake flags), open an issue/PR or ask here and I can adjust the script.
+The repository includes the MSYS2 fakeroot compatibility wrapper used by
+`vita-makepkg`. The scripts also repair missing SDK compatibility symlinks when
+Windows cannot create them.
 
-License: project license applies.
+## Install dependencies
+
+```bash
+./scripts/prepare/install_all.sh
+```
+
+Installed VDPM packages include zlib, bzip2, expat, curl, OpenSSL, Opus,
+libvita2d, FreeType, libpng, libjpeg-turbo, zstd, mbedTLS and SDL2. After those
+packages are ready, the script builds and installs FFmpeg-vita.
+
+Build directories and package archives are removed after installation. Preserve
+them for inspection with:
+
+```bash
+./scripts/prepare/install_all.sh --keep-build
+```
+
+## Optional GLES support
+
+The GXM backend does not require PVR_PSP2. To build the GLES backend, install its
+headers, libraries and runtime modules with:
+
+```bash
+./scripts/prepare/install_all.sh --with-pvr
+./makepsv --gl --release --no-deploy
+```
+
+`install_psv2` is called automatically by `--with-pvr`; it is not part of the
+normal GXM dependency installation.
+
+## Verification
+
+The installer verifies that the installed FFmpeg headers contain
+`AV_PIX_FMT_VITA` and that `libavcodec.a` contains `h264_vita`. A normal release
+build can then be tested with:
+
+```bash
+./makepsv --gxm --release --no-deploy
+```

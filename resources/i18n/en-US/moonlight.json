@@ -136,6 +136,8 @@
             "local_audio_title": "Local audio",
             "fullscreen_title": "Fullscreen",
             "frame_pacer_title": "Frame pacer",
+            "settings_background_opacity": "Settings background opacity",
+            "keep_awake_while_streaming": "Keep Vita awake while streaming",
             "center_region_title": "Center region only",
             "show_fps_title": "Show FPS",
             "save_debug_log_title": "Save debug log",

@@ -6,6 +6,7 @@
 #include <chrono>
 #include <thread>
 
+#include "ConfigManager.hpp"
 #include "GameStreamClient.hpp"
 #include "activity/main_activity.hpp"
 #include "controller/ControllerInput.hpp"
@@ -165,6 +166,12 @@ VitaPauseOverlay::VitaPauseOverlay(std::function<void()> onClose, const HostInfo
                 {
                     brls::View* settingsView = SettingsTab::create();
                     auto* frame = new brls::AppletFrame(settingsView);
+                    ConfigManager config;
+                    config.load();
+                    NVGcolor background = brls::Application::getTheme().getColor("brls/background");
+                    background.a = config.getVideoSettings().settings_background_opacity;
+                    settingsView->setBackgroundColor(nvgRGBA(0, 0, 0, 0));
+                    frame->setBackgroundColor(background);
                     frame->setTitle(brls::getStr("moonlight/tabs/settings"));
                     auto* activity = new brls::Activity(frame);
                     brls::Application::pushActivity(activity, brls::TransitionAnimation::FADE);

@@ -135,6 +135,8 @@
         "local_audio_title": "Audio local",
         "fullscreen_title": "Pantalla completa",
         "frame_pacer_title": "Frame pacer",
+        "settings_background_opacity": "Opacidad del fondo de ajustes",
+        "keep_awake_while_streaming": "Mantener la Vita activa durante la transmisión",
         "center_region_title": "Solo región central",
         "show_fps_title": "Mostrar FPS",
         "save_debug_log_title": "Guardar log de depuración",

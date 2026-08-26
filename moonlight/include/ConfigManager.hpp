@@ -66,6 +66,8 @@ struct VideoSettings
     bool localaudio                    = false;
     bool fullscreen                    = true;
     bool enable_frame_pacer            = true;
+    bool keep_awake_while_streaming    = true;
+    float settings_background_opacity  = 1.0f;
     bool center_region_only            = false;
     bool show_fps                      = false;
     bool save_debug_log                = false;

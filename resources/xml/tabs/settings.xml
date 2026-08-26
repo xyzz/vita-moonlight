@@ -97,6 +97,10 @@
                 id="debugLogToggle"
                 title="@i18n/moonlight/settings_tab/save_debug_log_title"/>
 
+            <brls:SliderCell
+                id="settingsOpacitySlider"
+                title="@i18n/moonlight/settings_tab/settings_background_opacity"/>
+
             <!-- CONTROLS -->
             <brls:Header title="@i18n/moonlight/settings_tab/controls_header"/>
 
@@ -143,6 +147,10 @@
 
             <!-- SYSTEM -->
             <brls:Header title="@i18n/moonlight/settings_tab/system_header"/>
+
+            <brls:BooleanCell
+                id="keepAwakeToggle"
+                title="@i18n/moonlight/settings_tab/keep_awake_while_streaming"/>
 
             <brls:DetailCell
                 title="@i18n/moonlight/settings/ip"

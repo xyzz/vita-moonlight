@@ -269,10 +269,20 @@ VideoSettings ConfigManager::getVideoSettings() const
             return def;
         }
     };
-    settings.sops                          = get("video", "sops", "true") == "true";
-    settings.localaudio                    = get("video", "localaudio", "false") == "true";
-    settings.fullscreen                    = get("video", "fullscreen", "true") == "true";
-    settings.enable_frame_pacer            = get("video", "enable_frame_pacer", "true") == "true";
+    settings.sops                       = get("video", "sops", "true") == "true";
+    settings.localaudio                 = get("video", "localaudio", "false") == "true";
+    settings.fullscreen                 = get("video", "fullscreen", "true") == "true";
+    settings.enable_frame_pacer         = get("video", "enable_frame_pacer", "true") == "true";
+    settings.keep_awake_while_streaming = get("video", "keep_awake_while_streaming", "true") == "true";
+    try
+    {
+        settings.settings_background_opacity = std::stof(get("video", "settings_background_opacity", "1.0"));
+    }
+    catch (...)
+    {
+        settings.settings_background_opacity = 1.0f;
+    }
+    settings.settings_background_opacity   = std::max(0.0f, std::min(1.0f, settings.settings_background_opacity));
     settings.center_region_only            = get("video", "center_region_only", "false") == "true";
     settings.show_fps                      = get("video", "show_fps", "false") == "true";
     settings.save_debug_log                = get("video", "save_debug_log", "false") == "true";
@@ -287,16 +297,24 @@ VideoSettings ConfigManager::getVideoSettings() const
     std::string touchscreenStr             = get("video", "touchscreen_mode", "1");
     if (touchscreenStr == "true")
     {
-        settings.touchscreen_mode = 2; // Mouse Absolute
+        settings.touchscreen_mode = 3;
     }
     else if (touchscreenStr == "false")
     {
-        settings.touchscreen_mode = 0; // Off
+        settings.touchscreen_mode = 0;
     }
     else
     {
-        settings.touchscreen_mode = std::stoi(touchscreenStr);
+        try
+        {
+            settings.touchscreen_mode = std::stoi(touchscreenStr);
+        }
+        catch (...)
+        {
+            settings.touchscreen_mode = 1;
+        }
     }
+    settings.touchscreen_mode             = std::max(0, std::min(4, settings.touchscreen_mode));
     settings.enable_network_optimizations = get("video", "enable_network_optimizations", "true") == "true";
     settings.double_tap_sprint_step_time  = std::stoi(get("video", "double_tap_sprint_step_time", "200"));
     settings.motion_controls_scalar_x     = std::stof(get("video", "motion_controls_scalar_x", "1.2"));
@@ -395,6 +413,8 @@ void ConfigManager::setVideoSettings(const VideoSettings& settings)
     set("video", "localaudio", settings.localaudio ? "true" : "false");
     set("video", "fullscreen", settings.fullscreen ? "true" : "false");
     set("video", "enable_frame_pacer", settings.enable_frame_pacer ? "true" : "false");
+    set("video", "keep_awake_while_streaming", settings.keep_awake_while_streaming ? "true" : "false");
+    set("video", "settings_background_opacity", std::to_string(settings.settings_background_opacity));
     set("video", "center_region_only", settings.center_region_only ? "true" : "false");
     set("video", "show_fps", settings.show_fps ? "true" : "false");
     set("video", "save_debug_log", settings.save_debug_log ? "true" : "false");

@@ -105,6 +105,9 @@ SessionMainView::SessionMainView(const HostInfo& host, const RemoteAppInfo& app)
     StreamConfiguration streamCfg = cfgMgr.getStreamConfig();
     VideoSettings videoSettings   = cfgMgr.getVideoSettings();
 
+    sessionActive.store(true);
+    setKeepAwakeWhileStreaming(videoSettings.keep_awake_while_streaming);
+
     g_controllerInput->setTouchscreenMode(videoSettings.touchscreen_mode);
 
     if (!overlayStatsView)
@@ -132,9 +135,9 @@ SessionMainView::SessionMainView(const HostInfo& host, const RemoteAppInfo& app)
     brls::Application::setLowLatencyMode(true);
 
     // Wake the render loop as soon as the decoder publishes a frame.
-    if (videoSettings.swap_interval == 0)
+    if (videoSettings.swap_interval == 0 && videoSettings.enable_frame_pacer)
     {
-        vita_frame_pacer_start(61);
+        vita_frame_pacer_start((int)targetFps);
     }
 
     if (vita_dp_init() == 0)
@@ -166,6 +169,15 @@ SessionMainView::SessionMainView(const HostInfo& host, const RemoteAppInfo& app)
 
     brls::Application::giveFocus(this);
 }
+
+void SessionMainView::setKeepAwakeWhileStreaming(bool enabled)
+{
+    if (sessionActive.load())
+    {
+        brls::Application::getPlatform()->disableScreenDimming(enabled, "streaming", "moonlight");
+    }
+}
+
 void SessionMainView::draw(NVGcontext* vg, float x, float y, float width, float height, brls::Style style, brls::FrameContext* ctx)
 {
     if (g_controllerInput)
@@ -194,13 +206,16 @@ void showSessionMain(const HostInfo& host, const RemoteAppInfo& app)
 
 SessionMainView::~SessionMainView()
 {
+    sessionActive.store(false);
+    brls::Application::getPlatform()->disableScreenDimming(false, "streaming", "moonlight");
+
     if (prePresentSubscribed)
     {
         brls::Application::getPrePresentEvent()->unsubscribe(prePresentSub);
         prePresentSubscribed = false;
     }
 
-    vita_frame_pacer_stop(61);
+    vita_frame_pacer_stop(60);
     brls::Application::setLowLatencyMode(false);
     vita_dp_fini();
     overlayStatsView.release();

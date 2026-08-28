@@ -5,7 +5,8 @@ VitaSDK sysroot. It supports native Linux, WSL and Windows/MSYS2.
 
 The script installs standard packages through VDPM and builds the project-specific
 FFmpeg-vita package. This FFmpeg fork provides the `h264_vita` decoder and Vita
-pixel formats used by the low-latency video path.
+pixel formats used by the low-latency video path. The package recipe pins the
+tested FFmpeg-vita revision before building it.
 
 ## Requirements
 

@@ -6,6 +6,7 @@
 #include <string.h>
 
 #include <atomic>
+#include <climits>
 #include <mutex>
 #include <unordered_map>
 #include <vector>
@@ -1949,6 +1950,13 @@ extern "C"
         drainUs = perf_now_us() - drainStartUs;
 
         uint32_t copyStartUs = perf_now_us();
+        if (decodeUnit->fullLength <= 0 || !decodeUnit->bufferList || decodeUnit->fullLength > INT_MAX - 256)
+        {
+            vita_log::error("[FFMPEG] Invalid decode unit length=%d", decodeUnit->fullLength);
+            copyUs = perf_now_us() - copyStartUs;
+            finalize_submit_metrics();
+            return DR_NEED_IDR;
+        }
         if (av_new_packet(pkt, decodeUnit->fullLength + 256) < 0)
         {
             vita_log::error("[FFMPEG] av_new_packet failed size=%d", decodeUnit->fullLength + 256);
@@ -1957,31 +1965,56 @@ extern "C"
             finalize_submit_metrics();
             return DR_NEED_IDR;
         }
-        uint8_t* dst    = pkt->data;
-        uint32_t offset = 0;
-        PLENTRY entry   = decodeUnit->bufferList;
+        uint8_t* dst                = pkt->data;
+        size_t offset               = 0;
+        const size_t packetCapacity = static_cast<size_t>(pkt->size);
+        const auto appendEntry      = [&](PLENTRY current)
+        {
+            if (!current || !current->data || current->length <= 0 || offset > packetCapacity)
+            {
+                return false;
+            }
+            const size_t entryLength = static_cast<size_t>(current->length);
+            if (entryLength > packetCapacity - offset)
+            {
+                return false;
+            }
+            memcpy(dst + offset, current->data, entryLength);
+            offset += entryLength;
+            return true;
+        };
+
+        PLENTRY entry = decodeUnit->bufferList;
         while (entry)
         {
+            bool appended = false;
             if (entry->bufferType == BUFFER_TYPE_SPS)
             {
                 if (g_sps_ctx)
                 {
-                    g_sps_ctx->fix(entry, GS_SPS_BITSTREAM_FIXUP, dst, &offset);
+                    appended = g_sps_ctx->fix(entry, GS_SPS_BITSTREAM_FIXUP, dst,
+                        packetCapacity, &offset);
                 }
                 else
                 {
-                    memcpy(dst + offset, entry->data, entry->length);
-                    offset += entry->length;
+                    appended = appendEntry(entry);
                 }
             }
             else
             {
-                memcpy(dst + offset, entry->data, entry->length);
-                offset += entry->length;
+                appended = appendEntry(entry);
+            }
+            if (!appended)
+            {
+                vita_log::error("[FFMPEG] AU assembly exceeded packet capacity");
+                av_packet_unref(pkt);
+                copyUs = perf_now_us() - copyStartUs;
+                finalize_submit_metrics();
+                return DR_NEED_IDR;
             }
             entry = entry->next;
         }
-        av_shrink_packet(pkt, offset);
+        av_shrink_packet(pkt, static_cast<int>(offset));
         copyUs = perf_now_us() - copyStartUs;
 
         pkt->pts = decodeUnit->presentationTimeUs;

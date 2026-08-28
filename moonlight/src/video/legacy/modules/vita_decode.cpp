@@ -272,42 +272,75 @@ extern "C" int vitavideo_submit_decode_unit(PDECODE_UNIT decodeUnit)
         picture.frame.pPicture[1] = NULL;
     }
 
-    if (decoder_buffer_size < (decodeUnit->fullLength + AV_INPUT_BUFFER_PADDING_SIZE))
+    if (decodeUnit->fullLength <= 0 || !decodeUnit->bufferList)
     {
-        decoder_buffer      = (char*)realloc(decoder_buffer, decodeUnit->fullLength + AV_INPUT_BUFFER_PADDING_SIZE);
-        decoder_buffer_size = decodeUnit->fullLength + AV_INPUT_BUFFER_PADDING_SIZE;
-        if (!decoder_buffer)
-            return DR_NEED_IDR;
+        return DR_NEED_IDR;
     }
-    PLENTRY entry   = decodeUnit->bufferList;
-    uint32_t length = 0;
+
+    const size_t requiredCapacity = static_cast<size_t>(decodeUnit->fullLength) + AV_INPUT_BUFFER_PADDING_SIZE;
+    if (decoder_buffer_size < requiredCapacity)
+    {
+        char* resizedBuffer = static_cast<char*>(realloc(decoder_buffer, requiredCapacity));
+        if (!resizedBuffer)
+            return DR_NEED_IDR;
+        decoder_buffer      = resizedBuffer;
+        decoder_buffer_size = requiredCapacity;
+    }
+    PLENTRY entry          = decodeUnit->bufferList;
+    size_t length          = 0;
+    const auto appendEntry = [&](PLENTRY current)
+    {
+        if (!current || !current->data || current->length <= 0 || length > decoder_buffer_size)
+        {
+            return false;
+        }
+        const size_t entryLength = static_cast<size_t>(current->length);
+        if (entryLength > decoder_buffer_size - length)
+        {
+            return false;
+        }
+        memcpy(decoder_buffer + length, current->data, entryLength);
+        length += entryLength;
+        return true;
+    };
+
     while (entry)
     {
+        bool appended = false;
         if (entry->bufferType == BUFFER_TYPE_SPS)
         {
 #ifdef __cplusplus
             if (g_sps_ctx)
             {
-                uint32_t before = length;
-                g_sps_ctx->fix(entry, GS_SPS_BITSTREAM_FIXUP, (uint8_t*)decoder_buffer, &length);
-                VITA_DEBUG_LOG("[Video][SPS] Fix aplicado (in=%u out=%u)", entry->length, (unsigned)(length - before));
+                size_t before = length;
+                appended      = g_sps_ctx->fix(entry, GS_SPS_BITSTREAM_FIXUP,
+                         reinterpret_cast<uint8_t*>(decoder_buffer),
+                         decoder_buffer_size, &length);
+                if (appended)
+                {
+                    VITA_DEBUG_LOG("[Video][SPS] Fix aplicado (in=%u out=%u)",
+                        entry->length, (unsigned)(length - before));
+                }
             }
             else
 #endif
             {
-                memcpy(decoder_buffer + length, entry->data, entry->length);
-                length += entry->length;
+                appended = appendEntry(entry);
             }
         }
         else
         {
-            memcpy(decoder_buffer + length, entry->data, entry->length);
-            length += entry->length;
+            appended = appendEntry(entry);
+        }
+        if (!appended)
+        {
+            VITA_DEBUG_LOG("[Video] AU assembly exceeded buffer capacity");
+            return DR_NEED_IDR;
         }
         entry = entry->next;
     }
     au.es.pBuf   = decoder_buffer;
-    au.es.size   = decodeUnit->fullLength;
+    au.es.size   = static_cast<uint32_t>(length);
     au.dts.lower = au.dts.upper = au.pts.lower = au.pts.upper = 0xFFFFFFFF;
 
     if (vd_submit_counter < 2)

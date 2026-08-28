@@ -1,7 +1,8 @@
-#include "sps.h" // clase SpsContext + flags
+#include "sps.h"
 #include <cstring>
+#include <limits>
 
-using namespace gs;
+namespace gs {
 
 SpsContext::SpsContext(int width, int height) : m_w(width), m_h(height) {
     m_stream = h264_new();
@@ -32,27 +33,57 @@ void SpsContext::destroy() {
     }
 }
 
-void SpsContext::fix(PLENTRY sps, int flags, uint8_t* out_buf, uint32_t* out_offset) {
-    if (!m_stream || !sps || !out_buf || !out_offset) return;
-    int start_len = sps->data[2] == 0x01 ? 3 : 4;
-    if (read_nal_unit(m_stream, reinterpret_cast<uint8_t*>(sps->data + start_len), sps->length - start_len) < 0) {
-        // fallback copiar
-        std::memcpy(out_buf + *out_offset, sps->data, sps->length);
-        *out_offset += sps->length;
-        return;
+bool SpsContext::fix(PLENTRY sps, int flags, uint8_t* out_buf,
+                     std::size_t out_capacity, std::size_t* out_offset) {
+    if (!sps || !sps->data || sps->length <= 0 || !out_buf || !out_offset ||
+        *out_offset > out_capacity) {
+        return false;
     }
+
+    const std::size_t original_offset = *out_offset;
+    const std::size_t sps_length = static_cast<std::size_t>(sps->length);
+    const auto append_original = [&]() {
+        if (sps_length > out_capacity - original_offset) {
+            return false;
+        }
+        std::memcpy(out_buf + original_offset, sps->data, sps_length);
+        *out_offset = original_offset + sps_length;
+        return true;
+    };
+
+    if (!m_stream) {
+        return append_original();
+    }
+
+    std::size_t start_len = 0;
+    if (sps_length >= 4 && sps->data[0] == 0 && sps->data[1] == 0) {
+        if (sps->data[2] == 1) {
+            start_len = 3;
+        } else if (sps_length >= 5 && sps->data[2] == 0 && sps->data[3] == 1) {
+            start_len = 4;
+        }
+    }
+
+    const std::size_t nal_length = sps_length - start_len;
+    if (start_len == 0 || nal_length == 0 ||
+        nal_length > static_cast<std::size_t>(std::numeric_limits<int>::max()) ||
+        read_nal_unit(m_stream, reinterpret_cast<uint8_t*>(sps->data + start_len),
+                      static_cast<int>(nal_length)) < 0 ||
+        !m_stream->nal || m_stream->nal->nal_unit_type != NAL_UNIT_TYPE_SPS) {
+        return append_original();
+    }
+
     if (m_w == 1280 && m_h == 720)
         m_stream->sps->level_idc = 32;
     else if (m_w == 1920 && m_h == 1080) {
         m_stream->sps->level_idc = 42;
-        // Force height to 1088 (68 macroblocks) to satisfy Vita decoder alignment requirements
+        // The Vita decoder requires a macroblock-aligned 1088-line coded height.
         m_stream->sps->pic_height_in_map_units_minus1 = 67;
-        // Add cropping to display only 1080 lines
         m_stream->sps->frame_cropping_flag = 1;
         m_stream->sps->frame_crop_left_offset = 0;
         m_stream->sps->frame_crop_right_offset = 0;
         m_stream->sps->frame_crop_top_offset = 0;
-        m_stream->sps->frame_crop_bottom_offset = 4; // 4 * 2 (SubHeightC) = 8 pixels cropped from bottom
+        m_stream->sps->frame_crop_bottom_offset = 4;
     }
     m_stream->sps->num_ref_frames = 1;
     if (flags & GS_SPS_REMOVE_VST_FIXUP)
@@ -72,14 +103,28 @@ void SpsContext::fix(PLENTRY sps, int flags, uint8_t* out_buf, uint32_t* out_off
         m_stream->sps->vui.max_bytes_per_pic_denom = 2;
         m_stream->sps->vui.max_bits_per_mb_denom = 1;
     }
-    std::memcpy(out_buf + *out_offset, sps->data, start_len);
-    *out_offset += start_len;
-    int wr = write_nal_unit(m_stream, out_buf + *out_offset, 128);
-    if (wr < 0) {
-        // fallback copiar original entera tras prefijo ya copiado
-        std::memcpy(out_buf + *out_offset, sps->data + start_len, sps->length - start_len);
-        *out_offset += (sps->length - start_len);
-    } else {
-        *out_offset += wr;
+
+    if (start_len > out_capacity - original_offset) {
+        return false;
     }
+    const std::size_t nal_capacity = out_capacity - original_offset - start_len;
+    const int writer_capacity = static_cast<int>(
+        nal_capacity > static_cast<std::size_t>(std::numeric_limits<int>::max())
+            ? std::numeric_limits<int>::max()
+            : nal_capacity);
+    if (writer_capacity == 0) {
+        return append_original();
+    }
+
+    std::memcpy(out_buf + original_offset, sps->data, start_len);
+    const int written = write_nal_unit(m_stream, out_buf + original_offset + start_len,
+                                       writer_capacity);
+    if (written <= 0 || written > writer_capacity) {
+        return append_original();
+    }
+
+    *out_offset = original_offset + start_len + static_cast<std::size_t>(written);
+    return true;
 }
+
+} // namespace gs

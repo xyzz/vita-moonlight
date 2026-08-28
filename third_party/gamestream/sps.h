@@ -1,9 +1,9 @@
 #pragma once
 #include <Limelight.h>
+#include <cstddef>
 #include <cstdint>
-#include <h264_stream.h> // necesitamos la definición completa de h264_stream_t
+#include <h264_stream.h>
 
-// Flags heredados para el fix de SPS (mantener compatibilidad con llamadas existentes)
 #define GS_SPS_BITSTREAM_FIXUP  0x01
 #define GS_SPS_REMOVE_VST_FIXUP 0x02
 #define GS_SPS_REMOVE_CLI_FIXUP 0x04
@@ -18,7 +18,8 @@ public:
     SpsContext(SpsContext&&) noexcept;
     SpsContext& operator=(SpsContext&&) noexcept;
 
-    void fix(PLENTRY sps, int flags, uint8_t* out_buf, uint32_t* out_offset);
+    [[nodiscard]] bool fix(PLENTRY sps, int flags, uint8_t* out_buf,
+                           std::size_t out_capacity, std::size_t* out_offset);
 private:
     h264_stream_t* m_stream = nullptr;
     int m_w = 0;

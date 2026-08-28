@@ -25,5 +25,6 @@ target_link_libraries(gamestream PUBLIC
     ${CURL_LIBRARIES}
     ${EXPAT_LIBRARIES}
 )
+target_link_libraries(gamestream PRIVATE h264bitstream)
 
 target_compile_definitions(gamestream PRIVATE USE_MBEDTLS_CRYPTO)

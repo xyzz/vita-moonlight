@@ -8,6 +8,7 @@ extern "C"
 
     // Backend logging primitive that writes to console/file. Uses printf-style formatting.
     __attribute__((format(printf, 1, 2))) void vita_debug_log(const char* fmt, ...);
+    void vita_debug_log_raw(const char* text);
 
     // Enable or disable file logging (creates/truncates moonlight.log in config dir)
     void enable_file_logging(bool enable);
@@ -19,6 +20,7 @@ extern "C"
 #ifdef __cplusplus
 #include <cstdarg>
 #include <cstdio>
+#include <cstring>
 
 namespace vita_log
 {
@@ -26,14 +28,22 @@ namespace vita_log
 inline void vlog(const char* level, const char* fmt, va_list args)
 {
     char buffer[1024];
+    size_t level_length = strlen(level);
+    if (level_length + 3 >= sizeof(buffer))
+        return;
+    buffer[0] = '[';
+    memcpy(buffer + 1, level, level_length);
+    buffer[level_length + 1] = ']';
+    buffer[level_length + 2] = ' ';
+    size_t prefix_length     = level_length + 3;
     va_list copy;
     va_copy(copy, args);
-    int n = vsnprintf(buffer, sizeof(buffer) - 1, fmt, copy);
+    int n = vsnprintf(buffer + prefix_length, sizeof(buffer) - prefix_length, fmt, copy);
     va_end(copy);
     if (n < 0)
         return;
     buffer[sizeof(buffer) - 1] = '\0';
-    vita_debug_log("[%s] %s", level, buffer);
+    vita_debug_log_raw(buffer);
 }
 
 inline void info(const char* fmt, ...)

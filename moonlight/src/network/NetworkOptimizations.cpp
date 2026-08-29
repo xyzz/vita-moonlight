@@ -5,10 +5,6 @@
 #include <stdio.h>
 #include <time.h>
 
-#include "ConfigManager.hpp"
-
-extern VideoSettings g_video_settings_snapshot;
-
 extern "C" uint64_t LiGetMillis();
 // Original function wrapped by the linker with --wrap
 extern "C" void __real_LiRequestIdrFrame(void);
@@ -55,12 +51,6 @@ static const uint32_t LOSS_SAMPLE_INTERVAL_MS = 50; // granular (legacy 50ms)
 static const uint32_t CONN_WINDOW_MS          = 1000; // status window
 static const uint32_t POOR_LOSS_PCT           = 15; // severe degradation threshold
 static const uint32_t WARN_LOSS_PCT           = 5; // umbral aviso
-
-// adaptive frame pacing
-static unsigned g_target_fps           = 60;
-static uint64_t g_pace_window_start    = 0;
-static unsigned g_pace_frames_produced = 0; // decoded in window
-static int g_drop_budget               = 0; // how many frames to skip next
 
 // Loss tracking (viewed vs completed)
 static unsigned g_interval_good          = 0;
@@ -264,53 +254,6 @@ extern "C" int vita_netopt_get_stats(struct VitaNetOptSnapshot* out)
     return 0;
 }
 
-// ====== Adaptive pacing and frameskip ======
-extern "C" void vita_netopt_set_target_fps(unsigned fps)
-{
-    if (fps == 0 || fps > 240)
-        return; // sanity
-    g_target_fps = fps;
-}
-
-extern "C" void vita_netopt_frame_produced()
-{
-    if (!g_enabled || !g_video_settings_snapshot.enable_frame_pacer)
-        return;
-    uint64_t now = monotonicMs();
-    if (g_pace_window_start == 0)
-        g_pace_window_start = now;
-    g_pace_frames_produced++;
-    uint64_t elapsed = now - g_pace_window_start;
-    if (elapsed >= 1000)
-    {
-        // Only trigger drop budget if the excess is persistent and significant (> 5 frames over target)
-        // to prevent micro-jitter/timing variance from triggering unnecessary drops.
-        if (g_pace_frames_produced > g_target_fps + 5)
-        {
-            int excess = (int)g_pace_frames_produced - (int)(g_target_fps + 5);
-            g_drop_budget += excess;
-            if (g_drop_budget > 5)
-                g_drop_budget = 5; // limit consecutive drops to 5 to avoid visual jumps
-        }
-        else
-        {
-            // Decay drop budget if we are within normal bounds
-            g_drop_budget = 0;
-        }
-        g_pace_frames_produced = 0;
-        g_pace_window_start    = now;
-    }
-}
-
-extern "C" unsigned vita_netopt_consume_drop_budget()
-{
-    if (!g_enabled || !g_video_settings_snapshot.enable_frame_pacer || g_drop_budget <= 0)
-        return 0;
-    unsigned drops = (unsigned)g_drop_budget;
-    g_drop_budget  = 0;
-    return drops;
-}
-
 // ====== Frame tracking and loss ======
 extern "C" void vita_netopt_on_frame_seen(unsigned frameIndex)
 {
@@ -433,11 +376,11 @@ extern "C" void vita_netopt_dump_extended()
     vita_netopt_get_stats(&s);
     VitaNetConnSnapshot c;
     vita_netopt_get_conn_snapshot(&c);
-    printf("[NetOptX] IDR(real=%u sup=%u f=%u winF=%u) lossEv=%u lost=%u bursts=%u lvl=%u min=%u waiting=%s | Conn t=%ums g=%u tot=%u lp=%u%% q=%d drop=%d RFIc=%u RFIof=%u burstMode=%u\n",
+    printf("[NetOptX] IDR(real=%u sup=%u f=%u winF=%u) lossEv=%u lost=%u bursts=%u lvl=%u min=%u waiting=%s | Conn t=%ums g=%u tot=%u lp=%u%% q=%d RFIc=%u RFIof=%u burstMode=%u\n",
         s.idrRequests, s.suppressedIdr, s.forcedIdr, g_net_stats.forcedIdrWindowCount, s.lossEvents, s.framesLostAccum, s.consecutiveLossBursts,
         s.backoffLevel, s.lastMinIntervalMs,
         (g_net_stats.waitingIdrStartMs ? "YES" : "no"),
-        c.intervalMs, c.goodFrames, c.totalFrames, c.lossPercent, (int)c.quality, g_drop_budget, g_rfi_count, g_rfi_overflows, (unsigned)g_net_stats.lossBurstMode);
+        c.intervalMs, c.goodFrames, c.totalFrames, c.lossPercent, (int)c.quality, g_rfi_count, g_rfi_overflows, (unsigned)g_net_stats.lossBurstMode);
 }
 
 // Global Interception of LiRequestIdrFrame Symbol

@@ -16,13 +16,10 @@ size_t decoder_block_size               = 0;
 SceAvcdecQueryDecoderInfo* decoder_info = NULL;
 SceVideodecQueryInitInfoHwAvcdec* init  = NULL;
 
-// Triple texture buffer for decode/display pipeline
 GxmTexture* frame_textures[3] = { nullptr, nullptr, nullptr };
 int frame_display_idx         = 0; // GPU reads from this
-int frame_ready_idx           = 1; // most recently decoded frame, waiting
-int frame_write_idx           = 2; // decoder writes to this
+int frame_write_idx           = 1; // decoder writes to this
 std::mutex g_frame_slots_mutex;
-bool single_frame_buffer            = true; // single buffer for minimal latency (like original legacy)
 uint32_t frame_publish_timestamp_us = 0; // end-to-end latency tracking
 
 int SCREEN_WIDTH  = 960;
@@ -31,9 +28,6 @@ int SCREEN_HEIGHT = 544;
 image_scaling_settings image_scaling = { 0 };
 
 bool active_video_thread = false;
-bool frame_ready_flag    = false;
-uint32_t frame_count     = 0;
-int need_drop            = 0;
 
 // Legacy mode and heuristics
 // Legacy modes removed
@@ -52,8 +46,7 @@ size_t decoder_output_phys_size = 0;
 int decoder_output_phys_block   = -1;
 bool decoder_output_phys_mapped = false;
 // NVG integration removed (direct render)
-bool legacy_single_immediate_present = false; // delayed presentation using Borealis
-bool video_fullscreen_stretch        = true; // activated by default to occupy full screen
+bool video_fullscreen_stretch = true; // activated by default to occupy full screen
 // low-latency removed: immediate presentation is now the only way
 int decoder_output_mode                    = 0; // 0=RGBA direct, 1=YUV420 experimental
 bool decoder_tried_direct_texture          = true;

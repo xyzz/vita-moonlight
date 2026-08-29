@@ -79,65 +79,7 @@ void VitaVideoRenderer::drawNVG(NVGcontext* vg, float viewportW, float viewportH
     if (g_stats.frames_decoded == 0)
         return;
 
-    int displayIdx = 0;
-    if (!single_frame_buffer)
-    {
-        int bufferMode = g_video_settings_snapshot.buffer_mode;
-        if (bufferMode == 2)
-        {
-            // Triple-buffering: Atomic Exchange
-            int current_display = __atomic_load_n(&frame_display_idx, __ATOMIC_ACQUIRE);
-            if (__atomic_load_n(&frame_ready_flag, __ATOMIC_ACQUIRE))
-            {
-                int old_ready   = __atomic_exchange_n(&frame_ready_idx, current_display, __ATOMIC_SEQ_CST);
-                current_display = old_ready;
-                __atomic_store_n(&frame_display_idx, current_display, __ATOMIC_RELEASE);
-                __atomic_store_n(&frame_ready_flag, false, __ATOMIC_RELEASE);
-            }
-            displayIdx = current_display;
-
-            // Triple-buffering collision check: ensure display, write, and ready are all distinct
-            int current_write = __atomic_load_n(&frame_write_idx, __ATOMIC_ACQUIRE);
-            int current_ready = __atomic_load_n(&frame_ready_idx, __ATOMIC_ACQUIRE);
-            if (displayIdx == current_write || displayIdx == current_ready || current_write == current_ready)
-            {
-                static uint32_t collision_counter = 0;
-                if ((collision_counter++ % 181) == 0)
-                {
-                    VITA_DEBUG_LOG("[Video][WARN][DIAG] COLLISION DETECTED in Triple Buffer: display=%d write=%d ready=%d",
-                        displayIdx, current_write, current_ready);
-                }
-            }
-        }
-        else
-        {
-            // Double-buffering rotation/swap
-            if (__atomic_load_n(&frame_ready_flag, __ATOMIC_ACQUIRE))
-            {
-                int ready = __atomic_load_n(&frame_ready_idx, __ATOMIC_ACQUIRE);
-                __atomic_store_n(&frame_display_idx, ready, __ATOMIC_RELEASE);
-                __atomic_store_n(&frame_ready_flag, false, __ATOMIC_RELEASE);
-            }
-            displayIdx = __atomic_load_n(&frame_display_idx, __ATOMIC_ACQUIRE);
-
-            // Double-buffering collision check
-            int current_write = __atomic_load_n(&frame_write_idx, __ATOMIC_ACQUIRE);
-            if (displayIdx == current_write)
-            {
-                static uint32_t collision_counter = 0;
-                if ((collision_counter++ % 181) == 0)
-                {
-                    VITA_DEBUG_LOG("[Video][WARN][DIAG] COLLISION DETECTED in Double Buffer: display=%d write=%d",
-                        displayIdx, current_write);
-                }
-            }
-        }
-    }
-    else
-    {
-        // Single buffering loads the latest active decoded texture index atomically
-        displayIdx = __atomic_load_n(&frame_display_idx, __ATOMIC_ACQUIRE);
-    }
+    int displayIdx = __atomic_load_n(&frame_display_idx, __ATOMIC_ACQUIRE);
 
     const GxmTexture* tex = frame_textures[displayIdx];
     if (!tex)
@@ -278,7 +220,7 @@ void VitaVideoRenderer::drawNVG(NVGcontext* vg, float viewportW, float viewportH
     nvgFill(vg);
 
     g_stats.frames_presented++;
-    onFramePresented();
+    onFramePresented(currentData);
 }
 
 void VitaVideoRenderer::destroyImage(NVGcontext* vg)
@@ -303,8 +245,10 @@ void VitaVideoRenderer::destroyImage(NVGcontext* vg)
 
 extern "C" void ffmpeg_process_deferred_releases(void);
 extern "C" void ffmpeg_increment_presented_frames(void);
+extern "C" void ffmpeg_mark_direct_buffer_presented(const void* data);
+extern "C" void ffmpeg_video_watchdog_tick(void);
 
-void VitaVideoRenderer::onFramePresented()
+void VitaVideoRenderer::onFramePresented(const void* textureData)
 {
     // Count each published frame once across both presentation paths.
     {
@@ -329,8 +273,10 @@ void VitaVideoRenderer::onFramePresented()
     // pay for a mutex lock+unlock on every single frame for nothing.
     if (g_video_settings_snapshot.render_mode == 1)
     {
-        ffmpeg_process_deferred_releases();
+        ffmpeg_video_watchdog_tick();
+        ffmpeg_mark_direct_buffer_presented(textureData);
         ffmpeg_increment_presented_frames();
+        ffmpeg_process_deferred_releases();
     }
     uint64_t now = vita_monotonic_ms();
     if (stats_start_ms == 0)

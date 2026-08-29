@@ -71,7 +71,7 @@ typedef struct
     uint32_t frames_decoded; // Frames decoded and presented (or ready)
     uint32_t frames_presented; // Frames actually presented (may differ if dropping is enabled)
     uint32_t frames_dropped_network; // Calculated by gaps in frameNumber
-    uint32_t frames_dropped_pacer; // Dropped by frame pacer (need_drop)
+    uint32_t frames_dropped_pacer; // Frames dropped to recover latency
     uint32_t idr_count; // Number of IDR NALs
     uint32_t p_slice_count; // Number of non-IDR slice type NALs
     uint32_t current_fps; // FPS measured last window

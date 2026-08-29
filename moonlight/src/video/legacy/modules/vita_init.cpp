@@ -12,7 +12,6 @@
 #include <borealis/core/application.hpp>
 #include <memory>
 
-#include "ConfigManager.hpp"
 #include "network/NetworkOptimizations.hpp"
 #include "video/pixel_format/pixel_format.hpp"
 #include "vita_globals.hpp"
@@ -110,7 +109,6 @@ extern "C" int vitavideo_setup(int videoFormat, int width, int height, int redra
         {
             g_stats.target_fps = (uint32_t)redrawRate;
         }
-        vita_netopt_set_target_fps(g_stats.target_fps ? g_stats.target_fps : 60);
 #ifdef __cplusplus
         if (!g_sps_ctx)
         {
@@ -345,38 +343,9 @@ extern "C" int vitavideo_setup(int videoFormat, int width, int height, int redra
             }
         }
 
-        // Use buffer mode from settings: 0 = Single, 1 = Double, 2 = Triple
-        ConfigManager config;
-        config.load();
-        int bufferMode                  = config.getVideoSettings().buffer_mode;
-        single_frame_buffer             = (bufferMode == 0);
-        legacy_single_immediate_present = (bufferMode == 0);
-
-        if (bufferMode == 2)
-        {
-            // Triple buffering starts with: GPU owning 0, shared ready is 1, decoder writes to 2
-            frame_display_idx = 0;
-            frame_ready_idx   = 1;
-            frame_write_idx   = 2;
-        }
-        else if (bufferMode == 1)
-        {
-            // Double buffering starts with display=0, ready=0, write=1
-            frame_display_idx = 0;
-            frame_ready_idx   = 0;
-            frame_write_idx   = 1;
-        }
-        else
-        {
-            // Ping-pong avoids writing into the texture currently sampled by GXM.
-            frame_display_idx = 0;
-            frame_ready_idx   = 0;
-            frame_write_idx   = 1;
-        }
-
-        const char* bufferModeStr = (bufferMode == 0) ? "single" : (bufferMode == 1) ? "double"
-                                                                                     : "triple";
-        VITA_DEBUG_LOG("[Video][INIT] %s buffer mode (display=%d ready=%d write=%d)", bufferModeStr, frame_display_idx, frame_ready_idx, frame_write_idx);
+        frame_display_idx = 0;
+        frame_write_idx   = 1;
+        VITA_DEBUG_LOG("[Video][INIT] latest-frame rotation (display=%d write=%d)", frame_display_idx, frame_write_idx);
         VITA_DEBUG_LOG("[Video][INIT] tex0=%p tex1=%p tex2=%p", gxm_texture_get_datap(frame_textures[0]), gxm_texture_get_datap(frame_textures[1]), gxm_texture_get_datap(frame_textures[2]));
         VITA_DEBUG_LOG("[Video] Framebuffer inicializado");
 
@@ -395,13 +364,6 @@ extern "C" int vitavideo_setup(int videoFormat, int width, int height, int redra
         active_pacer_thread = true;
         sceKernelStartThread(pacer_thread, 0, NULL);
 
-        // High priority (64) and pin exclusively to Core 1 to isolate it from the UI thread (Core 0/2)
-        sceKernelChangeThreadPriority(pacer_thread, 64);
-        sceKernelChangeThreadCpuAffinityMask(pacer_thread, SCE_KERNEL_CPU_MASK_USER_1);
-
-        // Adjust affinity of the main thread (this thread that does setup) to leave Core 1 free for the decoder
-        SceUID selfId = sceKernelGetThreadId();
-        sceKernelChangeThreadCpuAffinityMask(selfId, SCE_KERNEL_CPU_MASK_USER_0 | SCE_KERNEL_CPU_MASK_USER_2);
         video_status = VITA_VIDEO_INIT_FRAME_PACER_THREAD;
     }
     VITA_DEBUG_LOG("[Video] vitavideo_setup completado exitosamente, retornando 0");

@@ -153,15 +153,6 @@
                 },
                 "saved": "V-Sync saved"
             },
-            "buffer_mode": {
-                "title": "Buffer Mode",
-                "options": {
-                    "0": "Single (Minimal Latency)",
-                    "1": "Double",
-                    "2": "Triple"
-                },
-                "saved": "Buffer mode saved"
-            },
             "motion_controls_title": "Gyroscope",
             "double_tap_sprint_title": "Double tap to sprint",
             "touchscreen_mode": {

@@ -93,21 +93,15 @@ extern SceAvcdecQueryDecoderInfo* decoder_info;
 extern SceVideodecQueryInitInfoHwAvcdec* init;
 
 extern GxmTexture* frame_textures[3];
-// Triple-buffer roles:
-//   frame_display_idx - GPU is reading this (renderer thread)
-//   frame_ready_idx   - most recently decoded, waiting to be displayed
-//   frame_write_idx   - decoder is currently writing to this
+// The renderer reads the latest completed texture. The decoder rotates through
+// three write targets so a recently displayed texture is not reused immediately.
 extern int frame_display_idx;
-extern int frame_ready_idx;
 extern int frame_write_idx;
 #define FRAME_FRONT() (frame_textures[frame_display_idx])
 #define FRAME_BACK() (frame_textures[frame_write_idx])
-#define FRAME_READY() (frame_textures[frame_ready_idx])
 #ifdef __cplusplus
 extern std::mutex g_frame_slots_mutex;
 #endif
-// Single buffer mode (no triple/double buffering). When active, all indices are the same.
-extern bool single_frame_buffer;
 
 // End-to-end latency: decoder writes timestamp when frame is published,
 // renderer reads it when frame is presented to measure pipeline delay
@@ -116,9 +110,6 @@ extern uint32_t frame_publish_timestamp_us;
 extern image_scaling_settings image_scaling;
 
 extern bool active_video_thread;
-extern bool frame_ready_flag;
-extern uint32_t frame_count;
-extern int need_drop;
 
 // Legacy modes removed
 
@@ -141,8 +132,6 @@ extern uint32_t decoder_linear_rgba_height;
 extern int decoder_linear_rgba_memblock;
 extern bool decoder_linear_rgba_physically_backed;
 
-// Experimental mode: replicate legacy behavior (single buffer + immediate decode->draw)
-extern bool legacy_single_immediate_present; // if true, submit decodes and presents immediately (no frame_ready_flag)
 // Fullscreen presentation mode (stretches without preserving aspect)
 extern bool video_fullscreen_stretch;
 // low-latency removed: immediate route is standard

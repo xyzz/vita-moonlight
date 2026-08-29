@@ -47,10 +47,6 @@
                 id="swapInterval"
                 title="@i18n/moonlight/settings_tab/swap_interval/title"/>
 
-            <brls:SelectorCell
-                id="bufferModeSelector"
-                title="@i18n/moonlight/settings_tab/buffer_mode/title"/>
-
             <brls:BooleanCell
                 id="fullscreenToggle"
                 title="@i18n/moonlight/settings_tab/fullscreen_title"/>

@@ -48,6 +48,10 @@ typedef struct FFmpegVideoContext
     int stream_width;
     int stream_height;
     uint64_t last_pts_us;
+    uint64_t latency_epoch_offset_us;
+    uint64_t last_input_pts_us;
+    int last_input_frame_number;
+    uint32_t latency_samples;
     bool using_direct_memory;
     bool is_legacy_mode;
     const char* render_mode;
@@ -70,6 +74,7 @@ extern "C"
 
     DECODER_RENDERER_CALLBACKS get_ffmpeg_video_callbacks(void);
     void ffmpeg_process_deferred_releases(void);
+    void ffmpeg_video_watchdog_tick(void);
 
     void ffmpeg_video_set_render_mode(FFmpegVideoContext* context, const char* mode);
     const char* ffmpeg_video_get_render_mode(FFmpegVideoContext* context);

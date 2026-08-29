@@ -20,7 +20,7 @@ class VitaVideoRenderer final
     // Release NVG image that references the current GXM texture.
     // Public so UI code can clear any NVG references before stopping video.
     void destroyImage(struct NVGcontext* vg);
-    void onFramePresented();
+    void onFramePresented(const void* textureData = nullptr);
 
   private:
     VitaVideoRenderer()    = default;

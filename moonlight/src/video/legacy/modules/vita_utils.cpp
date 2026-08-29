@@ -36,24 +36,17 @@ uint64_t vita_monotonic_ms()
     return sceKernelGetSystemTimeWide() / 1000ULL;
 }
 
-// Thread pacer (limita FPS y setea need_drop)
+// Periodic network maintenance for the legacy decoder.
 int vita_pacer_thread_main(SceSize args, void* argp)
 {
     (void)args;
     (void)argp;
     VITA_DEBUG_LOG("[Video][PACER] thread iniciado");
-    // Adjust affinity: allow the pacer to use two cores if available (user 0 and 1)
-    sceKernelChangeThreadCpuAffinityMask(sceKernelGetThreadId(), SCE_KERNEL_CPU_MASK_USER_0 | SCE_KERNEL_CPU_MASK_USER_1);
-    uint64_t last_50_tick      = vita_monotonic_ms();
-    uint64_t last_500_tick     = last_50_tick;
-    uint64_t last_fps_reset_ms = last_50_tick; // To reset frame_count periodically (like legacy)
-    // Synchronize target fps with current settings (curr_fps[1] is updated externally)
-    vita_netopt_set_target_fps(curr_fps[1] > 0 ? curr_fps[1] : 60);
-    uint32_t fps_window_frames = 0;
-    uint32_t logCounter        = 0;
+    uint64_t last_50_tick  = vita_monotonic_ms();
+    uint64_t last_500_tick = last_50_tick;
     while (active_pacer_thread)
     {
-        sceKernelDelayThread(5 * 1000); // short sleep (~5ms) for granularity without busy-wait
+        sceKernelDelayThread(50 * 1000);
         uint64_t now = vita_monotonic_ms();
 
         // Granular tick 50ms (loss window / connection)
@@ -67,31 +60,6 @@ int vita_pacer_thread_main(SceSize args, void* argp)
         {
             vita_netopt_tick();
             last_500_tick = now;
-        }
-
-        // Reset frame_count every 1 second (like legacy) to avoid infinite accumulation
-        if (now - last_fps_reset_ms >= 1000)
-        {
-            fps_window_frames = frame_count;
-            frame_count       = 0; // Reset frame_count for new 1s window
-            // Log every second for detailed FPS monitoring
-            VITA_DEBUG_LOG("[Video][PACER][FPS] fps_window=%u need_drop=%d logCounter=%u", fps_window_frames, need_drop, logCounter);
-            logCounter++;
-            last_fps_reset_ms = now;
-        }
-
-        // Consume adaptive drop budget and load into need_drop (legacy variable) for compatibility
-        // CHANGE: use fresh fps_window_frames to calculate drops (do not accumulate indefinitely)
-        unsigned drops = vita_netopt_consume_drop_budget();
-        if (drops)
-        {
-            // Instead of += (which accumulates), use a model similar to legacy: if fps_window > target, calculate fresh drops
-            // For now, add with a reasonable limit to prevent need_drop from exploding
-            need_drop += (int)drops;
-            if (need_drop > 120)
-            { // Limit: do not let it grow beyond 2 seconds of frames at 60fps
-                need_drop = 120;
-            }
         }
     }
     VITA_DEBUG_LOG("[Video][PACER] thread saliendo");

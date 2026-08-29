@@ -5,11 +5,15 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <atomic>
 #include <climits>
+
+extern "C"
+{
+#include <Platform.h>
+}
+
+#include <atomic>
 #include <mutex>
-#include <unordered_map>
-#include <vector>
 
 #include "debug.hpp"
 #include "gamestream/client.h"
@@ -18,11 +22,15 @@
 extern "C"
 {
 #include <libavcodec/avcodec.h>
+#include <libavutil/error.h>
 #include <libavutil/imgutils.h>
 #include <libavutil/opt.h>
 #include <libavutil/pixfmt.h>
 #include <libswscale/swscale.h>
 }
+
+#include <psp2/kernel/processmgr.h>
+#include <psp2/kernel/threadmgr.h>
 
 #include <borealis/core/application.hpp>
 
@@ -35,8 +43,6 @@ extern "C"
 #include <borealis/extern/nanovg/nanovg_gxm_utils.h>
 #include <psp2/display.h>
 #include <psp2/gxm.h>
-#include <psp2/kernel/processmgr.h>
-#include <psp2/kernel/threadmgr.h>
 #include <psp2/videodec.h>
 #endif
 
@@ -47,6 +53,20 @@ static std::mutex g_ffmpeg_mutex;
 static std::atomic<int> g_active_decodes { 0 };
 static std::atomic<bool> g_ffmpeg_stop_request { false };
 static unsigned g_ffmpeg_frame_index = 0;
+static std::atomic<bool> g_ffmpeg_watchdog_active { false };
+static std::atomic<bool> g_ffmpeg_watchdog_fired { false };
+static std::atomic<bool> g_ffmpeg_last_input_was_idr { false };
+static std::atomic<uint32_t> g_ffmpeg_last_input_ms { 0 };
+static uint64_t g_ffmpeg_last_input_callback_us = 0;
+static uint64_t g_ffmpeg_last_enqueue_us        = 0;
+static RTP_VIDEO_STATS g_ffmpeg_rtp_snapshot    = {};
+static bool g_ffmpeg_rtp_snapshot_valid         = false;
+static std::atomic<uint32_t> g_dr_pool_allocated { 0 };
+static std::atomic<uint32_t> g_dr_pool_in_use { 0 };
+static std::atomic<uint32_t> g_dr_pool_pending { 0 };
+static std::atomic<uint32_t> g_dr_pool_exhaustions { 0 };
+static std::atomic<uint32_t> g_dr_pool_alloc_failures { 0 };
+static std::atomic<uint32_t> g_dr_pool_map_failures { 0 };
 
 static inline void wait_for_borealis_gxm_idle()
 {
@@ -86,9 +106,26 @@ struct ffmpeg_perf_counters
     uint32_t send_max_us;
     uint64_t recv_total_us;
     uint32_t recv_max_us;
-    uint32_t dropped_decode_units;
     uint32_t dropped_stale_frames;
-    uint32_t adaptive_drop_interval;
+    uint32_t stale_refreshes;
+    uint32_t ingress_samples;
+    uint64_t assembly_total_us;
+    uint32_t assembly_max_us;
+    uint64_t callback_delay_total_us;
+    uint32_t callback_delay_max_us;
+    uint32_t callback_gap_samples;
+    uint64_t callback_gap_total_us;
+    uint32_t callback_gap_max_us;
+    uint32_t callback_gap_over_50ms;
+    uint32_t enqueue_gap_samples;
+    uint64_t enqueue_gap_total_us;
+    uint32_t enqueue_gap_max_us;
+    uint32_t enqueue_gap_over_50ms;
+    uint64_t host_latency_total_us;
+    uint32_t host_latency_max_us;
+    uint32_t output_age_samples;
+    uint64_t output_age_total_us;
+    uint32_t output_age_max_us;
     uint64_t publish_total_us;
     uint32_t publish_max_us;
     uint64_t publish_direct_total_us;
@@ -101,9 +138,233 @@ struct ffmpeg_perf_counters
 
 static ffmpeg_perf_counters g_perf = { 0 };
 
+struct ffmpeg_perf_report
+{
+    ffmpeg_perf_counters perf;
+    uint32_t elapsed_ms;
+    uint32_t present_fps;
+    int pending_frames;
+    uint32_t pool_in_use;
+    uint32_t pool_allocated;
+    uint32_t pool_pending;
+    uint32_t pool_exhaustions;
+    uint32_t pool_alloc_failures;
+    uint32_t pool_map_failures;
+    bool has_net_delta;
+    uint32_t net_packets;
+    uint32_t net_fec;
+    uint32_t net_recovered;
+    uint32_t net_failed;
+    uint32_t net_oos;
+    uint32_t net_invalid;
+    uint32_t net_fec_invalid;
+};
+
+constexpr uint32_t PERF_REPORT_QUEUE_CAPACITY = 4;
+constexpr int PERF_REPORT_THREAD_PRIORITY     = 0x10000114;
+static ffmpeg_perf_report g_perf_report_queue[PERF_REPORT_QUEUE_CAPACITY];
+static std::atomic<uint32_t> g_perf_report_read { 0 };
+static std::atomic<uint32_t> g_perf_report_write { 0 };
+static std::atomic<uint32_t> g_perf_report_dropped { 0 };
+static std::atomic<SceUID> g_perf_report_sema { -1 };
+static std::atomic<SceUID> g_perf_report_thread { -1 };
+static std::atomic<bool> g_perf_report_running { false };
+static std::atomic<bool> g_perf_report_stop { false };
+static std::mutex g_perf_report_lifecycle_mutex;
+
 static inline uint32_t perf_now_us()
 {
     return sceKernelGetProcessTimeLow();
+}
+
+static void write_perf_report(const ffmpeg_perf_report& report)
+{
+    const ffmpeg_perf_counters& perf = report.perf;
+    uint32_t denom                   = report.elapsed_ms ? report.elapsed_ms : 1;
+    uint32_t submitFps               = (uint32_t)(((uint64_t)perf.submit_calls * 1000ULL) / denom);
+    uint32_t decodedFps              = (uint32_t)(((uint64_t)perf.decoded_frames * 1000ULL) / denom);
+    uint32_t publishedFps            = (uint32_t)(((uint64_t)perf.published_frames * 1000ULL) / denom);
+    uint32_t swsAvgUs                = perf.sws_calls ? (uint32_t)(perf.sws_total_us / perf.sws_calls) : 0;
+    uint32_t submitAvgUs             = perf.submit_calls ? (uint32_t)(perf.submit_total_us / perf.submit_calls) : 0;
+    uint32_t lockAvgUs               = perf.submit_calls ? (uint32_t)(perf.lock_wait_total_us / perf.submit_calls) : 0;
+    uint32_t drainAvgUs              = perf.submit_calls ? (uint32_t)(perf.drain_total_us / perf.submit_calls) : 0;
+    uint32_t copyAvgUs               = perf.submit_calls ? (uint32_t)(perf.copy_total_us / perf.submit_calls) : 0;
+    uint32_t sendAvgUs               = perf.submit_calls ? (uint32_t)(perf.send_total_us / perf.submit_calls) : 0;
+    uint32_t recvAvgUs               = perf.submit_calls ? (uint32_t)(perf.recv_total_us / perf.submit_calls) : 0;
+    uint32_t publishAvgUs            = perf.published_frames ? (uint32_t)(perf.publish_total_us / perf.published_frames) : 0;
+    uint32_t pubDirectAvgUs          = perf.published_frames ? (uint32_t)(perf.publish_direct_total_us / perf.published_frames) : 0;
+    uint32_t pubSwAvgUs              = perf.published_frames ? (uint32_t)(perf.publish_sw_total_us / perf.published_frames) : 0;
+    uint32_t slotsMtxAvgUs           = perf.published_frames ? (uint32_t)(perf.slots_mutex_total_us / perf.published_frames) : 0;
+    uint32_t assemblyAvgUs           = perf.ingress_samples ? (uint32_t)(perf.assembly_total_us / perf.ingress_samples) : 0;
+    uint32_t callbackAvgUs           = perf.ingress_samples ? (uint32_t)(perf.callback_delay_total_us / perf.ingress_samples) : 0;
+    uint32_t callbackGapAvgUs        = perf.callback_gap_samples ? (uint32_t)(perf.callback_gap_total_us / perf.callback_gap_samples) : 0;
+    uint32_t enqueueGapAvgUs         = perf.enqueue_gap_samples ? (uint32_t)(perf.enqueue_gap_total_us / perf.enqueue_gap_samples) : 0;
+    uint32_t hostAvgUs               = perf.ingress_samples ? (uint32_t)(perf.host_latency_total_us / perf.ingress_samples) : 0;
+    uint32_t outputAgeAvgUs          = perf.output_age_samples ? (uint32_t)(perf.output_age_total_us / perf.output_age_samples) : 0;
+
+    VITA_DEBUG_LOG("[PERF][VIDEO] win=%ums submit=%u/s dec=%u/s pub=%u/s present=%u/s queue=%d",
+        report.elapsed_ms, submitFps, decodedFps, publishedFps,
+        report.present_fps, report.pending_frames);
+    VITA_DEBUG_LOG("[PERF][VIDEO] submit_avg=%u/%umax lock=%u/%umax drain=%u/%umax copy=%u/%umax send=%u/%umax recv=%u/%umax",
+        submitAvgUs, perf.submit_max_us, lockAvgUs, perf.lock_wait_max_us,
+        drainAvgUs, perf.drain_max_us, copyAvgUs, perf.copy_max_us,
+        sendAvgUs, perf.send_max_us, recvAvgUs, perf.recv_max_us);
+    VITA_DEBUG_LOG("[PERF][VIDEO] pub_avg=%u/%umax dr=%u/%umax sw=%u/%umax slots_mtx=%u/%umax sws=%u/%umax stale=%u refresh=%u",
+        publishAvgUs, perf.publish_max_us,
+        pubDirectAvgUs, perf.publish_direct_max_us,
+        pubSwAvgUs, perf.publish_sw_max_us,
+        slotsMtxAvgUs, perf.slots_mutex_max_us,
+        swsAvgUs, perf.sws_max_us,
+        perf.dropped_stale_frames, perf.stale_refreshes);
+    VITA_DEBUG_LOG("[PERF][VIDEO] ingress assembly=%u/%umax callback=%u/%umax enqueue_gap=%u/%umax enqueue50=%u callback_gap=%u/%umax callback50=%u host=%u/%umax age=%u/%umax",
+        assemblyAvgUs, perf.assembly_max_us,
+        callbackAvgUs, perf.callback_delay_max_us,
+        enqueueGapAvgUs, perf.enqueue_gap_max_us, perf.enqueue_gap_over_50ms,
+        callbackGapAvgUs, perf.callback_gap_max_us, perf.callback_gap_over_50ms,
+        hostAvgUs, perf.host_latency_max_us,
+        outputAgeAvgUs, perf.output_age_max_us);
+    VITA_DEBUG_LOG("[PERF][VIDEO] pool=%u/%u pending=%u exhaust=%u alloc_fail=%u map_fail=%u",
+        report.pool_in_use, report.pool_allocated, report.pool_pending,
+        report.pool_exhaustions, report.pool_alloc_failures, report.pool_map_failures);
+    if (report.has_net_delta)
+    {
+        VITA_DEBUG_LOG("[PERF][NET] packets=%u fec=%u recovered=%u failed=%u oos=%u invalid=%u fec_invalid=%u",
+            report.net_packets, report.net_fec, report.net_recovered,
+            report.net_failed, report.net_oos, report.net_invalid,
+            report.net_fec_invalid);
+    }
+}
+
+static int perf_report_thread_main(SceSize, void*)
+{
+    while (true)
+    {
+        SceUID sema = g_perf_report_sema.load(std::memory_order_acquire);
+        if (sema < 0)
+        {
+            break;
+        }
+        sceKernelWaitSema(sema, 1, nullptr);
+
+        uint32_t read  = g_perf_report_read.load(std::memory_order_relaxed);
+        uint32_t write = g_perf_report_write.load(std::memory_order_acquire);
+        while (read != write)
+        {
+            write_perf_report(g_perf_report_queue[read]);
+            read = (read + 1) % PERF_REPORT_QUEUE_CAPACITY;
+            g_perf_report_read.store(read, std::memory_order_release);
+            write = g_perf_report_write.load(std::memory_order_acquire);
+        }
+
+        uint32_t dropped = g_perf_report_dropped.exchange(0, std::memory_order_acq_rel);
+        if (dropped)
+        {
+            VITA_DEBUG_LOG("[PERF][VIDEO] reporter dropped %u snapshots", dropped);
+        }
+        if (g_perf_report_stop.load(std::memory_order_acquire) && read == write)
+        {
+            break;
+        }
+    }
+    return 0;
+}
+
+static void stop_perf_reporter();
+
+static void start_perf_reporter()
+{
+    std::lock_guard<std::mutex> lock(g_perf_report_lifecycle_mutex);
+    if (g_perf_report_running.load(std::memory_order_acquire))
+    {
+        return;
+    }
+
+    SceUID sema = sceKernelCreateSema("ffmpeg_perf_queue", 0, 0, 1, nullptr);
+    if (sema < 0)
+    {
+        VITA_DEBUG_LOG("[PERF][VIDEO] reporter sema creation failed: 0x%08X", sema);
+        return;
+    }
+    SceUID thread = sceKernelCreateThread("ffmpeg_perf", perf_report_thread_main,
+        PERF_REPORT_THREAD_PRIORITY, 0x8000, 0, 0, nullptr);
+    if (thread < 0)
+    {
+        VITA_DEBUG_LOG("[PERF][VIDEO] reporter thread creation failed: 0x%08X", thread);
+        sceKernelDeleteSema(sema);
+        return;
+    }
+
+    g_perf_report_read.store(0, std::memory_order_relaxed);
+    g_perf_report_write.store(0, std::memory_order_relaxed);
+    g_perf_report_dropped.store(0, std::memory_order_relaxed);
+    g_perf_report_stop.store(false, std::memory_order_release);
+    g_perf_report_sema.store(sema, std::memory_order_release);
+    g_perf_report_thread.store(thread, std::memory_order_release);
+    int startResult = sceKernelStartThread(thread, 0, nullptr);
+    if (startResult < 0)
+    {
+        VITA_DEBUG_LOG("[PERF][VIDEO] reporter thread start failed: 0x%08X", startResult);
+        g_perf_report_thread.store(-1, std::memory_order_release);
+        g_perf_report_sema.store(-1, std::memory_order_release);
+        sceKernelDeleteThread(thread);
+        sceKernelDeleteSema(sema);
+        return;
+    }
+    g_perf_report_running.store(true, std::memory_order_release);
+    VITA_DEBUG_LOG("[PERF][VIDEO] reporter started");
+}
+
+static void stop_perf_reporter()
+{
+    std::lock_guard<std::mutex> lock(g_perf_report_lifecycle_mutex);
+    if (!g_perf_report_running.load(std::memory_order_acquire))
+    {
+        return;
+    }
+
+    g_perf_report_stop.store(true, std::memory_order_release);
+    SceUID sema = g_perf_report_sema.load(std::memory_order_acquire);
+    if (sema >= 0)
+    {
+        sceKernelSignalSema(sema, 1);
+    }
+    SceUID thread = g_perf_report_thread.load(std::memory_order_acquire);
+    if (thread >= 0)
+    {
+        sceKernelWaitThreadEnd(thread, nullptr, nullptr);
+        sceKernelDeleteThread(thread);
+    }
+    if (sema >= 0)
+    {
+        sceKernelDeleteSema(sema);
+    }
+
+    g_perf_report_thread.store(-1, std::memory_order_release);
+    g_perf_report_sema.store(-1, std::memory_order_release);
+    g_perf_report_running.store(false, std::memory_order_release);
+    g_perf_report_stop.store(false, std::memory_order_release);
+}
+
+static void enqueue_perf_report(const ffmpeg_perf_report& report)
+{
+    if (!g_perf_report_running.load(std::memory_order_acquire))
+    {
+        return;
+    }
+    uint32_t write = g_perf_report_write.load(std::memory_order_relaxed);
+    uint32_t next  = (write + 1) % PERF_REPORT_QUEUE_CAPACITY;
+    if (next == g_perf_report_read.load(std::memory_order_acquire))
+    {
+        g_perf_report_dropped.fetch_add(1, std::memory_order_relaxed);
+        return;
+    }
+    g_perf_report_queue[write] = report;
+    g_perf_report_write.store(next, std::memory_order_release);
+    SceUID sema = g_perf_report_sema.load(std::memory_order_acquire);
+    if (sema >= 0)
+    {
+        sceKernelSignalSema(sema, 1);
+    }
 }
 
 static void perf_report_if_due()
@@ -121,70 +382,39 @@ static void perf_report_if_due()
         return;
     }
 
-    uint32_t denom          = elapsedMs ? elapsedMs : 1;
-    uint32_t submitFps      = (uint32_t)(((uint64_t)g_perf.submit_calls * 1000ULL) / denom);
-    uint32_t decodedFps     = (uint32_t)(((uint64_t)g_perf.decoded_frames * 1000ULL) / denom);
-    uint32_t publishedFps   = (uint32_t)(((uint64_t)g_perf.published_frames * 1000ULL) / denom);
-    uint32_t swsAvgUs       = g_perf.sws_calls ? (uint32_t)(g_perf.sws_total_us / g_perf.sws_calls) : 0;
-    uint32_t submitAvgUs    = g_perf.submit_calls ? (uint32_t)(g_perf.submit_total_us / g_perf.submit_calls) : 0;
-    uint32_t lockAvgUs      = g_perf.submit_calls ? (uint32_t)(g_perf.lock_wait_total_us / g_perf.submit_calls) : 0;
-    uint32_t drainAvgUs     = g_perf.submit_calls ? (uint32_t)(g_perf.drain_total_us / g_perf.submit_calls) : 0;
-    uint32_t copyAvgUs      = g_perf.submit_calls ? (uint32_t)(g_perf.copy_total_us / g_perf.submit_calls) : 0;
-    uint32_t sendAvgUs      = g_perf.submit_calls ? (uint32_t)(g_perf.send_total_us / g_perf.submit_calls) : 0;
-    uint32_t recvAvgUs      = g_perf.submit_calls ? (uint32_t)(g_perf.recv_total_us / g_perf.submit_calls) : 0;
-    uint32_t publishAvgUs   = g_perf.published_frames ? (uint32_t)(g_perf.publish_total_us / g_perf.published_frames) : 0;
-    uint32_t pubDirectAvgUs = g_perf.published_frames ? (uint32_t)(g_perf.publish_direct_total_us / g_perf.published_frames) : 0;
-    uint32_t pubSwAvgUs     = g_perf.published_frames ? (uint32_t)(g_perf.publish_sw_total_us / g_perf.published_frames) : 0;
-    uint32_t slotsMtxAvgUs  = g_perf.published_frames ? (uint32_t)(g_perf.slots_mutex_total_us / g_perf.published_frames) : 0;
+    ffmpeg_perf_report report  = {};
+    report.perf                = g_perf;
+    report.elapsed_ms          = elapsedMs;
+    report.present_fps         = g_stats.current_fps;
+    report.pending_frames      = LiGetPendingVideoFrames();
+    report.pool_in_use         = g_dr_pool_in_use.load(std::memory_order_relaxed);
+    report.pool_allocated      = g_dr_pool_allocated.load(std::memory_order_relaxed);
+    report.pool_pending        = g_dr_pool_pending.load(std::memory_order_relaxed);
+    report.pool_exhaustions    = g_dr_pool_exhaustions.exchange(0, std::memory_order_relaxed);
+    report.pool_alloc_failures = g_dr_pool_alloc_failures.exchange(0, std::memory_order_relaxed);
+    report.pool_map_failures   = g_dr_pool_map_failures.exchange(0, std::memory_order_relaxed);
 
-    // Main pipeline timing log
-    VITA_DEBUG_LOG("[PERF][VIDEO] win=%ums submit=%u/s dec=%u/s pub=%u/s present=%u/s",
-        elapsedMs, submitFps, decodedFps, publishedFps, g_stats.current_fps);
-    // Per-frame breakdown (all values in microseconds)
-    VITA_DEBUG_LOG("[PERF][VIDEO] submit_avg=%u/%umax lock=%u/%umax drain=%u/%umax copy=%u/%umax send=%u/%umax recv=%u/%umax",
-        submitAvgUs, g_perf.submit_max_us,
-        lockAvgUs, g_perf.lock_wait_max_us,
-        drainAvgUs, g_perf.drain_max_us,
-        copyAvgUs, g_perf.copy_max_us,
-        sendAvgUs, g_perf.send_max_us,
-        recvAvgUs, g_perf.recv_max_us);
-    VITA_DEBUG_LOG("[PERF][VIDEO] pub_avg=%u/%umax dr=%u/%umax sw=%u/%umax slots_mtx=%u/%umax sws=%u/%umax drop=%u stale=%u",
-        publishAvgUs, g_perf.publish_max_us,
-        pubDirectAvgUs, g_perf.publish_direct_max_us,
-        pubSwAvgUs, g_perf.publish_sw_max_us,
-        slotsMtxAvgUs, g_perf.slots_mutex_max_us,
-        swsAvgUs, g_perf.sws_max_us,
-        g_perf.dropped_decode_units, g_perf.dropped_stale_frames);
+    const RTP_VIDEO_STATS* rtpStats = LiGetRTPVideoStats();
+    if (rtpStats)
+    {
+        if (g_ffmpeg_rtp_snapshot_valid)
+        {
+            report.has_net_delta   = true;
+            report.net_packets     = rtpStats->packetCountVideo - g_ffmpeg_rtp_snapshot.packetCountVideo;
+            report.net_fec         = rtpStats->packetCountFec - g_ffmpeg_rtp_snapshot.packetCountFec;
+            report.net_recovered   = rtpStats->packetCountFecRecovered - g_ffmpeg_rtp_snapshot.packetCountFecRecovered;
+            report.net_failed      = rtpStats->packetCountFecFailed - g_ffmpeg_rtp_snapshot.packetCountFecFailed;
+            report.net_oos         = rtpStats->packetCountOOS - g_ffmpeg_rtp_snapshot.packetCountOOS;
+            report.net_invalid     = rtpStats->packetCountInvalid - g_ffmpeg_rtp_snapshot.packetCountInvalid;
+            report.net_fec_invalid = rtpStats->packetCountFecInvalid - g_ffmpeg_rtp_snapshot.packetCountFecInvalid;
+        }
+        g_ffmpeg_rtp_snapshot       = *rtpStats;
+        g_ffmpeg_rtp_snapshot_valid = true;
+    }
 
-    g_perf.window_start_ms         = nowMs;
-    g_perf.submit_calls            = 0;
-    g_perf.decoded_frames          = 0;
-    g_perf.published_frames        = 0;
-    g_perf.sws_calls               = 0;
-    g_perf.sws_total_us            = 0;
-    g_perf.sws_max_us              = 0;
-    g_perf.submit_total_us         = 0;
-    g_perf.submit_max_us           = 0;
-    g_perf.lock_wait_total_us      = 0;
-    g_perf.lock_wait_max_us        = 0;
-    g_perf.drain_total_us          = 0;
-    g_perf.drain_max_us            = 0;
-    g_perf.copy_total_us           = 0;
-    g_perf.copy_max_us             = 0;
-    g_perf.send_total_us           = 0;
-    g_perf.send_max_us             = 0;
-    g_perf.recv_total_us           = 0;
-    g_perf.recv_max_us             = 0;
-    g_perf.dropped_decode_units    = 0;
-    g_perf.dropped_stale_frames    = 0;
-    g_perf.publish_total_us        = 0;
-    g_perf.publish_max_us          = 0;
-    g_perf.publish_direct_total_us = 0;
-    g_perf.publish_direct_max_us   = 0;
-    g_perf.publish_sw_total_us     = 0;
-    g_perf.publish_sw_max_us       = 0;
-    g_perf.slots_mutex_total_us    = 0;
-    g_perf.slots_mutex_max_us      = 0;
+    memset(&g_perf, 0, sizeof(g_perf));
+    g_perf.window_start_ms = nowMs;
+    enqueue_perf_report(report);
 }
 
 #ifdef BOREALIS_USE_GXM
@@ -218,102 +448,27 @@ static const dr_format_spec* get_dr_format_spec(enum AVPixelFormat fmt)
 }
 
 static std::mutex g_dr_mutex;
-// Deferred direct rendering texture unmap and free queue to avoid GPU page faults
-struct DeferredDirectTextureRelease
-{
-    void* vram_data;
-    SceUID memblock;
-    uint32_t frame_index;
-};
-static std::vector<DeferredDirectTextureRelease> g_deferred_releases;
-static std::mutex g_deferred_releases_mutex;
-
 static std::atomic<uint32_t> g_ffmpeg_presented_frames { 0 };
+
+static constexpr int kDirectBufferPoolSize = 12;
+
+struct DirectBufferSlot
+{
+    void* data;
+    SceUID memblock;
+    int size;
+    bool in_use;
+    bool pending_release;
+    bool presented;
+    uint32_t release_frame;
+};
+
+static DirectBufferSlot g_dr_pool[kDirectBufferPoolSize] = {};
+static std::mutex g_dr_pool_mutex;
 
 extern "C" void ffmpeg_increment_presented_frames(void)
 {
     g_ffmpeg_presented_frames.fetch_add(1, std::memory_order_release);
-}
-
-static inline void process_pending_vram_frees_if_safe() { }
-
-static void dummy_vram_free(void* opaque, uint8_t* data)
-{
-    // CDRAM buffers and mappings are managed dynamically by g_deferred_releases
-    // to prevent unmapping/freeing memory while the GPU is still sampling it.
-    SceUID mb = (SceUID)(intptr_t)opaque;
-    if (mb > 0)
-    {
-        uint32_t current_presented = g_ffmpeg_presented_frames.load(std::memory_order_acquire);
-        std::lock_guard<std::mutex> lock_releases(g_deferred_releases_mutex);
-        g_deferred_releases.push_back({ data, mb, current_presented });
-    }
-}
-
-extern "C" void ffmpeg_process_deferred_releases(void)
-{
-    std::vector<DeferredDirectTextureRelease> to_process;
-    {
-        std::lock_guard<std::mutex> lock(g_deferred_releases_mutex);
-        if (g_deferred_releases.empty())
-        {
-            return;
-        }
-        uint32_t current_presented = g_ffmpeg_presented_frames.load(std::memory_order_acquire);
-        auto it                    = g_deferred_releases.begin();
-        while (it != g_deferred_releases.end())
-        {
-            // Grace window: wait for 3 presented frames to ensure GXM TBDR scene is fully completed and presented
-            if (current_presented >= it->frame_index + 3)
-            {
-                to_process.push_back(*it);
-                it = g_deferred_releases.erase(it);
-            }
-            else
-            {
-                ++it;
-            }
-        }
-    }
-    for (const auto& item : to_process)
-    {
-        if (item.vram_data)
-        {
-            sceGxmUnmapMemory(item.vram_data);
-        }
-        if (item.memblock > 0)
-        {
-            sceKernelFreeMemBlock(item.memblock);
-            // VITA_DEBUG_LOG("[FFMPEG][DEFER] Safely unmapped and freed memblock %d on render thread (grace window elapsed, presented=%u, queued_at=%u)",
-            //                item.memblock, g_ffmpeg_presented_frames.load(std::memory_order_acquire), item.frame_index);
-        }
-    }
-}
-
-extern "C" void ffmpeg_flush_deferred_releases(void)
-{
-    std::vector<DeferredDirectTextureRelease> to_process;
-    {
-        std::lock_guard<std::mutex> lock(g_deferred_releases_mutex);
-        if (g_deferred_releases.empty())
-        {
-            return;
-        }
-        to_process = std::move(g_deferred_releases);
-        g_deferred_releases.clear();
-    }
-    for (const auto& item : to_process)
-    {
-        if (item.vram_data)
-        {
-            sceGxmUnmapMemory(item.vram_data);
-        }
-        if (item.memblock > 0)
-        {
-            sceKernelFreeMemBlock(item.memblock);
-            VITA_DEBUG_LOG("[FFMPEG][DEFER] Flushed and freed memblock %d immediately on stream stop", item.memblock);
-        }
-    }
 }
 
 static bool vram_alloc(int* size, SceUID* mb, void** ptr)
@@ -340,6 +495,171 @@ static bool vram_alloc(int* size, SceUID* mb, void** ptr)
     return true;
 }
 
+static void reclaim_direct_buffers_locked(bool force)
+{
+    uint32_t currentPresented = g_ffmpeg_presented_frames.load(std::memory_order_acquire);
+    for (DirectBufferSlot& slot : g_dr_pool)
+    {
+        if (!slot.pending_release)
+        {
+            continue;
+        }
+        if (force || currentPresented >= slot.release_frame + 3)
+        {
+            slot.pending_release = false;
+            g_dr_pool_pending.fetch_sub(1, std::memory_order_relaxed);
+        }
+    }
+}
+
+static void release_direct_buffer(void* opaque, uint8_t* data)
+{
+    (void)data;
+    DirectBufferSlot* slot = static_cast<DirectBufferSlot*>(opaque);
+    if (!slot)
+    {
+        return;
+    }
+
+    std::lock_guard<std::mutex> lock(g_dr_pool_mutex);
+    if (!slot->in_use)
+    {
+        return;
+    }
+    slot->in_use = false;
+    g_dr_pool_in_use.fetch_sub(1, std::memory_order_relaxed);
+    if (slot->presented)
+    {
+        slot->pending_release = true;
+        slot->release_frame   = g_ffmpeg_presented_frames.load(std::memory_order_acquire);
+        g_dr_pool_pending.fetch_add(1, std::memory_order_relaxed);
+    }
+    else
+    {
+        slot->pending_release = false;
+    }
+    slot->presented = false;
+}
+
+extern "C" void ffmpeg_mark_direct_buffer_presented(const void* data)
+{
+    if (!data)
+    {
+        return;
+    }
+
+    std::lock_guard<std::mutex> lock(g_dr_pool_mutex);
+    for (DirectBufferSlot& slot : g_dr_pool)
+    {
+        if (slot.in_use && slot.data == data)
+        {
+            slot.presented = true;
+            return;
+        }
+    }
+}
+
+extern "C" void ffmpeg_process_deferred_releases(void)
+{
+    std::lock_guard<std::mutex> lock(g_dr_pool_mutex);
+    reclaim_direct_buffers_locked(false);
+}
+
+static inline void process_pending_vram_frees_if_safe()
+{
+    ffmpeg_process_deferred_releases();
+}
+
+extern "C" void ffmpeg_flush_deferred_releases(void)
+{
+    std::lock_guard<std::mutex> lock(g_dr_pool_mutex);
+    reclaim_direct_buffers_locked(true);
+}
+
+static void destroy_direct_buffer_pool()
+{
+    std::lock_guard<std::mutex> lock(g_dr_pool_mutex);
+    reclaim_direct_buffers_locked(true);
+
+    uint32_t remaining = 0;
+    for (DirectBufferSlot& slot : g_dr_pool)
+    {
+        if (slot.in_use)
+        {
+            VITA_DEBUG_LOG("[FFMPEG][POOL] retaining in-use memblock %d during cleanup", slot.memblock);
+            remaining++;
+            continue;
+        }
+        if (slot.data)
+        {
+            sceGxmUnmapMemory(slot.data);
+        }
+        if (slot.memblock > 0)
+        {
+            sceKernelFreeMemBlock(slot.memblock);
+        }
+        memset(&slot, 0, sizeof(slot));
+    }
+
+    g_dr_pool_allocated.store(remaining, std::memory_order_relaxed);
+    g_dr_pool_in_use.store(remaining, std::memory_order_relaxed);
+    g_dr_pool_pending.store(0, std::memory_order_relaxed);
+}
+
+static DirectBufferSlot* acquire_direct_buffer(AVCodecContext* avctx, int size)
+{
+    std::lock_guard<std::mutex> lock(g_dr_pool_mutex);
+    reclaim_direct_buffers_locked(false);
+
+    for (DirectBufferSlot& slot : g_dr_pool)
+    {
+        if (slot.memblock > 0 && !slot.in_use && !slot.pending_release && slot.size >= size)
+        {
+            slot.in_use    = true;
+            slot.presented = false;
+            g_dr_pool_in_use.fetch_add(1, std::memory_order_relaxed);
+            return &slot;
+        }
+    }
+
+    for (DirectBufferSlot& slot : g_dr_pool)
+    {
+        if (slot.memblock > 0)
+        {
+            continue;
+        }
+
+        int allocationSize = size;
+        if (!vram_alloc(&allocationSize, &slot.memblock, &slot.data))
+        {
+            g_dr_pool_alloc_failures.fetch_add(1, std::memory_order_relaxed);
+            av_log(avctx, AV_LOG_ERROR, "vita direct buffer allocation failed for %d bytes\n", allocationSize);
+            return nullptr;
+        }
+
+        int mapRes = sceGxmMapMemory(slot.data, allocationSize, SCE_GXM_MEMORY_ATTRIB_READ);
+        if (mapRes < 0)
+        {
+            sceKernelFreeMemBlock(slot.memblock);
+            memset(&slot, 0, sizeof(slot));
+            g_dr_pool_map_failures.fetch_add(1, std::memory_order_relaxed);
+            av_log(avctx, AV_LOG_ERROR, "vita direct buffer map failed: 0x%x\n", mapRes);
+            return nullptr;
+        }
+
+        slot.size      = allocationSize;
+        slot.in_use    = true;
+        slot.presented = false;
+        g_dr_pool_allocated.fetch_add(1, std::memory_order_relaxed);
+        g_dr_pool_in_use.fetch_add(1, std::memory_order_relaxed);
+        return &slot;
+    }
+
+    g_dr_pool_exhaustions.fetch_add(1, std::memory_order_relaxed);
+    av_log(avctx, AV_LOG_ERROR, "vita direct buffer pool exhausted (%d slots)\n", kDirectBufferPoolSize);
+    return nullptr;
+}
+
 extern "C" int get_buffer2_direct(AVCodecContext* avctx, AVFrame* pic, int /*flags*/)
 {
     const dr_format_spec* spec = get_dr_format_spec((enum AVPixelFormat)pic->format);
@@ -352,36 +672,42 @@ extern "C" int get_buffer2_direct(AVCodecContext* avctx, AVFrame* pic, int /*fla
     int height = FFMAX(FFALIGN(pic->height, 16), 64);
     int pitch  = FFALIGN(width, (int)spec->alignment_pitch);
 
-    SceUID mb  = 0;
-    void* vram = nullptr;
-    int size   = av_image_get_buffer_size((enum AVPixelFormat)pic->format, pitch, height, 1);
-    if (!vram_alloc(&size, &mb, &vram))
+    int size = av_image_get_buffer_size((enum AVPixelFormat)pic->format, pitch, height, 1);
+    if (size < 0)
+    {
+        return size;
+    }
+
+    size                   = FFALIGN(size, 256 * 1024);
+    DirectBufferSlot* slot = acquire_direct_buffer(avctx, size);
+    if (!slot)
     {
         return AVERROR(ENOMEM);
     }
 
-    int mapRes = sceGxmMapMemory(vram, size, SCE_GXM_MEMORY_ATTRIB_READ);
-    if (mapRes < 0)
-    {
-        sceKernelFreeMemBlock(mb);
-        return AVERROR(ENOMEM);
-    }
-
-    pic->buf[0] = av_buffer_create((uint8_t*)vram, size, dummy_vram_free, (void*)(intptr_t)mb, 0);
-    if (!pic->buf[0])
-    {
-        sceGxmUnmapMemory(vram);
-        sceKernelFreeMemBlock(mb);
-        return AVERROR(ENOMEM);
-    }
-
-    av_image_fill_arrays(pic->data,
+    int fillRes = av_image_fill_arrays(pic->data,
         pic->linesize,
-        (const uint8_t*)vram,
+        static_cast<const uint8_t*>(slot->data),
         (enum AVPixelFormat)pic->format,
         pitch,
         height,
         1);
+    if (fillRes < 0)
+    {
+        std::lock_guard<std::mutex> lock(g_dr_pool_mutex);
+        slot->in_use = false;
+        g_dr_pool_in_use.fetch_sub(1, std::memory_order_relaxed);
+        return fillRes;
+    }
+
+    pic->buf[0] = av_buffer_create(static_cast<uint8_t*>(slot->data), slot->size, release_direct_buffer, slot, 0);
+    if (!pic->buf[0])
+    {
+        std::lock_guard<std::mutex> lock(g_dr_pool_mutex);
+        slot->in_use = false;
+        g_dr_pool_in_use.fetch_sub(1, std::memory_order_relaxed);
+        return AVERROR(ENOMEM);
+    }
     return 0;
 }
 
@@ -475,55 +801,216 @@ static void reset_global_slots()
     frame_textures[0] = nullptr;
     frame_textures[1] = nullptr;
     frame_textures[2] = nullptr;
-
-    int bufferMode = g_video_settings_snapshot.buffer_mode;
-    if (bufferMode == 2)
-    {
-        frame_display_idx   = 0;
-        frame_ready_idx     = 1;
-        frame_write_idx     = 2;
-        single_frame_buffer = false;
-    }
-    else if (bufferMode == 1)
-    {
-        frame_display_idx   = 0;
-        frame_ready_idx     = 0;
-        frame_write_idx     = 1;
-        single_frame_buffer = false;
-    }
-    else
-    {
-        frame_display_idx   = 0;
-        frame_ready_idx     = 0;
-        frame_write_idx     = 0;
-        single_frame_buffer = true;
-    }
-    __atomic_store_n(&frame_ready_flag, false, __ATOMIC_RELEASE);
-}
-
-static void free_decode_unit(PDECODE_UNIT unit)
-{
-    if (!unit)
-    {
-        return;
-    }
-    PLENTRY entry = unit->bufferList;
-    while (entry)
-    {
-        PLENTRY next = entry->next;
-        if (entry->data)
-        {
-            free(entry->data);
-        }
-        free(entry);
-        entry = next;
-    }
-    free(unit);
+    frame_display_idx = 0;
+    frame_write_idx   = 1;
 }
 
 static uint64_t monotonic_ms_local()
 {
     return vita_monotonic_ms();
+}
+
+static uint64_t monotonic_us_local()
+{
+    return PltGetMicroseconds();
+}
+
+static uint32_t clamp_u32(uint64_t value)
+{
+    return value > UINT32_MAX ? UINT32_MAX : (uint32_t)value;
+}
+
+static void record_ingress_timing(PDECODE_UNIT decodeUnit, uint64_t callbackTimeUs)
+{
+    if (!decodeUnit)
+    {
+        return;
+    }
+
+    uint32_t assemblyUs = 0;
+    if (decodeUnit->enqueueTimeUs >= decodeUnit->receiveTimeUs)
+    {
+        assemblyUs = clamp_u32(decodeUnit->enqueueTimeUs - decodeUnit->receiveTimeUs);
+    }
+
+    uint32_t callbackDelayUs = 0;
+    if (callbackTimeUs >= decodeUnit->enqueueTimeUs)
+    {
+        callbackDelayUs = clamp_u32(callbackTimeUs - decodeUnit->enqueueTimeUs);
+    }
+
+    if (g_ffmpeg_last_enqueue_us && decodeUnit->enqueueTimeUs >= g_ffmpeg_last_enqueue_us)
+    {
+        uint32_t enqueueGapUs = clamp_u32(decodeUnit->enqueueTimeUs - g_ffmpeg_last_enqueue_us);
+        g_perf.enqueue_gap_samples++;
+        g_perf.enqueue_gap_total_us += enqueueGapUs;
+        if (enqueueGapUs > g_perf.enqueue_gap_max_us)
+            g_perf.enqueue_gap_max_us = enqueueGapUs;
+        if (enqueueGapUs > 50000U)
+            g_perf.enqueue_gap_over_50ms++;
+    }
+    if (decodeUnit->enqueueTimeUs)
+    {
+        g_ffmpeg_last_enqueue_us = decodeUnit->enqueueTimeUs;
+    }
+
+    if (g_ffmpeg_last_input_callback_us && callbackTimeUs >= g_ffmpeg_last_input_callback_us)
+    {
+        uint32_t callbackGapUs = clamp_u32(callbackTimeUs - g_ffmpeg_last_input_callback_us);
+        g_perf.callback_gap_samples++;
+        g_perf.callback_gap_total_us += callbackGapUs;
+        if (callbackGapUs > g_perf.callback_gap_max_us)
+            g_perf.callback_gap_max_us = callbackGapUs;
+        if (callbackGapUs > 50000U)
+            g_perf.callback_gap_over_50ms++;
+    }
+    g_ffmpeg_last_input_callback_us = callbackTimeUs;
+    g_ffmpeg_last_input_ms.store((uint32_t)(callbackTimeUs / 1000ULL), std::memory_order_release);
+    g_ffmpeg_last_input_was_idr.store(decodeUnit->frameType == FRAME_TYPE_IDR, std::memory_order_release);
+    g_ffmpeg_watchdog_fired.store(false, std::memory_order_release);
+
+    uint32_t hostLatencyUs = (uint32_t)decodeUnit->frameHostProcessingLatency * 100U;
+    g_perf.ingress_samples++;
+    g_perf.assembly_total_us += assemblyUs;
+    if (assemblyUs > g_perf.assembly_max_us)
+        g_perf.assembly_max_us = assemblyUs;
+    g_perf.callback_delay_total_us += callbackDelayUs;
+    if (callbackDelayUs > g_perf.callback_delay_max_us)
+        g_perf.callback_delay_max_us = callbackDelayUs;
+    g_perf.host_latency_total_us += hostLatencyUs;
+    if (hostLatencyUs > g_perf.host_latency_max_us)
+        g_perf.host_latency_max_us = hostLatencyUs;
+}
+
+static void update_latency_epoch(FFmpegVideoContext* context, PDECODE_UNIT decodeUnit)
+{
+    if (!context || !decodeUnit || !decodeUnit->presentationTimeUs || decodeUnit->receiveTimeUs < decodeUnit->presentationTimeUs)
+    {
+        return;
+    }
+
+    if (context->latency_samples > 0 && (decodeUnit->frameNumber < context->last_input_frame_number || decodeUnit->presentationTimeUs < context->last_input_pts_us))
+    {
+        context->latency_epoch_offset_us = 0;
+        context->latency_samples         = 0;
+    }
+
+    uint64_t offsetUs = decodeUnit->receiveTimeUs - decodeUnit->presentationTimeUs;
+    if (context->latency_samples == 0 || offsetUs < context->latency_epoch_offset_us)
+    {
+        context->latency_epoch_offset_us = offsetUs;
+    }
+    context->last_input_frame_number = decodeUnit->frameNumber;
+    context->last_input_pts_us       = decodeUnit->presentationTimeUs;
+    context->latency_samples++;
+}
+
+static uint32_t frame_interval_us()
+{
+    uint32_t targetFps = g_stats.target_fps ? g_stats.target_fps : 60U;
+    return 1000000U / targetFps;
+}
+
+static bool get_stream_age_us(FFmpegVideoContext* context, uint64_t ptsUs, uint32_t* ageUs)
+{
+    if (!context || !ptsUs || !ageUs || context->latency_samples < 4)
+    {
+        return false;
+    }
+
+    uint64_t expectedUs = context->latency_epoch_offset_us + ptsUs;
+    uint64_t nowUs      = monotonic_us_local();
+    if (nowUs <= expectedUs)
+    {
+        *ageUs = 0;
+        return true;
+    }
+
+    *ageUs = clamp_u32(nowUs - expectedUs);
+    return true;
+}
+
+static bool should_drop_stale_output(FFmpegVideoContext* context, uint64_t ptsUs)
+{
+    uint32_t ageUs = 0;
+    if (!get_stream_age_us(context, ptsUs, &ageUs))
+    {
+        return false;
+    }
+
+    g_perf.output_age_samples++;
+    g_perf.output_age_total_us += ageUs;
+    if (ageUs > g_perf.output_age_max_us)
+        g_perf.output_age_max_us = ageUs;
+
+    uint32_t staleThresholdUs = frame_interval_us() * 4U;
+    if (ageUs <= staleThresholdUs)
+    {
+        return false;
+    }
+
+    static uint32_t staleLogCounter = 0;
+    if ((staleLogCounter++ % 30) == 0)
+    {
+        VITA_DEBUG_LOG("[FFMPEG][LAT] suppressing stale output age=%uus threshold=%uus pts=%llu",
+            ageUs, staleThresholdUs, (unsigned long long)ptsUs);
+    }
+    g_perf.dropped_stale_frames++;
+    g_stats.frames_dropped_pacer++;
+    return true;
+}
+
+static bool should_refresh_stale_stream(FFmpegVideoContext* context, uint64_t ptsUs)
+{
+    if (!context || context->latency_samples < 8)
+    {
+        return false;
+    }
+
+    uint32_t ageUs = 0;
+    if (!get_stream_age_us(context, ptsUs, &ageUs))
+    {
+        return false;
+    }
+
+    uint32_t refreshThresholdUs = frame_interval_us() * 12U;
+    if (ageUs <= refreshThresholdUs)
+    {
+        return false;
+    }
+
+    VITA_DEBUG_LOG("[FFMPEG][LAT] abandoning stale stream age=%uus threshold=%uus; requesting IDR",
+        ageUs, refreshThresholdUs);
+    g_perf.dropped_stale_frames++;
+    g_perf.stale_refreshes++;
+    g_stats.frames_dropped_pacer++;
+    return true;
+}
+
+static int recover_decoder(FFmpegVideoContext* context, const char* stage, int error)
+{
+    char errorText[AV_ERROR_MAX_STRING_SIZE] = {};
+    if (av_strerror(error, errorText, sizeof(errorText)) < 0)
+    {
+        snprintf(errorText, sizeof(errorText), "unknown error");
+    }
+    vita_log::error("[FFMPEG] %s error=0x%X (%s); reopening decoder", stage, error, errorText);
+    ffmpeg_decoder_destroy(&context->decoder);
+    process_pending_vram_frees_if_safe();
+    if (ffmpeg_decoder_init(&context->decoder) < 0)
+    {
+        context->initialized = false;
+        vita_log::error("[FFMPEG] decoder recovery failed");
+    }
+
+    static uint64_t lastForcedIdrUs = 0;
+    uint64_t nowUs                  = monotonic_us_local();
+    if (!lastForcedIdrUs || nowUs - lastForcedIdrUs >= 100000ULL)
+    {
+        vita_netopt_force_idr();
+        lastForcedIdrUs = nowUs;
+    }
+    return DR_NEED_IDR;
 }
 
 // Experimental YUV CSC fast-path is currently unstable with the active render path.
@@ -809,10 +1296,6 @@ static bool publish_direct_frame(FFmpegVideoContext* ctx, AVFrame* frame)
         return false;
     }
 
-    // Triple buffering system:
-    // This fixes tearing and synchronization issues but adds latency.
-    // For maximum performance and minimum latency, single buffer would be better,
-    // but triple buffering is used here for stability. Not optimal for max performance.
     dr_texture* texFront = reinterpret_cast<dr_texture*>(ctx->dr_textures[ctx->dr_front_idx]);
     dr_texture* texSpare = reinterpret_cast<dr_texture*>(ctx->dr_textures[ctx->dr_spare_idx]);
     if (!texSpare)
@@ -1278,6 +1761,11 @@ static bool publish_frame(FFmpegVideoContext* ctx, AVFrame* frame, uint64_t ptsU
         return false;
     }
 
+    if (should_drop_stale_output(ctx, ptsUs))
+    {
+        return false;
+    }
+
     uint32_t publishStartUs = perf_now_us();
 
     bool published       = false;
@@ -1343,48 +1831,13 @@ static bool publish_frame(FFmpegVideoContext* ctx, AVFrame* frame, uint64_t ptsU
         active_idx = ctx->sw_last_present_idx;
 #endif
 
-        int bufferMode = g_video_settings_snapshot.buffer_mode;
-        if (bufferMode == 0)
-        {
-            // Single Buffering: Immediate presentation of the latest active decoded texture slot
-            __atomic_store_n(&frame_display_idx, active_idx, __ATOMIC_RELEASE);
-            __atomic_store_n(&frame_ready_idx, active_idx, __ATOMIC_RELEASE);
-            __atomic_store_n(&frame_write_idx, active_idx, __ATOMIC_RELEASE);
-            single_frame_buffer = true;
-        }
-        else if (bufferMode == 1)
-        {
-            // Double Buffering: Post the decoded frame as ready for the renderer to swap
-            __atomic_store_n(&frame_ready_idx, active_idx, __ATOMIC_RELEASE);
-            __atomic_store_n(&frame_ready_flag, true, __ATOMIC_RELEASE);
-            single_frame_buffer = false;
-        }
-        else
-        {
-            // Triple Buffering: Lock-free atomic exchange
-            int old_ready = __atomic_exchange_n(&frame_ready_idx, active_idx, __ATOMIC_SEQ_CST);
-            __atomic_store_n(&frame_write_idx, old_ready, __ATOMIC_RELEASE);
-            __atomic_store_n(&frame_ready_flag, true, __ATOMIC_RELEASE);
-            single_frame_buffer = false;
-        }
+        __atomic_store_n(&frame_display_idx, active_idx, __ATOMIC_RELEASE);
         __atomic_store_n(&frame_publish_timestamp_us, perf_now_us(), __ATOMIC_RELEASE);
     }
     uint32_t slotsMtxUs = perf_now_us() - slotsMtxStartUs;
 
     // Wake the render loop now instead of letting it sleep out its frame budget.
     vita_video_frame_published();
-
-    uint32_t texW  = ctx->current_frame.width > 0 ? (uint32_t)ctx->current_frame.width : image_scaling.texture_width;
-    uint32_t texH  = ctx->current_frame.height > 0 ? (uint32_t)ctx->current_frame.height : image_scaling.texture_height;
-    uint64_t ptsMs = ptsUs ? (ptsUs / 1000ULL) : monotonic_ms_local();
-
-#ifdef BOREALIS_USE_GXM
-    if (ctx->using_direct_memory)
-    {
-        // Direct path: avoid per-frame blocking GPU waits from decode thread.
-        // Texture recycling is handled by triple buffering in publish_direct_frame.
-    }
-#endif
 
     ctx->last_pts_us        = ptsUs;
     uint32_t publishTotalUs = perf_now_us() - publishStartUs;
@@ -1411,6 +1864,7 @@ static void ffmpeg_release_locked(FFmpegVideoContext* ctx)
     {
         return;
     }
+    stop_perf_reporter();
 
 #ifdef BOREALIS_USE_GXM
     for (int i = 0; i < 3; ++i)
@@ -1443,6 +1897,7 @@ static void ffmpeg_release_locked(FFmpegVideoContext* ctx)
     }
 #ifdef BOREALIS_USE_GXM
     ffmpeg_flush_deferred_releases();
+    destroy_direct_buffer_pool();
 #endif
     memset(&ctx->decoder, 0, sizeof(ctx->decoder));
     memset(&ctx->current_frame, 0, sizeof(ctx->current_frame));
@@ -1499,6 +1954,8 @@ extern "C"
 
     void ffmpeg_video_cleanup(FFmpegVideoContext* context)
     {
+        g_ffmpeg_watchdog_active.store(false, std::memory_order_release);
+        g_ffmpeg_last_input_ms.store(0, std::memory_order_release);
         g_ffmpeg_stop_request.store(true, std::memory_order_release);
         int waitCount = 0;
         while (g_active_decodes.load(std::memory_order_acquire) > 0 && waitCount < 5000)
@@ -1537,12 +1994,14 @@ extern "C"
         }
         stats_start_ms     = monotonic_ms_local();
         g_stats.target_fps = context->frame_rate > 0 ? (uint32_t)context->frame_rate : 60;
+        g_ffmpeg_watchdog_active.store(true, std::memory_order_release);
     }
 
     static void ffmpeg_video_stop_locked(FFmpegVideoContext* context)
     {
         if (!context)
             return;
+        stop_perf_reporter();
         if (context->decoder.initialized)
         {
             ffmpeg_decoder_destroy(&context->decoder);
@@ -1572,6 +2031,8 @@ extern "C"
     {
         // Signal stop request: prevent new decodes from starting, and wait for in-flight
         // decodes to finish before destroying resources.
+        g_ffmpeg_watchdog_active.store(false, std::memory_order_release);
+        g_ffmpeg_last_input_ms.store(0, std::memory_order_release);
         g_ffmpeg_stop_request.store(true, std::memory_order_release);
         // Immediately clear any renderer-held references so the UI stops sampling
         // the soon-to-be-destroyed textures while we wait for the decoder to drain.
@@ -1669,13 +2130,34 @@ extern "C"
         }
 
         memset(&g_stats, 0, sizeof(g_stats));
-        stats_start_ms     = 0;
-        last_fps_window_ms = 0;
-        frame_count        = 0;
-        need_drop          = 0;
-        g_stats.target_fps = redrawRate > 0 ? (uint32_t)redrawRate : 60;
-        vita_netopt_set_target_fps(g_stats.target_fps);
+        memset(&g_perf, 0, sizeof(g_perf));
+        g_ffmpeg_last_input_callback_us = 0;
+        g_ffmpeg_last_enqueue_us        = 0;
+        g_ffmpeg_last_input_ms.store(0, std::memory_order_relaxed);
+        g_ffmpeg_watchdog_fired.store(false, std::memory_order_relaxed);
+        g_ffmpeg_last_input_was_idr.store(false, std::memory_order_relaxed);
+        g_ffmpeg_watchdog_active.store(false, std::memory_order_relaxed);
+        const RTP_VIDEO_STATS* rtpStats = LiGetRTPVideoStats();
+        if (rtpStats)
+        {
+            g_ffmpeg_rtp_snapshot       = *rtpStats;
+            g_ffmpeg_rtp_snapshot_valid = true;
+        }
+        else
+        {
+            g_ffmpeg_rtp_snapshot_valid = false;
+        }
+        g_dr_pool_exhaustions.store(0, std::memory_order_relaxed);
+        g_dr_pool_alloc_failures.store(0, std::memory_order_relaxed);
+        g_dr_pool_map_failures.store(0, std::memory_order_relaxed);
+#ifdef BOREALIS_USE_GXM
+        g_ffmpeg_presented_frames.store(0, std::memory_order_relaxed);
+#endif
+        stats_start_ms       = 0;
+        last_fps_window_ms   = 0;
+        g_stats.target_fps   = redrawRate > 0 ? (uint32_t)redrawRate : 60;
         g_ffmpeg_frame_index = 0;
+        start_perf_reporter();
 
         if (ffmpeg_decoder_init(&context->decoder) < 0)
         {
@@ -1722,6 +2204,8 @@ extern "C"
 
     static void ffmpeg_video_cleanup_callback(void)
     {
+        g_ffmpeg_watchdog_active.store(false, std::memory_order_release);
+        g_ffmpeg_last_input_ms.store(0, std::memory_order_release);
         g_ffmpeg_stop_request.store(true, std::memory_order_release);
         int waitCount = 0;
         while (g_active_decodes.load(std::memory_order_acquire) > 0 && waitCount < 5000)
@@ -1742,15 +2226,61 @@ extern "C"
         g_ffmpeg_stop_request.store(false, std::memory_order_release);
     }
 
+    void ffmpeg_video_watchdog_tick(void)
+    {
+        if (!g_ffmpeg_watchdog_active.load(std::memory_order_acquire) || g_ffmpeg_stop_request.load(std::memory_order_acquire) || g_ffmpeg_last_input_was_idr.load(std::memory_order_acquire))
+        {
+            return;
+        }
+
+        uint32_t lastInputMs = g_ffmpeg_last_input_ms.load(std::memory_order_acquire);
+        if (!lastInputMs)
+        {
+            return;
+        }
+
+        uint32_t nowMs  = (uint32_t)LiGetMillis();
+        uint32_t idleMs = nowMs - lastInputMs;
+        if (idleMs < 250U || g_ffmpeg_last_input_ms.load(std::memory_order_acquire) != lastInputMs)
+        {
+            return;
+        }
+
+        bool expected = false;
+        if (!g_ffmpeg_watchdog_fired.compare_exchange_strong(expected, true, std::memory_order_acq_rel))
+        {
+            return;
+        }
+
+        const RTP_VIDEO_STATS* rtpStats = LiGetRTPVideoStats();
+        if (rtpStats)
+        {
+            VITA_DEBUG_LOG("[FFMPEG][WATCHDOG] no input for %ums; requesting IDR (packets=%u recovered=%u failed=%u oos=%u invalid=%u)",
+                idleMs,
+                rtpStats->packetCountVideo,
+                rtpStats->packetCountFecRecovered,
+                rtpStats->packetCountFecFailed,
+                rtpStats->packetCountOOS,
+                rtpStats->packetCountInvalid);
+        }
+        else
+        {
+            VITA_DEBUG_LOG("[FFMPEG][WATCHDOG] no input for %ums; requesting IDR", idleMs);
+        }
+        vita_netopt_force_idr();
+    }
+
     static int ffmpeg_video_submit_decode_unit(PDECODE_UNIT decodeUnit)
     {
         g_perf.submit_calls++;
-        uint32_t submitStartUs = perf_now_us();
-        uint32_t lockWaitUs    = 0;
-        uint32_t drainUs       = 0;
-        uint32_t copyUs        = 0;
-        uint32_t sendUs        = 0;
-        uint32_t recvUs        = 0;
+        uint32_t submitStartUs  = perf_now_us();
+        uint64_t callbackTimeUs = monotonic_us_local();
+        record_ingress_timing(decodeUnit, callbackTimeUs);
+        uint32_t lockWaitUs = 0;
+        uint32_t drainUs    = 0;
+        uint32_t copyUs     = 0;
+        uint32_t sendUs     = 0;
+        uint32_t recvUs     = 0;
 
         auto update_max_u32 = [](uint32_t& dst, uint32_t value)
         {
@@ -1775,77 +2305,6 @@ extern "C"
             update_max_u32(g_perf.recv_max_us, recvUs);
         };
 
-        // Low-latency drop control.
-        // By default, automatic dropping is OFF (it can oscillate and increase jitter).
-        // Manual override: MOONLIGHT_FFMPEG_FORCE_DROP_EVERY=N.
-        // Optional auto mode: MOONLIGHT_FFMPEG_AUTO_DROP=1.
-        static uint32_t s_drop_phase      = 0;
-        static int s_forcedDropEvery      = -1;
-        static int s_autoDropEnabled      = -1;
-        static int s_dropStaleDrainFrames = -1;
-        if (s_forcedDropEvery < 0)
-        {
-            const char* forcedEnv = getenv("MOONLIGHT_FFMPEG_FORCE_DROP_EVERY");
-            if (forcedEnv)
-            {
-                int v = atoi(forcedEnv);
-                if (v < 0)
-                    v = 0;
-                s_forcedDropEvery = v;
-                VITA_DEBUG_LOG("[FFMPEG][LAT] forced drop_every=%d (env)", s_forcedDropEvery);
-            }
-            else
-            {
-                s_forcedDropEvery = 0;
-            }
-        }
-        if (s_autoDropEnabled < 0)
-        {
-            const char* autoEnv = getenv("MOONLIGHT_FFMPEG_AUTO_DROP");
-            s_autoDropEnabled   = (autoEnv && autoEnv[0] == '1') ? 1 : 0;
-            VITA_DEBUG_LOG("[FFMPEG][LAT] auto_drop=%d (env)", s_autoDropEnabled);
-        }
-        if (s_dropStaleDrainFrames < 0)
-        {
-            const char* staleEnv = getenv("MOONLIGHT_FFMPEG_DROP_STALE_DRAIN");
-            // Default OFF: stale frames drained before send are asynchronous completions on Vita, do not drop.
-            s_dropStaleDrainFrames = (staleEnv && staleEnv[0] == '1') ? 1 : 0;
-            VITA_DEBUG_LOG("[FFMPEG][LAT] drop_stale_drain=%d (env)", s_dropStaleDrainFrames);
-        }
-
-        uint32_t dropEvery = 0;
-        uint32_t targetFps = g_stats.target_fps ? g_stats.target_fps : 60;
-        if (s_forcedDropEvery > 0)
-        {
-            dropEvery = (uint32_t)s_forcedDropEvery;
-        }
-        else if (s_autoDropEnabled && targetFps > 0 && g_perf.submit_calls >= 30)
-        {
-            uint32_t frameBudgetUs = 1000000U / targetFps;
-            uint32_t submitAvgUs   = (uint32_t)(g_perf.submit_total_us / g_perf.submit_calls);
-            if (submitAvgUs > frameBudgetUs)
-            {
-                uint32_t overUs  = submitAvgUs - frameBudgetUs;
-                uint32_t overPct = (uint32_t)(((uint64_t)overUs * 100ULL) / (frameBudgetUs ? frameBudgetUs : 1));
-
-                // More aggressive when we are clearly above budget to keep latency low.
-                if (overPct >= 10)
-                    dropEvery = 4;
-                else if (overPct >= 7)
-                    dropEvery = 5;
-                else if (overPct >= 5)
-                    dropEvery = 6;
-                else if (overPct >= 3)
-                    dropEvery = 8;
-                else
-                    dropEvery = 10;
-            }
-        }
-
-        if (dropEvery > 12)
-            dropEvery = 12;
-        g_perf.adaptive_drop_interval = dropEvery;
-
         if (!decodeUnit)
         {
             VITA_DEBUG_LOG("[FFMPEG] submit_decode_unit: null decodeUnit");
@@ -1857,19 +2316,6 @@ extern "C"
         {
             finalize_submit_metrics();
             return DR_NEED_IDR;
-        }
-
-        if (dropEvery > 0 && decodeUnit->frameType != FRAME_TYPE_IDR)
-        {
-            s_drop_phase++;
-            if ((s_drop_phase % dropEvery) == 0)
-            {
-                g_perf.dropped_decode_units++;
-                g_stats.frames_dropped_pacer++;
-                finalize_submit_metrics();
-                perf_report_if_due();
-                return DR_OK;
-            }
         }
 
         uint32_t lockStartUs = perf_now_us();
@@ -1899,9 +2345,22 @@ extern "C"
             return DR_NEED_IDR;
         }
 
+        update_latency_epoch(context, decodeUnit);
+
         AVCodecContext* avctx = context->decoder.avctx;
         AVPacket* pkt         = context->decoder.pkt;
         AVFrame* frame        = context->decoder.frame;
+
+        if (should_refresh_stale_stream(context, decodeUnit->presentationTimeUs))
+        {
+            avcodec_flush_buffers(avctx);
+            context->latency_epoch_offset_us = 0;
+            context->last_input_pts_us       = 0;
+            context->last_input_frame_number = 0;
+            context->latency_samples         = 0;
+            finalize_submit_metrics();
+            return DR_NEED_IDR;
+        }
 
         uint32_t drainStartUs         = perf_now_us();
         bool drainReceived            = false;
@@ -1919,8 +2378,9 @@ extern "C"
                 }
                 if (drain < 0)
                 {
-                    vita_log::error("[FFMPEG] receive_frame drain error: 0x%X", drain);
-                    break;
+                    drainUs = perf_now_us() - drainStartUs;
+                    finalize_submit_metrics();
+                    return recover_decoder(context, "receive_frame drain", drain);
                 }
                 if (drainReceived)
                 {
@@ -1931,39 +2391,46 @@ extern "C"
                 drainReceived = true;
             }
         }
+        else
+        {
+            drainUs = perf_now_us() - drainStartUs;
+            finalize_submit_metrics();
+            return recover_decoder(context, "allocate drain frame", AVERROR(ENOMEM));
+        }
         if (drainReceived)
         {
-            if (s_dropStaleDrainFrames)
+            int64_t drainPts = (frame->pts != AV_NOPTS_VALUE) ? frame->pts : (int64_t)context->last_pts_us;
+            int64_t ptsDiff  = (int64_t)decodeUnit->presentationTimeUs - drainPts;
+            if (ptsDiff != 0)
             {
-                g_perf.dropped_stale_frames++;
-                av_frame_unref(frame);
-            }
-            else
-            {
-                int64_t drainPts = (frame->pts != AV_NOPTS_VALUE) ? frame->pts : (int64_t)context->last_pts_us;
-                if (publish_frame(context, frame, (uint64_t)drainPts))
+                static uint32_t s_drain_pts_mismatch_counter = 0;
+                if ((s_drain_pts_mismatch_counter++ % 60) == 0)
                 {
-                    av_frame_unref(frame);
+                    VITA_DEBUG_LOG("[FFMPEG][DIAG] drained PTS distance: submitted=%lld frame=%lld diff=%lld us (%lld ms)",
+                        (long long)decodeUnit->presentationTimeUs, (long long)drainPts,
+                        (long long)ptsDiff, (long long)(ptsDiff / 1000));
                 }
             }
+            publish_frame(context, frame, decodeUnit->presentationTimeUs);
+            av_frame_unref(frame);
         }
         drainUs = perf_now_us() - drainStartUs;
 
         uint32_t copyStartUs = perf_now_us();
         if (decodeUnit->fullLength <= 0 || !decodeUnit->bufferList || decodeUnit->fullLength > INT_MAX - 256)
         {
-            vita_log::error("[FFMPEG] Invalid decode unit length=%d", decodeUnit->fullLength);
             copyUs = perf_now_us() - copyStartUs;
             finalize_submit_metrics();
-            return DR_NEED_IDR;
+            return recover_decoder(context, "invalid decode unit", AVERROR_INVALIDDATA);
         }
-        if (av_new_packet(pkt, decodeUnit->fullLength + 256) < 0)
+        int packetRes = av_new_packet(pkt, decodeUnit->fullLength + 256);
+        if (packetRes < 0)
         {
             vita_log::error("[FFMPEG] av_new_packet failed size=%d", decodeUnit->fullLength + 256);
             // Do not free decodeUnit here; ownership belongs to the depacketizer.
             copyUs = perf_now_us() - copyStartUs;
             finalize_submit_metrics();
-            return DR_NEED_IDR;
+            return recover_decoder(context, "allocate packet", packetRes);
         }
         uint8_t* dst                = pkt->data;
         size_t offset               = 0;
@@ -2006,11 +2473,10 @@ extern "C"
             }
             if (!appended)
             {
-                vita_log::error("[FFMPEG] AU assembly exceeded packet capacity");
                 av_packet_unref(pkt);
                 copyUs = perf_now_us() - copyStartUs;
                 finalize_submit_metrics();
-                return DR_NEED_IDR;
+                return recover_decoder(context, "assemble packet", AVERROR_INVALIDDATA);
             }
             entry = entry->next;
         }
@@ -2032,11 +2498,10 @@ extern "C"
         int sendRes          = avcodec_send_packet(avctx, pkt);
         sendUs               = perf_now_us() - sendStartUs;
         av_packet_unref(pkt);
-        if (sendRes < 0 && sendRes != AVERROR(EAGAIN))
+        if (sendRes < 0)
         {
-            vita_log::error("[FFMPEG] send_packet error=0x%X", sendRes);
             finalize_submit_metrics();
-            return DR_NEED_IDR;
+            return recover_decoder(context, "send_packet", sendRes);
         }
 
         vita_netopt_on_frame_seen(g_ffmpeg_frame_index);
@@ -2057,11 +2522,10 @@ extern "C"
                 }
                 if (ret < 0)
                 {
-                    vita_log::error("[FFMPEG] receive_frame error=0x%X", ret);
                     // Do not free decodeUnit here; caller (depacketizer) handles freeing.
                     recvUs = perf_now_us() - recvStartUs;
                     finalize_submit_metrics();
-                    return DR_NEED_IDR;
+                    return recover_decoder(context, "receive_frame", ret);
                 }
                 if (frameReceived)
                 {
@@ -2071,6 +2535,12 @@ extern "C"
                 av_frame_move_ref(frame, s_recv_frame);
                 frameReceived = true;
             }
+        }
+        else
+        {
+            recvUs = perf_now_us() - recvStartUs;
+            finalize_submit_metrics();
+            return recover_decoder(context, "allocate receive frame", AVERROR(ENOMEM));
         }
         recvUs = perf_now_us() - recvStartUs;
 
@@ -2098,19 +2568,15 @@ extern "C"
                 }
             }
 
-            if (publish_frame(context, frame, (uint64_t)framePts))
+            publish_frame(context, frame, decodeUnit->presentationTimeUs);
+            if (stats_start_ms == 0)
             {
-                if (stats_start_ms == 0)
-                {
-                    stats_start_ms = monotonic_ms_local();
-                }
-                g_stats.frames_decoded++;
-                g_perf.decoded_frames++;
-                frame_count++;
-                vita_netopt_frame_produced();
-                vita_netopt_on_frame_completed(g_ffmpeg_frame_index);
-                g_ffmpeg_frame_index++;
+                stats_start_ms = monotonic_ms_local();
             }
+            g_stats.frames_decoded++;
+            g_perf.decoded_frames++;
+            vita_netopt_on_frame_completed(g_ffmpeg_frame_index);
+            g_ffmpeg_frame_index++;
             av_frame_unref(frame);
         }
 
@@ -2130,10 +2596,8 @@ extern "C"
         callbacks.stop                       = ffmpeg_video_stop_callback;
         callbacks.cleanup                    = ffmpeg_video_cleanup_callback;
         callbacks.submitDecodeUnit           = ffmpeg_video_submit_decode_unit;
-        // Restoring CAPABILITY_DIRECT_SUBMIT enables low-latency direct submission from the connection thread.
-        // Since direct rendering is active, avcodec_send_packet takes under 3.5ms and is safe to execute.
-        // This bypasses the packet queuing backlog, reducing end-to-end latency to the absolute minimum.
-        callbacks.capabilities = CAPABILITY_DIRECT_SUBMIT | CAPABILITY_SLICES_PER_FRAME(2);
+        callbacks.capabilities               = CAPABILITY_SLICES_PER_FRAME(2);
+        VITA_DEBUG_LOG("[FFMPEG] Decode submission uses the dedicated video thread");
         return callbacks;
     }
 

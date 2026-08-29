@@ -909,31 +909,6 @@ SettingsTab::SettingsTab()
             brls::Application::notify(brls::getStr("moonlight/settings_tab/swap_interval/saved"));
         } });
 
-    // Configure Buffer Mode
-    std::vector<std::string> bufferModeOptions = {
-        brls::getStr("moonlight/settings_tab/buffer_mode/options/0"),
-        brls::getStr("moonlight/settings_tab/buffer_mode/options/1"),
-        brls::getStr("moonlight/settings_tab/buffer_mode/options/2")
-    };
-    int currentBufferMode = videoSettings.buffer_mode;
-    if (currentBufferMode < 0 || currentBufferMode > 2)
-        currentBufferMode = 0;
-    bufferModeSelector->init(brls::getStr("moonlight/settings_tab/buffer_mode/title"), bufferModeOptions, currentBufferMode, [](int selected)
-        {
-        if (selected >= 0 && selected <= 2) {
-            ConfigManager config;
-            config.load();
-            VideoSettings settings = config.getVideoSettings();
-            settings.buffer_mode = selected;
-            config.setVideoSettings(settings);
-            config.save();
-
-            extern VideoSettings g_video_settings_snapshot;
-            g_video_settings_snapshot.buffer_mode = selected;
-
-            brls::Application::notify(brls::getStr("moonlight/settings_tab/buffer_mode/saved"));
-        } });
-
     // Start background loading
     this->initAsync();
 

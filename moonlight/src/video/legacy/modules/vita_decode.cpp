@@ -21,8 +21,12 @@ extern gs::SpsContext* g_sps_ctx;
 
 #include "Limelight.h"
 #include "debug.hpp"
-#include "network/NetworkOptimizations.hpp"
 #include "session/vita_session.hpp"
+extern "C"
+{
+#include "Platform.h"
+}
+#include "network/NetworkOptimizations.hpp"
 #include "video/pixel_format/pixel_format.hpp"
 #include "video/render_mode_cache.hpp"
 #include "vita_sceAvcInternal.hpp"
@@ -99,16 +103,58 @@ int vitavideo_init_1080p_internal_api(int width, int height, SceVideodecQueryIni
 #define SCE_AVCDEC_PIXELFORMAT_YUV420_PLANAR 0x4
 #endif
 
-static inline uint64_t monotonicMs_local()
-{
-    if (LiGetMillis)
-        return LiGetMillis();
-    return 0;
-}
-
 // Internal control to avoid log spam in physical fallback
 static bool decoder_phys_fallback_permanent_disable = false; // if true do not retry physical alloc
 static int decoder_phys_fallback_fail_count         = 0;
+
+static bool legacy_frame_is_stale(PDECODE_UNIT decodeUnit)
+{
+    static uint64_t epochOffsetUs = 0;
+    static uint64_t lastPtsUs     = 0;
+    static int lastFrameNumber    = -1;
+    static uint32_t samples       = 0;
+
+    if (!decodeUnit || decodeUnit->receiveTimeUs < decodeUnit->presentationTimeUs)
+    {
+        return false;
+    }
+
+    if (samples > 0 && (decodeUnit->frameNumber <= lastFrameNumber || decodeUnit->presentationTimeUs < lastPtsUs))
+    {
+        epochOffsetUs = 0;
+        samples       = 0;
+    }
+
+    uint64_t offsetUs = decodeUnit->receiveTimeUs - decodeUnit->presentationTimeUs;
+    if (samples == 0 || offsetUs < epochOffsetUs)
+    {
+        epochOffsetUs = offsetUs;
+    }
+    lastFrameNumber = decodeUnit->frameNumber;
+    lastPtsUs       = decodeUnit->presentationTimeUs;
+    samples++;
+
+    if (samples < 4 || decodeUnit->frameType == FRAME_TYPE_IDR)
+    {
+        return false;
+    }
+
+    uint64_t expectedUs = epochOffsetUs + decodeUnit->presentationTimeUs;
+    uint64_t nowUs      = PltGetMicroseconds();
+    if (nowUs <= expectedUs || nowUs - expectedUs <= 100000ULL)
+    {
+        return false;
+    }
+
+    static uint32_t staleLogCounter = 0;
+    if ((staleLogCounter++ % 30) == 0)
+    {
+        VITA_DEBUG_LOG("[Video][LAT] dropping stale frame age=%lluus frame=%d",
+            (unsigned long long)(nowUs - expectedUs), decodeUnit->frameNumber);
+    }
+    g_stats.frames_dropped_pacer++;
+    return true;
+}
 
 extern "C" int vitavideo_submit_decode_unit(PDECODE_UNIT decodeUnit)
 {
@@ -117,8 +163,13 @@ extern "C" int vitavideo_submit_decode_unit(PDECODE_UNIT decodeUnit)
     static const uint64_t texture_guard_sig_tail = 0xA55AA55AA55AA55AULL;
     static const uint64_t texture_guard_sig_head = 0xDEADBEEFCAFEBABEULL;
     static const uint8_t texture_guard_fill      = 0xD6;
-    uint8_t* texBack                             = (uint8_t*)gxm_texture_get_datap(FRAME_BACK());
-    unsigned int strideBytes                     = gxm_texture_get_stride(FRAME_BACK());
+    if (legacy_frame_is_stale(decodeUnit))
+    {
+        return DR_NEED_IDR;
+    }
+
+    uint8_t* texBack         = (uint8_t*)gxm_texture_get_datap(FRAME_BACK());
+    unsigned int strideBytes = gxm_texture_get_stride(FRAME_BACK());
     if (!strideBytes)
         strideBytes = image_scaling.texture_width * 4;
     // Force no physical fallback in RGBA mode (stable debugging)
@@ -442,57 +493,15 @@ extern "C" int vitavideo_submit_decode_unit(PDECODE_UNIT decodeUnit)
 
     // (Already decoded directly into BACK texture)
 
+    int currentWrite = __atomic_load_n(&frame_write_idx, __ATOMIC_ACQUIRE);
+    __atomic_store_n(&frame_display_idx, currentWrite, __ATOMIC_RELEASE);
+    int nextWrite = (currentWrite + 1) % 3;
+    __atomic_store_n(&frame_write_idx, nextWrite, __ATOMIC_RELEASE);
+
+    static uint32_t rotationDiagCounter = 0;
+    if ((rotationDiagCounter++ % 181) == 0)
     {
-        int bufferMode = g_video_settings_snapshot.buffer_mode;
-        if (bufferMode == 2)
-        {
-            // Triple-buffering lock-free swap via atomic exchange
-            int current_write = __atomic_load_n(&frame_write_idx, __ATOMIC_ACQUIRE);
-            int old_ready     = __atomic_exchange_n(&frame_ready_idx, current_write, __ATOMIC_SEQ_CST);
-            __atomic_store_n(&frame_write_idx, old_ready, __ATOMIC_RELEASE);
-            __atomic_store_n(&frame_ready_flag, true, __ATOMIC_RELEASE);
-
-            static uint32_t decode_diag_counter = 0;
-            if ((decode_diag_counter++ % 181) == 0)
-            {
-                VITA_DEBUG_LOG("[Video][DIAG] Triple Swap - Decoded to %d, Published to ready_idx=%d, Next write_idx=%d (Mode: Triple Exchange)",
-                    current_write, current_write, old_ready);
-            }
-        }
-        else if (bufferMode == 1)
-        {
-            // Double-buffering rotation (0 -> 1 -> 0)
-            int current_write = __atomic_load_n(&frame_write_idx, __ATOMIC_ACQUIRE);
-            __atomic_store_n(&frame_ready_idx, current_write, __ATOMIC_RELEASE);
-            int next_write = (current_write + 1) % 2;
-            __atomic_store_n(&frame_write_idx, next_write, __ATOMIC_RELEASE);
-            __atomic_store_n(&frame_ready_flag, true, __ATOMIC_RELEASE);
-
-            static uint32_t decode_diag_counter = 0;
-            if ((decode_diag_counter++ % 181) == 0)
-            {
-                VITA_DEBUG_LOG("[Video][DIAG] Double Swap - Decoded to %d, Published to ready_idx=%d, Next write_idx=%d (Mode: Double Rotation)",
-                    current_write, current_write, next_write);
-            }
-        }
-        else
-        {
-            // Single buffer (ping-pong): immediately promote write slot to display.
-            // write_idx alternates between slot 0 and slot 1 so the AVCDEC decoder
-            // never writes to the slot the GPU is currently reading.
-            int current_write = __atomic_load_n(&frame_write_idx, __ATOMIC_ACQUIRE);
-            __atomic_store_n(&frame_display_idx, current_write, __ATOMIC_RELEASE);
-            __atomic_store_n(&frame_ready_idx, current_write, __ATOMIC_RELEASE);
-            int next_write = (current_write == 1) ? 0 : 1;
-            __atomic_store_n(&frame_write_idx, next_write, __ATOMIC_RELEASE);
-
-            static uint32_t single_diag_counter = 0;
-            if ((single_diag_counter++ % 181) == 0)
-            {
-                VITA_DEBUG_LOG("[Video][DIAG] Single Ping-Pong - Decoded to %d, display->%d, Next write->%d",
-                    current_write, current_write, next_write);
-            }
-        }
+        VITA_DEBUG_LOG("[Video][DIAG] Latest frame %d published, next write %d", currentWrite, nextWrite);
     }
 
     __atomic_store_n(&frame_publish_timestamp_us, (uint32_t)sceKernelGetProcessTimeLow(), __ATOMIC_RELEASE);
@@ -505,21 +514,10 @@ extern "C" int vitavideo_submit_decode_unit(PDECODE_UNIT decodeUnit)
 
     VitaSession::onFrameDecoded();
 
-    uint64_t tPresentMs = monotonicMs_local();
     if (active_video_thread)
     {
-        vita_netopt_frame_produced();
-        if (need_drop > 0)
-        {
-            need_drop--;
-            g_stats.frames_dropped_pacer++;
-        }
-        else
-        {
-            g_stats.frames_decoded++;
-            frame_count++;
-            vita_netopt_on_frame_completed(syntheticFrameIndex);
-        }
+        g_stats.frames_decoded++;
+        vita_netopt_on_frame_completed(syntheticFrameIndex);
     }
     syntheticFrameIndex++;
     vd_submit_counter++;

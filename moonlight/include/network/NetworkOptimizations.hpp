@@ -32,12 +32,6 @@ extern "C"
 
     int vita_netopt_get_stats(struct VitaNetOptSnapshot* out);
 
-    // ===== Advanced Extensions (legacy-inspired) =====
-    // Adaptive frame pacing and frameskip
-    void vita_netopt_set_target_fps(unsigned fps); // Objective FPS for calculating drops
-    void vita_netopt_frame_produced(); // Call when a frame is decoded (before rendering)
-    unsigned vita_netopt_consume_drop_budget(); // Returns how many frames should be skipped (and consumes that budget)
-
     // Frame tracking to calculate loss and connection status
     void vita_netopt_on_frame_seen(unsigned frameIndex); // seen (packet completed or detected by sequence)
     void vita_netopt_on_frame_completed(unsigned frameIndex); // full frame decoded
@@ -66,7 +60,7 @@ extern "C"
     // RFI (Reference Frame Invalidation) stub: in this version it only counts and decides IDR if overflow
     void vita_netopt_try_invalidate_ref_range(unsigned startFrame, unsigned endFrame);
 
-    // Extended dump (includes connection status and drops)
+    // Extended dump (includes connection status)
     void vita_netopt_dump_extended();
 
     // ===== Instrumentation of video timings (latencies) =====

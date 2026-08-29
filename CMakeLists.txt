@@ -125,6 +125,32 @@ endif()
 program_target(${PROJECT_NAME} "${MAIN_SRC}")
 set_target_properties(${PROJECT_NAME} PROPERTIES CXX_STANDARD 17)
 
+if(PLATFORM_PSV)
+    find_program(VITA_LIBS_GEN_EXECUTABLE NAMES vita-libs-gen HINTS "$ENV{VITASDK}/bin")
+    find_program(VITA_STUB_MAKE_EXECUTABLE NAMES gmake make)
+    if(NOT VITA_LIBS_GEN_EXECUTABLE OR NOT VITA_STUB_MAKE_EXECUTABLE)
+        message(FATAL_ERROR "vita-libs-gen and make are required to build the Vita low-delay import stub")
+    endif()
+
+    set(VITA_LOW_DELAY_STUB_CONFIG "${CMAKE_CURRENT_SOURCE_DIR}/cmake/vita/SceVideodecLowDelay.yml")
+    set(VITA_LOW_DELAY_STUB_DIR "${CMAKE_CURRENT_BINARY_DIR}/vita-low-delay-stub")
+    set(VITA_LOW_DELAY_GENERATED_LIB "${VITA_LOW_DELAY_STUB_DIR}/libSceAvcodecUser_stub.a")
+    set(VITA_LOW_DELAY_STUB_LIB "${VITA_LOW_DELAY_STUB_DIR}/libSceVideodecLowDelay_stub.a")
+
+    add_custom_command(
+        OUTPUT "${VITA_LOW_DELAY_STUB_LIB}"
+        COMMAND ${CMAKE_COMMAND} -E make_directory "${VITA_LOW_DELAY_STUB_DIR}"
+        COMMAND "${VITA_LIBS_GEN_EXECUTABLE}" "${VITA_LOW_DELAY_STUB_CONFIG}" "${VITA_LOW_DELAY_STUB_DIR}"
+        COMMAND ${CMAKE_COMMAND} -E env "VITASDK=$ENV{VITASDK}"
+                "${VITA_STUB_MAKE_EXECUTABLE}" -C "${VITA_LOW_DELAY_STUB_DIR}"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different "${VITA_LOW_DELAY_GENERATED_LIB}" "${VITA_LOW_DELAY_STUB_LIB}"
+        DEPENDS "${VITA_LOW_DELAY_STUB_CONFIG}"
+        VERBATIM
+    )
+    add_custom_target(vita-low-delay-stub DEPENDS "${VITA_LOW_DELAY_STUB_LIB}")
+    add_dependencies(${PROJECT_NAME} vita-low-delay-stub)
+endif()
+
 target_compile_definitions(${PROJECT_NAME} PRIVATE USE_MBEDTLS)
 
 if (PLATFORM_PSV)
@@ -205,6 +231,7 @@ if(PLATFORM_PSV)
         -lSceNet_stub
         -lSceNetCtl_stub
         -lScePower_stub
+        "${VITA_LOW_DELAY_STUB_LIB}"
         -lSceVideodec_stub
         -lSceCommonDialog_stub
         -lSceAppMgr_stub

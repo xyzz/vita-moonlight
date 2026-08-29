@@ -1,0 +1,11 @@
+version: 2
+firmware: 3.60
+modules:
+  SceAvcodecUser:
+    nid: 0x5AA351E8
+    libraries:
+      SceVideodecLowDelayUser:
+        kernel: false
+        nid: 0x6354EEFF
+        functions:
+          sceAvcdecSetLowDelayModeNongameapp: 0xD57F82C1

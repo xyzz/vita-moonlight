@@ -17,6 +17,7 @@ extern "C"
 #define SCE_AVCDEC_MODE_EXTENDED 2
 
     int sceAvcdecSetDecodeModeInternal(SceVideodecType codec, int mode);
+    int sceAvcdecSetLowDelayModeNongameapp(SceVideodecType codec, int mode);
     int sceAvcdecQueryDecoderMemSizeInternal(SceVideodecType codec, const SceAvcdecQueryDecoderInfo* query, SceAvcdecDecoderInfo* decoderInfo);
     int sceAvcdecCreateDecoderInternal(SceVideodecType codec, SceAvcdecCtrl* decoder, const SceAvcdecQueryDecoderInfo* query);
     int sceAvcdecDecodeAuInternal(const SceAvcdecCtrl* decoder, const SceAvcdecAu* au, int* timeout);
@@ -25,5 +26,7 @@ extern "C"
 #ifdef __cplusplus
 }
 #endif
+
+#define SCE_AVCDEC_DELAY_MODE_LOW 0
 
 #endif // VITA_NONGAME_PROTOTYPES_H

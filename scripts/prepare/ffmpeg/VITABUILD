@@ -1,7 +1,7 @@
 pkgname=ffmpeg
 pkgver=6.0.vita
-pkgrel=3
-gitrev=d395e7a8744338ed780dfcfe13d78b111715e173
+pkgrel=4
+gitrev=6a127f9e840f62df364c37aac881b5407ed18a8b
 url="https://github.com/AorsiniYT/FFmpeg-vita"
 source=("FFmpeg-vita-${gitrev}.tar.gz::https://github.com/AorsiniYT/FFmpeg-vita/archive/${gitrev}.tar.gz")
 sha256sums=('SKIP')

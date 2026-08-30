@@ -45,6 +45,7 @@ class SettingsTab : public brls::Box
 
     // New elements for streaming configuration
     BRLS_BIND(brls::SelectorCell, renderModeSelector, "renderModeSelector");
+    BRLS_BIND(brls::SelectorCell, streamResolutionSelector, "streamResolutionSelector");
     BRLS_BIND(brls::SelectorCell, resolutionSelector, "resolutionSelector");
     BRLS_BIND(brls::SelectorCell, fpsSelector, "fpsSelector");
     BRLS_BIND(brls::SelectorCell, bitrateSelector, "bitrateSelector");

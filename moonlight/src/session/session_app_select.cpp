@@ -577,17 +577,12 @@ void SessionAppSelect::AppSelected(const RemoteAppInfo& app, bool forceStart)
             vita_log::info("[SessionAppSelect] Moonmic handshake %s (%s:%d)", hsResult.success ? "OK" : "FAIL", micHost.c_str(), micPort);
         }
 
-        // Debug: show read configuration values
-        vita_log::info("[SessionAppSelect] Configuración leída:");
-        vita_log::info("[SessionAppSelect] - Stream: %dx%d @ %dfps, bitrate=%d",
-            streamSettings.width, streamSettings.height, streamSettings.fps, streamSettings.bitrate);
-        vita_log::info("[SessionAppSelect] - Video: render_mode=%d", videoSettings.render_mode);
+        vita_log::info("[SessionAppSelect] Stream %dx%d @ %dfps, bitrate=%d, render_mode=%d",
+            streamSettings.streamWidth, streamSettings.streamHeight,
+            streamSettings.fps, streamSettings.bitrate, videoSettings.render_mode);
 
-        // FORCE 960x544 stream for PS Vita (optimal quality)
-        // Settings resolution values are saved for HOST monitor control only
-        // Sunshine will downscale from displayWidth x displayHeight to 960x544 with high quality
-        streamConfig.width  = VITA_STREAM_WIDTH;
-        streamConfig.height = VITA_STREAM_HEIGHT;
+        streamConfig.width  = streamSettings.streamWidth;
+        streamConfig.height = streamSettings.streamHeight;
         streamConfig.fps    = streamSettings.fps > 0 ? streamSettings.fps : VITA_STREAM_DEFAULT_FPS;
 
         // Build RTSP launch URL without displayWidth/displayHeight

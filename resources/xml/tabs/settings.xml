@@ -32,6 +32,10 @@
                 title="@i18n/moonlight/settings_tab/pixel_format/title"/>
 
             <brls:SelectorCell
+                id="streamResolutionSelector"
+                title="@i18n/moonlight/settings_tab/stream_resolution/title"/>
+
+            <brls:SelectorCell
                 id="resolutionSelector"
                 title="@i18n/moonlight/settings_tab/resolution/title"/>
 

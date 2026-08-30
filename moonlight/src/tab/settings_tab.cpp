@@ -309,6 +309,36 @@ SettingsTab::SettingsTab()
 
     updateModeDependentVisibility(initialRenderMode, false);
 
+    std::vector<std::string> streamResolutions = {
+        brls::getStr("moonlight/settings_tab/stream_resolution/options/0"),
+        brls::getStr("moonlight/settings_tab/stream_resolution/options/1")
+    };
+    int currentStreamResolution = streamConfig.streamWidth == 848 && streamConfig.streamHeight == 480 ? 1 : 0;
+    streamResolutionSelector->init(
+        brls::getStr("moonlight/settings_tab/stream_resolution/title"),
+        streamResolutions,
+        currentStreamResolution,
+        [](int selected)
+        {
+            ConfigManager config;
+            config.load();
+            StreamConfiguration settings = config.getStreamConfig();
+            if (selected == 1)
+            {
+                settings.streamWidth  = 848;
+                settings.streamHeight = 480;
+            }
+            else
+            {
+                settings.streamWidth  = 960;
+                settings.streamHeight = 544;
+            }
+            config.setStreamConfig(settings);
+            config.save();
+            brls::Application::notify(
+                brls::getStr("moonlight/settings_tab/stream_resolution/saved"));
+        });
+
     // Set resolution selectors with allowed values ​​for PS Vita
     std::vector<std::string> resolutions = {
         brls::getStr("moonlight/settings_tab/resolution/options/0"), // Auto (host current)

@@ -86,9 +86,17 @@
             "yuv": "YUV420 (CSC hardware)",
             "notify": "Formato de píxel: {0}"
         },
+        "stream_resolution": {
+            "title": "Resolución de transmisión",
+            "options": {
+                "0": "960x544 (Nativa)",
+                "1": "848x480 (Bajo consumo)"
+            },
+            "saved": "Resolución de transmisión guardada"
+        },
         "resolution": {
             "title": "Resolución del Monitor Host",
-            "description": "Controla solo la resolución del monitor del HOST. El stream siempre es 960x544 para óptima calidad.",
+            "description": "Controla la resolución del monitor del host. La resolución de transmisión se configura por separado.",
             "options": {
                 "0": "Auto (Actual del Host)",
                 "1": "960x544",

@@ -188,6 +188,7 @@ bool VitaSession::start()
     m_audio_callbacks.stop                = audio_renderer_stop;
     m_audio_callbacks.cleanup             = audio_renderer_cleanup;
     m_audio_callbacks.decodeAndPlaySample = audio_renderer_decode_and_play_sample;
+    m_audio_callbacks.capabilities |= CAPABILITY_SUPPORTS_ARBITRARY_AUDIO_DURATION;
 
     return internalStart();
 }

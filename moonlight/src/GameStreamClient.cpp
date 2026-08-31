@@ -244,6 +244,7 @@ bool GameStreamClient::startApp(const std::string& address, STREAM_CONFIGURATION
     VideoSettings videoSettings = sopsConfig.getVideoSettings();
     bool sops                   = videoSettings.sops; // Default is true
     vita_log::info("[GameStreamClient] SOPS (Optimize game settings) = %d", sops);
+    vita_log::info("[GameStreamClient] Local audio playback on host = %d", videoSettings.localaudio);
 
     // Pre-start Moonmic resolution handshake (Plan A)
     uint16_t targetWidth  = 0;
@@ -273,7 +274,8 @@ bool GameStreamClient::startApp(const std::string& address, STREAM_CONFIGURATION
         vita_log::info("[GameStreamClient] Applying Moonmic target resolution to gs_start_app: %dx%d", displayWidth, displayHeight);
     }
 
-    int status = gs_start_app(&m_server_data[address], &config, appId, sops, true, 0x1, displayWidth, displayHeight);
+    int status = gs_start_app(&m_server_data[address], &config, appId, sops,
+        videoSettings.localaudio, 0x1, displayWidth, displayHeight);
 
     if (mode == StartMode::NEW_ONLY)
         g_force_fresh_launch_h264 = prevForce;

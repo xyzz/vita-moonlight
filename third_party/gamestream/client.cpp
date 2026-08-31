@@ -751,9 +751,9 @@ int gs_start_app(PSERVER_DATA server, STREAM_CONFIGURATION* config, int appId,
         }
     } else {
         snprintf(url, sizeof(url),
-                 "https://%s:%u/resume?uniqueid=%s&rikey=%s&rikeyid=%d%s",
+                 "https://%s:%u/resume?uniqueid=%s&rikey=%s&rikeyid=%d&localAudioPlayMode=%d%s",
                  server->serverInfo.address, server->httpsPort, unique_id.c_str(),
-                 rand.hex().bytes(), rikeyid, LiGetLaunchUrlQueryParameters());
+                 rand.hex().bytes(), rikeyid, localaudio, LiGetLaunchUrlQueryParameters());
     }
 
     if ((ret = http_request(url, &data, HTTPRequestTimeoutLong)) == GS_OK) {

@@ -24,6 +24,7 @@ temp/
 client.pem
 key.pem
 /ip_vita.txt
+/*.log
 test/
 /scripts/prepare/*/src/
 /scripts/prepare/*/pkg/

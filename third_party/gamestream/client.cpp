@@ -708,76 +708,91 @@ int gs_start_app(PSERVER_DATA server, STREAM_CONFIGURATION* config, int appId,
 
     extern bool g_force_fresh_launch_h264; // declarado en vita_session.cpp
     bool forceFresh = g_force_fresh_launch_h264;
-    if (server->currentGame == 0 || forceFresh) {
-        int channelCounnt =
-            config->audioConfiguration == AUDIO_CONFIGURATION_STEREO
-                ? CHANNEL_COUNT_STEREO
-                : CHANNEL_COUNT_51_SURROUND;
-        int mask = config->audioConfiguration == AUDIO_CONFIGURATION_STEREO
-                       ? CHANNEL_MASK_STEREO
-                       : CHANNEL_MASK_51_SURROUND;
-        int fps = sops && config->fps > 60 ? 60 : config->fps;
+    if (server->currentGame == 0 || forceFresh)
+    {
+        int channelCounnt = config->audioConfiguration == AUDIO_CONFIGURATION_STEREO
+            ? CHANNEL_COUNT_STEREO
+            : CHANNEL_COUNT_51_SURROUND;
+        int mask          = config->audioConfiguration == AUDIO_CONFIGURATION_STEREO
+                     ? CHANNEL_MASK_STEREO
+                     : CHANNEL_MASK_51_SURROUND;
+        int fps           = sops && config->fps > 60 ? 60 : config->fps;
 
         // Build base /launch URL with standard parameters
         snprintf(url, sizeof(url),
-                 "https://%s:%u/"
-                 "launch?uniqueid=%s&appid=%d&mode=%dx%dx%d&additionalStates=1&"
-                 "sops=%d&rikey=%s&rikeyid=%d&localAudioPlayMode=%d&"
-                 "surroundAudioInfo=%d&remoteControllersBitmap=%d&gcmap=%d",
-                 server->serverInfo.address, server->httpsPort, unique_id.c_str(), appId,
-                 config->width, config->height, fps, sops, rand.hex().bytes(),
-                 rikeyid, localaudio, (mask << 16) + channelCounnt,
-                 gamepad_mask, gamepad_mask);
+            "https://%s:%u/"
+            "launch?uniqueid=%s&appid=%d&mode=%dx%dx%d&additionalStates=1&"
+            "sops=%d&rikey=%s&rikeyid=%d&localAudioPlayMode=%d&"
+            "surroundAudioInfo=%d&remoteControllersBitmap=%d&gcmap=%d",
+            server->serverInfo.address, server->httpsPort, unique_id.c_str(), appId,
+            config->width, config->height, fps, sops, rand.hex().bytes(),
+            rikeyid, localaudio, (mask << 16) + channelCounnt,
+            gamepad_mask, gamepad_mask);
 
         // Append display resolution hint if specified (Sunshine protocol extension)
         // Allows host to configure display at different resolution than stream
         // Use case: Stream 960x544 to client while host display runs at 1920x1080
-        if (displayWidth > 0 && displayHeight > 0) {
+        if (displayWidth > 0 && displayHeight > 0)
+        {
             size_t currentLen = strlen(url);
             snprintf(url + currentLen, sizeof(url) - currentLen,
-                     "&displayWidth=%d&displayHeight=%d",
-                     displayWidth, displayHeight);
+                "&displayWidth=%d&displayHeight=%d",
+                displayWidth, displayHeight);
             vita_log::info("[gs_start_app] Display resolution hint: {}x{} (stream: {}x{})",
-                             displayWidth, displayHeight,
-                             config->width, config->height);
+                displayWidth, displayHeight,
+                config->width, config->height);
         }
 
         // Append Limelight query parameters
         size_t currentLen = strlen(url);
         snprintf(url + currentLen, sizeof(url) - currentLen, "%s",
-                 LiGetLaunchUrlQueryParameters());
-        if (forceFresh && server->currentGame != 0) {
+            LiGetLaunchUrlQueryParameters());
+        if (forceFresh && server->currentGame != 0)
+        {
             vita_log::warning("[gs_start_app] Ignorando resume para forzar renegociación H.264 (fresh launch)");
         }
-    } else {
+    }
+    else
+    {
         snprintf(url, sizeof(url),
-                 "https://%s:%u/resume?uniqueid=%s&rikey=%s&rikeyid=%d&localAudioPlayMode=%d%s",
-                 server->serverInfo.address, server->httpsPort, unique_id.c_str(),
-                 rand.hex().bytes(), rikeyid, localaudio, LiGetLaunchUrlQueryParameters());
+            "https://%s:%u/resume?uniqueid=%s&rikey=%s&rikeyid=%d&localAudioPlayMode=%d%s",
+            server->serverInfo.address, server->httpsPort, unique_id.c_str(),
+            rand.hex().bytes(), rikeyid, localaudio, LiGetLaunchUrlQueryParameters());
     }
 
-    if ((ret = http_request(url, &data, HTTPRequestTimeoutLong)) == GS_OK) {
+    if ((ret = http_request(url, &data, HTTPRequestTimeoutLong)) == GS_OK)
+    {
         server->currentGame = appId;
-    } else {
+    }
+    else
+    {
         goto exit;
     }
 
-    if ((ret = xml_status(data) != GS_OK)) {
+    if ((ret = xml_status(data) != GS_OK))
+    {
         goto exit;
-    } else if ((ret = xml_search(data, "gamesession", &result)) != GS_OK) {
+    }
+    else if ((ret = xml_search(data, "gamesession", &result)) != GS_OK)
+    {
         goto exit;
     }
 
-    if (result == "0") {
+    if (result == "0")
+    {
         ret = GS_FAILED;
         goto exit;
     }
 
-    if (xml_search(data, "sessionUrl0", &result) == GS_OK && !result.empty()) {
+    if (xml_search(data, "sessionUrl0", &result) == GS_OK && !result.empty())
+    {
         const std::string::size_type size = result.size();
+        delete[] server->serverInfo.rtspSessionUrl;
         server->serverInfo.rtspSessionUrl = new char[size + 1];
-        memcpy((void *) server->serverInfo.rtspSessionUrl, result.c_str(), size + 1);
-    } else {
+        memcpy((void*)server->serverInfo.rtspSessionUrl, result.c_str(), size + 1);
+    }
+    else
+    {
         vita_log::error("sessionUrl0 not found or empty");
     }
 

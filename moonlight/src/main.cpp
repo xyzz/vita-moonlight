@@ -19,11 +19,14 @@
 #include <SDL2/SDL_main.h>
 #endif
 
+#include <atomic>
 #include <borealis.hpp>
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
+#include <memory>
 #include <string>
+#include <thread>
 #ifndef _WIN32
 #include <sys/stat.h>
 #endif
@@ -33,10 +36,12 @@
 
 #include "ConfigManager.hpp"
 #include "activity/main_activity.hpp"
+#include "session/vita_session.hpp"
 #include "settings.hpp"
 #include "tab/add_host_tab.hpp"
 #include "tab/hosts_tab.hpp"
 #include "tab/settings_tab.hpp"
+#include "utils/dialog_utils.h"
 #include "utils/host_search.hpp"
 // Include debug wrapper for console/Vita output testing
 #include "debug.hpp"
@@ -55,6 +60,116 @@ extern "C" unsigned int sceLibcHeapSize = 2 * 1024 * 1024;
 #endif
 
 using namespace brls::literals; // for _i18n
+
+namespace
+{
+
+#if defined(__PSV__)
+std::atomic<bool> appBackgrounded { false };
+std::atomic<bool> resumeReconnectPending { false };
+
+struct ResumeReconnectState
+{
+    brls::Dialog* dialog = nullptr;
+    int retriesRemaining = 1;
+};
+
+void finishResumeReconnect(const std::shared_ptr<ResumeReconnectState>& state, bool reconnected)
+{
+    if (state->dialog)
+    {
+        state->dialog->close();
+        state->dialog = nullptr;
+    }
+    brls::Application::unblockInputs();
+    resumeReconnectPending.store(false);
+
+    if (reconnected)
+    {
+        vita_log::info("[Main] Stream reconectado tras reanudar la aplicación");
+    }
+    else
+    {
+        vita_log::error("[Main] No se pudo reconectar el stream tras reanudar la aplicación");
+        brls::Application::notify(brls::getStr("moonlight/session/app_select/reconnect_failed"));
+    }
+}
+
+void reconnectStreamAfterResume(const std::shared_ptr<ResumeReconnectState>& state)
+{
+    VitaSession* session = VitaSession::active();
+    if (!session)
+    {
+        brls::sync([state]()
+            {
+            if (state->dialog) {
+                state->dialog->close();
+                state->dialog = nullptr;
+            }
+            brls::Application::unblockInputs();
+            resumeReconnectPending.store(false); });
+        return;
+    }
+
+    bool reconnected = session->reconnectAfterResume();
+    brls::sync([state, reconnected]()
+        {
+        if (reconnected) {
+            finishResumeReconnect(state, true);
+        } else if (state->retriesRemaining > 0) {
+            state->retriesRemaining--;
+            vita_log::warning("[Main] Reconnect tras resume falló; reintentando en 1 segundo");
+            brls::delay(1000, [state]() {
+                std::thread([state]() {
+                    reconnectStreamAfterResume(state);
+                }).detach();
+            });
+        } else {
+            finishResumeReconnect(state, false);
+        } });
+}
+
+void beginResumeReconnect()
+{
+    if (!VitaSession::active())
+    {
+        resumeReconnectPending.store(false);
+        return;
+    }
+
+    auto state = std::make_shared<ResumeReconnectState>();
+    brls::Application::blockInputs();
+    state->dialog = createLoadingDialog(brls::getStr("moonlight/session/app_select/reconnecting"));
+
+    brls::delay(150, [state]()
+        { std::thread([state]()
+              { reconnectStreamAfterResume(state); })
+              .detach(); });
+}
+
+void handleWindowFocusChanged(bool focused)
+{
+    if (!focused)
+    {
+        appBackgrounded.store(true);
+        vita_log::info("[Main] Aplicación suspendida o enviada a segundo plano");
+        return;
+    }
+
+    if (!appBackgrounded.exchange(false) || resumeReconnectPending.exchange(true))
+    {
+        return;
+    }
+
+    vita_log::info("[Main] Aplicación reanudada; programando reconexión del stream");
+    // Power callbacks run on Borealis' Vita callback thread.
+    brls::sync([]()
+        { brls::delay(750, []()
+              { beginResumeReconnect(); }); });
+}
+#endif
+
+}
 
 int main(int argc, char* argv[])
 {
@@ -231,6 +346,10 @@ int main(int argc, char* argv[])
     moonlight::settings::loadSettingsFromConfig();
 
     brls::Application::createWindow("moonlight/title"_i18n);
+
+#if defined(__PSV__)
+    brls::Application::getWindowFocusChangedEvent()->subscribe(handleWindowFocusChanged);
+#endif
 
     // Apply saved V-Sync (swap interval) and frame rate limit to main application menus
     {

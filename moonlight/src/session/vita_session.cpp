@@ -208,13 +208,16 @@ bool VitaSession::internalStart()
     vita_log::info("[VitaSession] LiStartConnection ok (%dx%d@%d fps bitrate=%dK formats=0x%X)", m_config.width, m_config.height, m_config.fps, m_config.bitrate, m_config.supportedVideoFormats);
     VideoManager::instance()->startVideo();
     vita_log::info("[VitaSession] Video iniciado con decodificador: %s", VideoManager::instance()->getRenderMode().c_str());
-    m_is_active     = true;
-    m_is_terminated = false;
+    m_is_active              = true;
+    m_is_terminated          = false;
+    m_allow_resume_reconnect = true;
+    m_reconnect_attempts     = 0;
     return true;
 }
 
 void VitaSession::stop(bool terminateApp)
 {
+    m_allow_resume_reconnect = false;
     if (!m_is_active && !m_is_terminated)
         return;
 
@@ -242,9 +245,54 @@ bool VitaSession::attemptReconnect()
         return false;
     m_reconnect_attempts++;
     vita_log::info("[VitaSession] Reconnect intento %d", m_reconnect_attempts);
-    // Simple: stop and restart
+
+    return restartConnection(false);
+}
+
+bool VitaSession::reconnectAfterResume()
+{
+    if (!m_allow_resume_reconnect)
+    {
+        vita_log::info("[VitaSession] Reconnect tras resume omitido: sesión no reanudable");
+        return true;
+    }
+
+    vita_log::info("[VitaSession] Reanudación de Vita detectada; renovando sesión y stream");
+    return restartConnection(true);
+}
+
+bool VitaSession::restartConnection(bool renegotiateSession)
+{
+
+    g_session_stopping = true;
+    VideoManager::instance()->stopVideo();
     LiStopConnection();
-    return internalStart();
+    m_is_active     = false;
+    m_is_terminated = false;
+
+    if (renegotiateSession && !GameStreamClient::instance().resumeApp(m_address, m_config, m_app_id))
+    {
+        g_session_stopping = false;
+        m_is_terminated    = true;
+        return false;
+    }
+
+    g_session_stopping = false;
+
+    if (!internalStart())
+    {
+        m_is_terminated = true;
+        return false;
+    }
+
+    if (g_controllerInput)
+    {
+        g_controllerInput->setStreamingActive(true);
+        g_controllerInput->lockPSButton();
+        g_controllerInput->dropInput();
+    }
+    notifyGamepadType();
+    return true;
 }
 
 void VitaSession::onFrameDecoded()

@@ -332,6 +332,31 @@ bool GameStreamClient::startApp(const std::string& address, STREAM_CONFIGURATION
     return true;
 }
 
+bool GameStreamClient::resumeApp(const std::string& address, STREAM_CONFIGURATION& config, int appId)
+{
+    auto server = m_server_data.find(address);
+    if (server == m_server_data.end() || server->second.currentGame == 0)
+    {
+        vita_log::warning("[GameStreamClient] No hay sesión activa para reanudar en %s", address.c_str());
+        return false;
+    }
+
+    ConfigManager configManager;
+    configManager.load();
+    VideoSettings settings = configManager.getVideoSettings();
+    int status             = gs_start_app(&server->second, &config, appId, settings.sops,
+                    settings.localaudio, 0x1, 0, 0);
+    if (status != GS_OK)
+    {
+        vita_log::error("[GameStreamClient] Reanudación de sesión falló: %d", status);
+        return false;
+    }
+
+    m_last_stream_cfg[address] = config;
+    vita_log::info("[GameStreamClient] Sesión reanudada y parámetros RTSP renovados");
+    return true;
+}
+
 bool GameStreamClient::lastStreamConfig(const std::string& address, STREAM_CONFIGURATION& out) const
 {
     auto it = m_last_stream_cfg.find(address);

@@ -54,8 +54,7 @@
   "change_ip_empty_error": "The IP can't be empty",
   "change_ip_same": "That IP is already set",
   "change_ip_success": "Host IP updated",
-  "change_ip_failure": "Couldn't update the host IP"
-  ,
+  "change_ip_failure": "Couldn't update the host IP",
   "edit_host_title": "Edit Host",
   "edit_host_name_hint": "Host name",
   "edit_host_ip_hint": "Host IP or IP:Port",

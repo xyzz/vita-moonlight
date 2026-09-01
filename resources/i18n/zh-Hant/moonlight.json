@@ -1,0 +1,488 @@
+{
+    "title": "Moonlight Vita",
+    "tabs": {
+        "settings": "設置",
+        "about": "關於\"月光\"Vita",
+        "add_host": "添加主機",
+        "hosts": "主機"
+    },
+    "capunlocker_notify": "檢測到 CapUnlocker！將有效全部4個核心與擴充記憶體。",
+    "welcome": "歡迎使用 Moonlight Vita！",
+    "components": {
+        "buttons_header": "按鈕",
+        "button_primary": "主按鈕",
+        "button_highlight": "  Highlight button",
+        "button_wrapping": "帶有文本的默認按鈕",
+        "button_bordered": "邊框按鈕",
+        "button_borderless": "無邊框按鈕",
+        "slider_header": "幻燈片",
+        "labels_header": "標籤",
+        "regular_label": "這是一個標籤。 默認情況下,如果剩下的垂直空間允許,它們會自動包裹並擴展它們的高度. 否則,它們會被截取,就像側邊欄的一些分頁.\n這是一個標籤。 默認情況下,如果剩下的垂直空間允許,它們會自動包裹並擴展它們的高度. 否則,它們會被截取,就像側邊欄的一些分頁.",
+        "label_left": "此標籤爲左對齊",
+        "label_center": "此標籤爲中相",
+        "label_right": "此標籤對齊",
+        "images_header_title": "圖像",
+        "images_header_subtitle": "聚焦以觀看縮放方式",
+        "images_downscaled": "縮小",
+        "images_original": "原文",
+        "images_upscaled": "升級",
+        "images_stretched": "伸縮",
+        "images_cropped": "已裁剪"
+    },
+    "about": {
+        "title": "Moonlight Vita",
+        "description": "適用於 PlayStation Vita 的開源 NVIDIA GameStream 串流程式。可透過 Sunshine 或 GeForce Experience 串流電腦遊戲。",
+        "author": "作者：AorsiniYT",
+        "original_creators": "原始 Vita 端口: xyzz, d3m3vilurr, cgutman",
+        "moonlight_repo": "原版 Moonlight：github.com/moonlight-stream",
+        "github": "源代碼：github.com/xyzz/vita-moonlight",
+        "licence": "許可證:GPLv3",
+        "logo_credit": "Logo 與 UI 已針對 Vita 調整。基於 Borealis。"
+    },
+    "settings": {
+        "add_host": "添加主機",
+        "add_host_desc": "添加用於流媒體的新 PC",
+        "add_host_title": "添加主機",
+        "add_host_manual": "主機名稱",
+        "add_host_auto": "自動搜索 PC",
+        "add_host_manual_msg": "手動添加 PC 的函數( 待決)",
+        "add_host_auto_msg": "自動搜索 PC 的功能( 待定)",
+        "add_host_ip_placeholder": "例如 192.168.1.100",
+        "add_host_name_placeholder": "主機名稱",
+        "add_host_missing_fields": "必須輸入 IP 和名稱",
+        "add_host_added": "主機已添加",
+        "add_host_not_implemented": "(尚未執行)",
+        "ip": "IP",
+        "dns": "DNS 數據",
+        "notify": "發出通知",
+        "language": "語言",
+        "add_host_connection_type": "連接類型",
+        "add_host_lan": "局域網(當地)",
+        "add_host_online": "在線(外部)",
+        "hosts_list_title": "已保存的 PC",
+        "hosts_list_empty": "沒有保存的 PC",
+        "rear_touch_detail": "配置後接觸區和行動",
+        "front_touch_detail": "區域與操作",
+        "add_host_connect_question_dialog": "連接到 $(name)（$(ip)）？",
+        "add_host_connect": "連接",
+        "add_host_cancel": "取消"
+    },
+    "settings_tab": {
+        "header": "串流設置",
+        "controls_header": "控件",
+        "system_header": "系統",
+        "render_mode": {
+            "title": "繪圖模式",
+            "legacy_option": "傳統 (SceVideodec)",
+            "modern_option": "現代 (FFmpeg)",
+            "legacy_name": "傳統",
+            "modern_name": "現代",
+            "unknown_name": "未知",
+            "notify": "繪圖模式：{0}"
+        },
+        "pixel_format": {
+            "title": "像素格式",
+            "rgba": "直接 RGBA",
+            "yuv": "YUV420 (硬件 CSC)",
+            "notify": "像素格式：{0}"
+        },
+        "stream_resolution": {
+            "title": "串流分辨率",
+            "options": {
+                "0": "848x480 (低帶寬)",
+                "1": "960x540",
+                "2": "960x544 (原生)",
+                "3": "1024x576",
+                "4": "1152x648",
+                "5": "1280x540",
+                "6": "1280x720",
+                "7": "1366x768",
+                "8": "1600x900",
+                "9": "1920x1080"
+            },
+            "saved": "串流分辨率已保存"
+        },
+        "resolution": {
+            "title": "主機顯示器分辨率",
+            "description": "控制主機顯示器分辨率。串流分辨率單獨設置。",
+            "options": {
+                "0": "自動( 當前主機)",
+                "1": "960x544",
+                "2": "1024x576",
+                "3": "1152x648",
+                "4": "1280x540",
+                "5": "1280x720",
+                "6": "1366x768",
+                "7": "1600x900",
+                "8": "1920x1080"
+            },
+            "saved": "主機顯示器分辨率已保存"
+        },
+        "fps": {
+            "title": "FPS",
+            "options": {
+                "0": "24 FPS (電影)",
+                "1": "30 FPS(標準)",
+                "2": "40 FPS",
+                "3": "50 FPS (PAL)",
+                "4": "60 FPS (NTSC)"
+            },
+            "saved": "FPS 已保存"
+        },
+        "bitrate": {
+            "title": "比特率( Kbps)",
+            "options": {
+                "0": "自動( 建議)",
+                "1": "2000 Kbps (低)",
+                "2": "5000 Kbps (標準)",
+                "3": "8000 Kbps (HD)",
+                "4": "10000 Kbps (HD+)",
+                "5": "15000 Kbps (Full HD)",
+                "6": "20000 Kbps (Full HD+)",
+                "7": "30000 Kbps (Ultra HD)",
+                "8": "50000 Kbps (最高)"
+            },
+            "saved": "位速率已保存"
+        },
+        "sops_title": "串流優化",
+        "network_opt_title": "網絡優化",
+        "network_opt_enabled": "網絡優化啓用",
+        "network_opt_disabled": "網絡優化已禁用",
+        "local_audio_title": "本地音頻",
+        "fullscreen_title": "全屏",
+        "frame_pacer_title": "畫面調整",
+        "settings_background_opacity": "設置背景不透明度",
+        "keep_awake_while_streaming": "串流時保持 Vita 喚醒",
+        "center_region_title": "僅中心區域",
+        "show_fps_title": "顯示 FPS",
+        "save_debug_log_title": "保存調試日誌",
+        "ref_frame_title": "參考幀失效",
+        "swap_interval": {
+            "title": "V-Sync（交換間隔）",
+            "options": {
+                "0": "V-Sync 關閉（無限制）",
+                "1": "V-Sync 開開（60 FPS）",
+                "2": "V-Sync 2x（30 FPS）",
+                "3": "V-Sync 3x（20 FPS）",
+                "4": "V-Sync 4x（15 FPS）"
+            },
+            "saved": "V-Sync 已儲存"
+        },
+        "motion_controls_title": "陀螺儀",
+        "double_tap_sprint_title": "點兩下衝刺",
+        "touchscreen_mode": {
+            "title": "觸摸屏模式",
+            "options": {
+                "0": "已禁用",
+                "1": "相對軌道盤",
+                "2": "DS4 觸控板(僅限PS4)",
+                "3": "定位滑鼠",
+                "4": "多觸摸平板電腦"
+            },
+            "saved": "觸摸屏模式已保存",
+            "changed": "觸摸屏模式改爲:"
+        },
+        "gamepad_type": {
+            "title": "控制器類型",
+            "options": {
+                "xbox": "Xbox 360",
+                "ps4": "PlayStation 4"
+            },
+            "notify_prefix": "控制器類型改爲:"
+        },
+        "swap_shoulder_buttons": {
+            "title": "交換 R1/L1 <- > R2/L2",
+            "notify_enabled": "啓用了肩部交換按鈕",
+            "notify_disabled": "換肩按鈕已禁用"
+        },
+        "mouse_accel": {
+            "title": "鼠標加速"
+        },
+        "keyboard_layout": {
+            "title": "鍵盤配置",
+            "saved": "鍵盤配置已儲存"
+        },
+        "language_changed": "語言已儲存。請重新開始 Moonlight Vita 以套用。",
+        "language_restarting": "正在重新開始 Moonlight Vita...",
+        "language_save_failed": "無法儲存語言",
+        "language_restart_failed": "無法重新開始。請手動重新開始 Moonlight Vita。",
+        "moonmic_header": "Moonmic",
+        "moonmic_requirement": "需要在主機上運行 Moonmic",
+        "microphone_enabled_title": "啓用麥克風",
+        "microphone_description": "將麥克風音訊傳送到主機，找不到主機時在 10 秒後重試連線",
+        "microphone_enabled": "[OK] 麥克風將在串流開始時啓動",
+        "microphone_disabled": "[X] 麥克風已停用",
+        "microphone_configure_title": "設定麥克風",
+        "microphone_configure_detail": "調整增益、編碼和測試"
+    },
+    "microphone": {
+        "title": "麥克風配置",
+        "subtitle": "需要 MoonMic: https://github.com/AorsiniYT/libmoonmic",
+        "gain_header": "增益設置",
+        "gain_description": "放大麥克風輸入（1x-50x）。提高設定會增加音量。",
+        "gain_label": "增益：{0}x",
+        "format_header": "音頻格式",
+        "opus_toggle": "使用 Opus 壓縮",
+        "opus_description": "透過壓縮降低頻寬用量",
+        "test_header": "測試",
+        "test_description": "對著麥克風講話，應可從 Vita 喇叭聽到聲音。",
+        "test_toggle": "測試麥克風（本機）",
+        "test_remote_toggle": "測試麥克風（遠端）",
+        "notify_local_started": "本機測試已開始",
+        "notify_local_failed": "啓動本地測試失敗",
+        "notify_local_stopped": "本機測試已停止",
+        "notify_remote_started": "遠端測試已開始",
+        "notify_remote_connecting": "正在連接到主機...",
+        "notify_remote_stopped": "遠端測試已停止",
+        "notify_opus_enabled": "啓用 Opus 壓縮",
+        "notify_opus_disabled": "啓用原始 PCM",
+        "host_selector_title": "選擇遠程測試的主機",
+        "no_hosts": "沒有可用的已配對主機",
+        "notify_no_host": "尚未選擇主機。請先完成配對",
+        "port_header": "連接埠設定",
+        "port_title": "麥克風連接埠",
+        "port_hint": "UDP 連接埠（預設：48100）"
+    },
+    "keyboard": {
+        "title": "配置鍵盤",
+        "configure_title": "配置鍵盤",
+        "configure_detail": "版式、主題和定製",
+        "header_mode": "鍵盤模式",
+        "header_layout": "鍵盤配置",
+        "header_modern": "現代選項",
+        "header_theme": "外觀（即將推出）",
+        "mode_title": "鍵盤類型",
+        "mode_legacy": "傳統（系統 IME）",
+        "mode_modern": "現代（自訂覆蓋層）",
+        "mode_saved": "鍵盤模式已保存",
+        "numbers_row_title": "顯示數字行",
+        "arrows_title": "顯示箭頭鍵",
+        "theme_preview_title": "當前主題",
+        "theme_editor_title": "主題編輯器",
+        "theme_info": "自訂鍵盤主題將在未來更新中提供。可以建立並分享自己的鍵盤設計！",
+        "input_mode_title": "鍵盤輸入模式 (UTF-8)",
+        "input_mode_utf8": "啓用 UTF-8 輸入",
+        "input_mode_vk": "啓用了 VK 輸入( 默認)",
+        "theme_default": "默認",
+        "theme_selection_future": "主題選擇功能即將推出",
+        "theme_not_available": "不可用",
+        "theme_editor_future": "主題編輯器即將推出"
+    },
+    "shortcuts": {
+        "title": "快捷鍵設置",
+        "configure_title": "配置快捷鍵",
+        "configure_detail": "自定義暫停和鍵盤組合",
+        "pause_combo_title": "暫停快捷鍵",
+        "keyboard_combo_title": "鍵盤快捷鍵",
+        "custom_shortcut_title": "快捷鍵",
+        "button_slot_1": "按鈕 1",
+        "button_slot_2": "按鈕 2",
+        "button_slot_3": "按鈕 3",
+        "add_shortcut_title": "新增快捷鍵",
+        "add_shortcut_detail": "建立新的自訂組合",
+        "editor_action_title": "動作",
+        "editor_name_title": "名稱",
+        "editor_name_hint": "此快捷鍵的可選名稱",
+        "action_pause": "暫停",
+        "action_keyboard": "鍵盤",
+        "disabled_combo": "已禁用",
+        "clear_combo_title": "清除組合",
+        "clear_combo_detail": "將按鈕 1、2 和 3 設為無",
+        "delete_shortcut_title": "刪除快捷鍵",
+        "delete_shortcut_detail": "刪除此自定義快捷鍵",
+        "save_shortcut_title": "保存更改",
+        "save_shortcut_detail": "套用此快捷鍵設定",
+        "reset_defaults_title": "還原預設",
+        "reset_defaults_detail": "暫停: START + L1 + R1 | 鍵盤: START + LEFT",
+        "notify_saved": "快捷鍵已保存",
+        "notify_invalid_combo": "選擇至少一個按鈕",
+        "notify_defaults_restored": "快捷鍵預設已還原",
+        "notify_deleted": "快捷鍵已刪除",
+        "notify_cleared": "已清除組合"
+    },
+    "rear_touch": {
+        "title": "背面觸控",
+        "toggle": "背面觸控",
+        "calibrate": "校準背面觸控",
+        "calibration_zone_title": "活動區域",
+        "calibration_zone_detail": "以校正調整邊距",
+        "actions_header": "角落動作",
+        "swap_warning": "R1/L1 <-> R2/L2 交換已啓用。NW/NE -> L1/R1，SW/SE -> L3/R3。自訂角落動作已停用。",
+        "action_nw": "左上角動作",
+        "action_ne": "右上角動作",
+        "action_sw": "左下角動作",
+        "action_se": "右下角動作",
+        "notify_enabled": "背面觸控已啓用",
+        "notify_disabled": "背面觸控已停用",
+        "notify_action_saved": "背面觸控動作已儲存",
+        "notify_calibration_saved": "背面觸控校準已儲存",
+        "detail_top": "上",
+        "detail_bottom": "下",
+        "detail_left": "左",
+        "detail_right": "右",
+        "calibration": {
+            "title": "校準背面觸控",
+            "overlay_title": "背面觸控調整",
+            "status_enabled": "情形：已啓用",
+            "status_disabled": "情形：已停用",
+            "selected_edge": "選擇的邊界：",
+            "current_action": "目前動作：",
+            "margins": "邊距（px）",
+            "margins_format": "{0} - {1}: {2} | {3}: {4} | {5}: {6} | {7}: {8}",
+            "assignments_prefix": "指派",
+            "assignments_top_format": "{0} - {1}: {2} | {3}: {4}",
+            "assignments_bottom_format": "{0}: {1} | {2}: {3}",
+            "instructions": "▲/▼ 切換邊界 • ◀/▶ 調整邊距 • L/R 切換動作 • △ 切換觸控 • □ 還原預設設定",
+            "zone_labels": {
+                "nw": "NW",
+                "ne": "NE",
+                "sw": "SW",
+                "se": "SE"
+            },
+            "edge_labels": [
+                "上",
+                "右",
+                "下",
+                "左"
+            ],
+            "actions": {
+                "save": "保存",
+                "cancel": "取消",
+                "next_edge": "下一個邊界",
+                "prev_edge": "上一個邊界",
+                "increase_margin": "增加邊界",
+                "decrease_margin": "縮小邊界",
+                "next_action": "下一個動作",
+                "prev_action": "上一個動作",
+                "toggle_enabled": "切換啓用",
+                "reset": "重設"
+            }
+        }
+    },
+    "front_touch": {
+        "title": "前面觸控區",
+        "toggle": "前面觸控區",
+        "offset": "區域偏移",
+        "offset_detail": "與螢幕邊界的距離",
+        "size": "區域大小",
+        "size_detail": "方形區域的寬度/高度",
+        "preview": "預覽區域",
+        "preview_detail": "預覽並測試角落區域",
+        "zones_description": "串流時點按畫面角落以觸發動作",
+        "actions_header": "角落動作",
+        "action_nw": "左上角動作",
+        "action_ne": "右上角動作",
+        "action_sw": "左下角動作",
+        "action_se": "右下角動作",
+        "notify_enabled": "前面觸控區已啓用",
+        "notify_disabled": "前面觸控區已停用",
+        "notify_action_saved": "前面觸控動作已儲存"
+    },
+    "hints": {
+        "cancel": "取消"
+    },
+    "host_dialog/connecting": "正在生成證書...",
+    "main": {
+        "cancel": "取消"
+    },
+    "trackpad": {
+        "header": "觸控板設定",
+        "pointer_speed": {
+            "title": "指針速度",
+            "detail": "滑動時調整光標速度倍率"
+        },
+        "tap_to_click": {
+            "title": "輕觸點按",
+            "detail": "輕觸觸控板即可點按",
+            "enabled": "輕觸點按已有效",
+            "disabled": "輕觸點按已停用"
+        },
+        "gestures_header": "手勢與按鍵選項",
+        "two_finger_right_click": {
+            "title": "雙指右鍵",
+            "detail": "以兩指執行右鍵",
+            "enabled": "啓用右鍵雙指鍵",
+            "disabled": "兩指右鍵已停用"
+        },
+        "two_finger_scroll": {
+            "title": "二指滾動",
+            "detail": "用兩指滑動來捲動",
+            "enabled": "啓用了雙指滾動",
+            "disabled": "二指滾動已禁用"
+        },
+        "invert_scroll": {
+            "title": "倒轉滾動方向",
+            "detail": "使用自然捲動（iOS 方式）或傳統捲動",
+            "natural": "自然捲動已啓用（iOS 方式）",
+            "traditional": "啓用了傳統滾動"
+        },
+        "multi_touch": {
+            "title": "多觸摸手勢",
+            "detail": "啓用撮合縮放等進階手勢",
+            "enabled": "多觸摸手勢啓用",
+            "disabled": "多觸摸手勢已禁用"
+        },
+        "advanced_header": "高級選項",
+        "edge_zone": {
+            "title": "邊界無效區",
+            "detail": "定義邊界區域以忽略意外輕觸"
+        },
+        "dead_zone": {
+            "title": "移動死亡區",
+            "detail": "登記滑動前的最低移動量"
+        }
+    },
+    "gyro": {
+        "title": "陀螺儀設定",
+        "header": "陀螺儀",
+        "toggle": "啓用陀螺儀",
+        "settings_entry": "陀螺儀設定",
+        "settings_detail": "調整靈敏度並進行測試",
+        "scalars_header": "靈敏度分級",
+        "scalars_description": "調整各軸靈敏度（0.1x - 3.0x）。數字越高越靈敏。",
+        "scalar_suffix": "縮放",
+        "test_header": "測試與校準",
+        "test_description": "開啓 PS Vita 輪廓視圖，並根據感測器移動。",
+        "test_button": "測試傳感器",
+        "test_detail": "打開視覺測試",
+        "test_title": "傳感器測試",
+        "notify_enabled": "陀螺儀已啓用",
+        "notify_disabled": "陀螺儀已停用"
+    },
+    "session": {
+        "pause": {
+            "title": "暫停",
+            "keyboard": "鍵盤",
+            "resume": "繼續",
+            "disconnect": "斷開連接",
+            "close_app": "關閉應用",
+            "notify_disconnected": "已斷開連接",
+            "notify_app_closed": "應用已關閉"
+        },
+        "app_select": {
+            "subtitle": "選擇要啓動的應用",
+            "connecting": "正在連接...",
+            "reconnecting": "正在重新連接...",
+            "reconnect_failed": "無法重新連接串流",
+            "starting": "正在啓動...",
+            "error_no_host": "錯誤：未找到主機信息。",
+            "no_apps": "該主機上未找到應用。",
+            "running_session": "正在運行的會話",
+            "error_connect": "連接服務器時出錯",
+            "paired": "已配對",
+            "pairing_failed": "配對已取消/失敗",
+            "error_start_app": "啓動應用時出錯",
+            "error_start_stream": "啓動流時出錯",
+            "active_session_msg": "存在活動會話：$(app)。要繼續該會話還是開始新的？",
+            "button_resume": "恢復會話",
+            "button_start_new": "開始新會話",
+            "ending_session": "正在關閉主機上的會話...",
+            "error_end_session": "無法關閉主機上的會話",
+            "moonmic_not_connected": "Moonmic 未連接",
+            "moonmic_host_active": "Moonmic 主機已啓用",
+            "resolution_prompt_body": "串流前會將主機顯示器切換爲 $(res)（可能會重啓 Sunshine）。是否繼續？",
+            "resolution_prompt_continue": "繼續",
+            "resolution_prompt_cancel": "取消"
+        }
+    }
+}

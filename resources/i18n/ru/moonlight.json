@@ -1,20 +1,469 @@
 {
+  "title": "Moonlight Vita",
+  "tabs": {
+    "settings": "Настройки",
+    "about": "Обсуждение Moonlight Vita",
+    "add_host": "Добавить хост",
+    "hosts": "Ведущие"
+  },
+  "capunlocker_notify": "CapUnlocker обнаружен! Все 4 ядра и расширенная оперативная память будут включены.",
+  "welcome": "Добро пожаловать в Moonlight Vita!",
+  "components": {
+    "buttons_header": "Кнопки",
+    "button_primary": "Главная Кнопка",
+    "button_highlight": " Кнопка освещения",
+    "button_wrapping": "Кнопка по умолчанию с текстом обертки",
+    "button_bordered": "Ограниченная кнопка",
+    "button_borderless": "Безграничная кнопка",
+    "slider_header": "Слайдер",
+    "labels_header": "этикетки",
+    "regular_label": "Это ярлык. По умолчанию они автоматически обернут и расширят свою высоту, если позволит оставшееся вертикальное пространство. В противном случае они будут усечены, как и некоторые вкладки боковой панели.\nЭто ярлык. По умолчанию они автоматически обернут и расширят свою высоту, если позволит оставшееся вертикальное пространство. В противном случае они будут усечены, как и некоторые вкладки боковой панели.",
+    "label_left": "Этот ярлык выровнен слева",
+    "label_center": "Этот ярлык выровнен по центру",
+    "label_right": "Этот ярлык правильно выровнен",
+    "images_header_title": "Изображения",
+    "images_header_subtitle": "Сосредоточьте их, чтобы увидеть метод масштабирования",
+    "images_downscaled": "пониженный",
+    "images_original": "Оригинал",
+    "images_upscaled": "высококлассный",
+    "images_stretched": "растянутый",
+    "images_cropped": "обрезанный"
+  },
+  "about": {
+    "title": "Moonlight Vita",
+    "description": "Открытый клиент NVIDIA GameStream для PlayStation Vita. Потоковые игры для ПК с Sunshine или GeForce Experience.",
+    "author": "Автор: AorsiniYT",
+    "original_creators": "Оригинальный порт Vita: xyzz, d3m3vilurr, cgutman",
+    "moonlight_repo": "Оригинальное название: github.com/moonlight-stream",
+    "github": "Источник: github.com/xyzz/vita-moonlight",
+    "licence": "Лицензия: GPLv3",
+    "logo_credit": "Логотип и пользовательский интерфейс адаптированы для Vita. Основано на Бореалисе."
+  },
+  "settings": {
+    "add_host": "Добавить хост",
+    "add_host_desc": "Добавить новый PC для потоковой передачи",
+    "add_host_title": "Добавить хост",
+    "add_host_manual": "Имя ведущего",
+    "add_host_auto": "Поиск по PC автоматически",
+    "add_host_manual_msg": "Функция добавления ПК вручную (в ожидании)",
+    "add_host_auto_msg": "Функция автоматического поиска ПК (в ожидании)",
+    "add_host_ip_placeholder": "например, 192.168.1.100",
+    "add_host_name_placeholder": "Имя ведущего",
+    "add_host_missing_fields": "Вы должны ввести IP и имя",
+    "add_host_added": "Хозяин добавил",
+    "add_host_not_implemented": "(пока не реализовано)",
+    "ip": "IP",
+    "dns": "DNS",
+    "notify": "Опубликовать уведомление",
+    "language": "Язык языка",
+    "add_host_connection_type": "Тип соединения",
+    "add_host_lan": "LAN (местный)",
+    "add_host_online": "Онлайн (внешний)",
+    "hosts_list_title": "Спасенные ПК",
+    "hosts_list_empty": "Нет сохраненных ПК",
+    "rear_touch_detail": "Настройка задних сенсорных зон и действий",
+    "front_touch_detail": "Зоны и действия",
+    "add_host_connect_question_dialog": "Подключиться к $(name) на $(ip)?",
+    "add_host_connect": "Подключить",
+    "add_host_cancel": "отменить"
+  },
+  "settings_tab": {
+    "header": "Потоковые настройки",
+    "controls_header": "Управление",
+    "system_header": "Система",
+    "render_mode": {
+      "title": "Режим Рендера",
+      "legacy_option": "Классический (SceVideodec)",
+      "modern_option": "Современный (FFmpeg)",
+      "legacy_name": "Классический",
+      "modern_name": "современный",
+      "unknown_name": "неизвестный",
+      "notify": "Режим рендера: {0}"
+    },
+    "pixel_format": {
+      "title": "Pixel формат",
+      "rgba": "Прямой RGBA",
+      "yuv": "YUV420 (аппаратный CSC)",
+      "notify": "Формат пикселя: {0}"
+    },
+    "stream_resolution": {
+      "title": "Разрешение трансляции",
+      "options": {
+        "0": "848x480 (низкая пропускная способность)",
+        "1": "960x540",
+        "2": "960x544 (родной)",
+        "3": "1024x576",
+        "4": "1152x648",
+        "5": "1280x540",
+        "6": "1280x720",
+        "7": "1366x768",
+        "8": "1600x900",
+        "9": "1920x1080"
+      },
+      "saved": "Потоковое разрешение сохранено"
+    },
+    "resolution": {
+      "title": "Разрешение монитора хоста",
+      "description": "Контролирует разрешение хоста монитора. Разрешение потока настраивается отдельно.",
+      "options": {
+        "0": "Авто (текущий хост)",
+        "1": "960x544",
+        "2": "1024x576",
+        "3": "1152x648",
+        "4": "1280x540",
+        "5": "1280x720",
+        "6": "1366x768",
+        "7": "1600x900",
+        "8": "1920x1080"
+      },
+      "saved": "Разрешение хоста монитора сохранено"
+    },
+    "fps": {
+      "title": "FPS",
+      "options": {
+        "0": "24 FPS (Кино)",
+        "1": "30 FPS (стандарт)",
+        "2": "40 FPS",
+        "3": "50 FPS (PAL)",
+        "4": "60 FPS (NTSC)"
+      },
+      "saved": "FPS сохранён"
+    },
+    "bitrate": {
+      "title": "Bitrate (Kbps)",
+      "options": {
+        "0": "Авто (рекомендуется)",
+        "1": "2000 Kbps (низкий)",
+        "2": "5000 Кбит/с (стандарт)",
+        "3": "8000 Кбит/с (HD)",
+        "4": "10000 Кбит/с (HD+)",
+        "5": "15000 Кбит/с (Full HD)",
+        "6": "20000 Кбит/с (Full HD+)",
+        "7": "30000 Кбит/с (Ultra HD)",
+        "8": "50000 Кбит/с (максимум)"
+      },
+      "saved": "Битрейт сохранён"
+    },
+    "sops_title": "Потоковая оптимизация",
+    "network_opt_title": "Оптимизация сети",
+    "network_opt_enabled": "Оптимизация сети включена",
+    "network_opt_disabled": "Сетевая оптимизация отключена",
+    "local_audio_title": "Локальный звук",
+    "fullscreen_title": "Полный экран",
+    "frame_pacer_title": "Синхронизация кадров",
+    "settings_background_opacity": "Настройки фоновой непрозрачности",
+    "keep_awake_while_streaming": "Держите Vita бодрствующей во время потоковой передачи",
+    "center_region_title": "Только центр региона",
+    "show_fps_title": "Показать FPS",
+    "save_debug_log_title": "Сохранить журнал отладки",
+    "ref_frame_title": "Недействительность системы ссылок",
+    "swap_interval": {
+      "title": "V-Sync (Swap Interval)",
+      "options": {
+        "0": "V-Sync OFF (неограниченный)",
+        "1": "V-Sync ON (60 FPS)",
+        "2": "V-Sync 2x (30 FPS)",
+        "3": "V-Sync 3x (20 FPS)",
+        "4": "V-Sync 4x (15 FPS)"
+      },
+      "saved": "V-Sync сохранён"
+    },
+    "motion_controls_title": "гироскоп",
+    "double_tap_sprint_title": "Двойной удар в спринт",
+    "touchscreen_mode": {
+      "title": "Режим сенсорного экрана",
+      "options": {
+        "0": "Отключено",
+        "1": "Относительный трекпад",
+        "2": "сенсорная панель DS4 (только PS4)",
+        "3": "Абсолютная мышь",
+        "4": "Планшет Multitouch"
+      },
+      "saved": "Режим сенсорного экрана сохранен",
+      "changed": "Режим сенсорного экрана изменился на:"
+    },
+    "gamepad_type": {
+      "title": "Тип контроллера",
+      "options": {
+        "xbox": "Xbox 360",
+        "ps4": "PlayStation 4"
+      },
+      "notify_prefix": "Тип контроллера изменился на:"
+    },
+    "swap_shoulder_buttons": {
+      "title": "Swap R1/L1 <-> R2/L2",
+      "notify_enabled": "Кнопки плеча Swap включены",
+      "notify_disabled": "Кнопки плеча Swap отключены"
+    },
+    "mouse_accel": {
+      "title": "Ускорение мыши"
+    },
+    "keyboard_layout": {
+      "title": "Планировка клавиатуры",
+      "saved": "Макет клавиатуры сохранен"
+    },
+    "language_changed": "Язык сохранён. Перезапустите Moonlight Vita, чтобы применить его.",
+    "language_restarting": "Перезапуск Moonlight Vita...",
+    "language_save_failed": "Не удалось сохранить язык",
+    "language_restart_failed": "Не удалось перезапустить. Перезапустите Moonlight Vita вручную.",
+    "moonmic_header": "Moonmic",
+    "moonmic_requirement": "Требуется запущенный Moonmic на хосте",
+    "microphone_enabled_title": "Включить микрофон",
+    "microphone_description": "Передаёт звук с микрофона на хост и повторяет подключение каждые 10 с",
+    "microphone_enabled": "[ОК] Микрофон запустится вместе с трансляцией",
+    "microphone_disabled": "[X] Микрофон отключен",
+    "microphone_configure_title": "Настройка микрофона",
+    "microphone_configure_detail": "Настройка усиления, кодека и теста"
+  },
+  "microphone": {
+    "title": "Конфигурация микрофона",
+    "subtitle": "Требуется MoonMic: https://github.com/AorsiniYT/libmoonmic",
+    "gain_header": "Настройка усиления",
+    "gain_description": "Усиление входа микрофона (1x–50x). Более высокие значения увеличивают громкость.",
+    "gain_label": "Усиление: {0}x",
+    "format_header": "Формат аудио",
+    "opus_toggle": "Использовать сжатие Opus",
+    "opus_description": "Снижает расход полосы пропускания с помощью сжатия",
+    "test_header": "Тесты",
+    "test_description": "Говорите в микрофон. Вы должны услышать свой голос в динамиках Vita.",
+    "test_toggle": "Проверить микрофон (локально)",
+    "test_remote_toggle": "Проверить микрофон (удалённо)",
+    "notify_local_started": "Локальный тест запущен",
+    "notify_local_failed": "Не удалось начать местный тест",
+    "notify_local_stopped": "Локальный тест остановлен",
+    "notify_remote_started": "Удалённый тест запущен",
+    "notify_remote_connecting": "Подключение к хосту...",
+    "notify_remote_stopped": "Удалённый тест остановлен",
+    "notify_opus_enabled": "Сжатие Opus включено",
+    "notify_opus_disabled": "PCM без сжатия включён",
+    "host_selector_title": "Выберите хост для удаленного тестирования",
+    "no_hosts": "Нет доступных сопряжённых хостов",
+    "notify_no_host": "Хост не выбран. Сначала выполните сопряжение",
+    "port_header": "Настройка порта",
+    "port_title": "Микрофонный порт",
+    "port_hint": "UDP порт (по умолчанию: 48100)"
+  },
+  "keyboard": {
+    "title": "Настройка клавиатуры",
+    "configure_title": "Настройка клавиатуры",
+    "configure_detail": "Раскладка, темы и персонализация",
+    "header_mode": "Режим клавиатуры",
+    "header_layout": "Раскладка клавиатуры",
+    "header_modern": "Современные опции",
+    "header_theme": "Оформление (скоро)",
+    "mode_title": "Тип клавиатуры",
+    "mode_legacy": "Классическая (системная IME)",
+    "mode_modern": "Современная (пользовательский оверлей)",
+    "mode_saved": "Режим клавиатуры сохранен",
+    "numbers_row_title": "Показать цифровой ряд",
+    "arrows_title": "Показать клавиши со стрелками",
+    "theme_preview_title": "Текущая тема",
+    "theme_editor_title": "Тематический редактор",
+    "theme_info": "Пользовательские темы клавиатуры будут доступны в будущем обновлении. Вы сможете создавать и делиться своими собственными дизайнами клавиатуры!",
+    "input_mode_title": "Режим ввода клавиатуры (UTF-8)",
+    "input_mode_utf8": "Входные данные UTF-8",
+    "input_mode_vk": "VK вход включен (по умолчанию)",
+    "theme_default": "по умолчанию",
+    "theme_selection_future": "Выбор темы в будущем обновлении",
+    "theme_not_available": "Недоступно",
+    "theme_editor_future": "Тематический редактор появится в будущем обновлении"
+  },
+  "shortcuts": {
+    "title": "Настройка сочетаний",
+    "configure_title": "Настроить сочетания",
+    "configure_detail": "Настройка паузы и комбинации клавиатуры",
+    "pause_combo_title": "Сочетание для паузы",
+    "keyboard_combo_title": "Сочетание для клавиатуры",
+    "custom_shortcut_title": "Сочетание",
+    "button_slot_1": "Кнопка 1",
+    "button_slot_2": "Кнопка 2",
+    "button_slot_3": "Кнопка 3",
+    "add_shortcut_title": "Добавить сочетание",
+    "add_shortcut_detail": "Создайте новую пользовательскую комбинацию",
+    "editor_action_title": "Действие",
+    "editor_name_title": "Имя",
+    "editor_name_hint": "Факультативное название для этого ярлыка",
+    "action_pause": "Пауза",
+    "action_keyboard": "Клавиатура",
+    "disabled_combo": "Отключено",
+    "clear_combo_title": "Очистить сочетание",
+    "clear_combo_detail": "Устанавливает для кнопок 1, 2 и 3 значение «Нет»",
+    "delete_shortcut_title": "Удалить сочетание",
+    "delete_shortcut_detail": "Удалите этот пользовательский ярлык",
+    "save_shortcut_title": "Сохранить изменения",
+    "save_shortcut_detail": "Применяйте эту конфигурацию ярлыка",
+    "reset_defaults_title": "Восстановить по умолчанию",
+    "reset_defaults_detail": "Пауза: START + L1 + R1 | Клавиатура: START + LEFT",
+    "notify_saved": "Сочетание сохранено",
+    "notify_invalid_combo": "Выберите хотя бы одну кнопку",
+    "notify_defaults_restored": "Сочетания по умолчанию восстановлены",
+    "notify_deleted": "Сочетание удалено",
+    "notify_cleared": "Сочетание очищено"
+  },
+  "rear_touch": {
+    "title": "Заднее прикосновение",
+    "toggle": "Заднее прикосновение",
+    "calibrate": "Калибровка задних касаний",
+    "calibration_zone_title": "Активная зона",
+    "calibration_zone_detail": "Отрегулировать поля с помощью калибровки",
+    "actions_header": "Угловые действия",
+    "swap_warning": "Обмен R1/L1 <-> R2/L2 включён. NW/NE -> L1/R1, SW/SE -> L3/R3. Пользовательские действия для углов отключены.",
+    "action_nw": "Северо-западное угловое действие",
+    "action_ne": "Северо-восточный угол действия",
+    "action_sw": "Юго-западный угол действия",
+    "action_se": "Юго-восточный угол действия",
+    "notify_enabled": "Задний контакт включен",
+    "notify_disabled": "Заднее прикосновение отключено",
+    "notify_action_saved": "Rear touch action скачать",
+    "notify_calibration_saved": "Задняя сенсорная калибровка сохранена",
+    "detail_top": "Топ",
+    "detail_bottom": "нижняя часть",
+    "detail_left": "Левый",
+    "detail_right": "Правильно.",
+    "calibration": {
+      "title": "Калибровочный задний прикосновение",
+      "overlay_title": "Регулировка задних касаний",
+      "status_enabled": "Статус: Включено",
+      "status_disabled": "Статус: отключено",
+      "selected_edge": "Выбранный край:",
+      "current_action": "Текущие действия:",
+      "margins": "Маржа (px)",
+      "margins_format": "{0} - {1}: {2} | {3}: {4} | {5}: {6} | {7}: {8}",
+      "assignments_prefix": "Назначения",
+      "assignments_top_format": "{0} - {1}: {2} | {3}: {4}",
+      "assignments_bottom_format": "{0}: {1} | {2}: {3}",
+      "instructions": "↑ change edge • ← ← adjust margin • L/R change action •   toggle touch • □ reset defaults",
+      "zone_labels": {
+        "nw": "NW",
+        "ne": "Нэ",
+        "sw": "SW",
+        "se": "Шеф."
+      },
+      "edge_labels": [
+        "Топ",
+        "Правильно.",
+        "нижняя часть",
+        "Левый"
+      ],
+      "actions": {
+        "save": "Спасти",
+        "cancel": "отменить",
+        "next_edge": "Следующий край",
+        "prev_edge": "Предыдущий край",
+        "increase_margin": "Увеличение маржи",
+        "decrease_margin": "Снижение маржи",
+        "next_action": "Следующее действие",
+        "prev_action": "Предыдущее действие",
+        "toggle_enabled": "Toggle Enabled",
+        "reset": "сброс"
+      }
+    }
+  },
+  "front_touch": {
+    "title": "Передние сенсорные зоны",
+    "toggle": "Передние сенсорные зоны",
+    "offset": "Зона смещения",
+    "offset_detail": "Расстояние от края экрана",
+    "size": "Размер зоны",
+    "size_detail": "Площадь ширина/высота",
+    "preview": "Зоны предварительного просмотра",
+    "preview_detail": "Визуализация и тестирование угловых зон",
+    "zones_description": "Нажмите углы экрана, чтобы вызвать действия во время потоковой передачи",
+    "actions_header": "Угловые действия",
+    "action_nw": "Северо-западное угловое действие",
+    "action_ne": "Северо-восточный угол действия",
+    "action_sw": "Юго-западный угол действия",
+    "action_se": "Юго-восточный угол действия",
+    "notify_enabled": "Передние зоны касания",
+    "notify_disabled": "Передние зоны касания отключены",
+    "notify_action_saved": "Сохранение Front touch"
+  },
+  "hints": {
+    "cancel": "отменить"
+  },
+  "host_dialog/connecting": "Получение сертификатов...",
   "main": {
     "cancel": "Отмена"
+  },
+  "trackpad": {
+    "header": "Конфигурация Trackpad",
+    "pointer_speed": {
+      "title": "Скорость указателя",
+      "detail": "Настройка множителя скорости курсора при прокрутке"
+    },
+    "tap_to_click": {
+      "title": "Tap to click",
+      "detail": "Нажмите, нажав трекпад без нажатия",
+      "enabled": "Tap to click enabled",
+      "disabled": "Tap to click отключены"
+    },
+    "gestures_header": "Gestures & Click Варианты",
+    "two_finger_right_click": {
+      "title": "Правый щелчок двумя пальцами",
+      "detail": "Выполните правый клик двумя пальцами",
+      "enabled": "Двухпальцевый правый клик включен",
+      "disabled": "Двухпальцевый правый клик отключен"
+    },
+    "two_finger_scroll": {
+      "title": "прокрутка двумя пальцами",
+      "detail": "Прокрутка с помощью смахивания двумя пальцами",
+      "enabled": "Двухпальцевая прокрутка включена",
+      "disabled": "Двухпальцевая прокрутка отключена"
+    },
+    "invert_scroll": {
+      "title": "Перевернуть направление прокрутки",
+      "detail": "Используйте естественную прокрутку (в стиле iOS) или традиционную",
+      "natural": "Природная прокрутка включена (в стиле iOS)",
+      "traditional": "Традиционная прокрутка включена"
+    },
+    "multi_touch": {
+      "title": "Мультитач жесты",
+      "detail": "Включите расширенные жесты, такие как pinch to zoom",
+      "enabled": "Мультитач жесты включены",
+      "disabled": "Мультитач жесты отключены"
+    },
+    "advanced_header": "Расширенные варианты",
+    "edge_zone": {
+      "title": "Мертвые зоны Края",
+      "detail": "Определите зоны по краям, чтобы игнорировать случайные прикосновения"
+    },
+    "dead_zone": {
+      "title": "Движение мертвой зоны",
+      "detail": "Минимальный порог движения перед регистрацией в качестве свайпа"
+    }
+  },
+  "gyro": {
+    "title": "Настройки гироскопа",
+    "header": "гироскоп",
+    "toggle": "Включить гироскоп",
+    "settings_entry": "Настройки гироскопа",
+    "settings_detail": "Скорректировать скаляры и тест",
+    "scalars_header": "Скаляр чувствительности",
+    "scalars_description": "Настройка чувствительности по оси (0.1x - 3.0x). Более высокий = более чувствительный.",
+    "scalar_suffix": "масштаб",
+    "test_header": "Тест и калибровка",
+    "test_description": "Открывает вид с помощью силуэта PS Vita, который движется в соответствии с датчиками.",
+    "test_button": "Испытательные датчики",
+    "test_detail": "Открытый визуальный тест",
+    "test_title": "Испытание датчика",
+    "notify_enabled": "Гироскоп включен",
+    "notify_disabled": "Гироскоп отключен"
   },
   "session": {
     "pause": {
       "title": "Меню паузы",
+      "keyboard": "Клавиатура",
       "resume": "Продолжить",
       "disconnect": "Отключить",
       "close_app": "Закрыть приложение",
       "notify_disconnected": "Отключено от хоста",
       "notify_app_closed": "Приложение закрыто на хосте"
-    }
-  ,
+    },
     "app_select": {
       "subtitle": "Выберите приложение для запуска",
       "connecting": "Подключение...",
+      "reconnecting": "Повторное подключение...",
+      "reconnect_failed": "Не удалось повторно подключиться к трансляции",
       "starting": "Запуск...",
       "error_no_host": "Ошибка: информация о хосте не найдена.",
       "no_apps": "Приложения не найдены на этом хосте.",
@@ -28,7 +477,12 @@
       "button_resume": "Возобновить",
       "button_start_new": "Начать новую",
       "ending_session": "Завершение сессии на хосте...",
-      "error_end_session": "Не удалось завершить сессию на хосте"
+      "error_end_session": "Не удалось завершить сессию на хосте",
+      "moonmic_not_connected": "Лунный не связан",
+      "moonmic_host_active": "Лунный хозяин активен",
+      "resolution_prompt_body": "Дисплей хоста переключается на $(res) перед потоковой передачей (может перезапустить Sunshine). Продолжай?",
+      "resolution_prompt_continue": "Продолжать",
+      "resolution_prompt_cancel": "отменить"
     }
   }
 }

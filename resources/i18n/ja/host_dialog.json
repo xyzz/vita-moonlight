@@ -1,0 +1,86 @@
+{
+    "dialog": {
+        "title": "ホストメニュー",
+        "close": "ふりがな",
+        "connect": "コネクト",
+        "info": "インフォメーション",
+        "settings": "コンテンツ",
+        "ok": "OK",
+        "test_connection": "テスト接続"
+    },
+    "wol": {
+        "button": "モーニング・オン・ラン",
+        "success": "ウェイクオンLANマジックパケットが正常に送信されました",
+        "failure": "Wake-on-LAN パケットを送信できない"
+    },
+    "info": {
+        "title": "ホスト情報",
+        "name": "お名前 (必須)",
+        "ip": "IPアドレス",
+        "mac": "MACアドレス"
+    },
+    "settings": {
+        "title": "コンテンツ"
+    },
+    "dropdown": {
+        "edit_host": "ホストの編集",
+        "delete": "ホストを削除する",
+        "pair_online": "ペアオンライン(外)",
+        "title": "アクション"
+    },
+    "connecting": "証明書の生成...",
+    "host_list_empty": "ホストを保存しない",
+    "confirm_delete_msg": "ホストを削除したいですか?",
+    "yes": "はい",
+    "no": "なし",
+    "add_host_paired_success": "ホスト$(name)のペアリングと保存成功!",
+    "add_host_paired_error_deviceini": "エラー: ペアリング後にデバイス.iniが見つかりません。",
+    "add_host_paired_error_failed": "ペアリングが失敗しました。 ホストは保存されませんでした。",
+    "pairing_title": "ペアリング...",
+    "pairing_connecting": "ホストに接続し、PINを待って...",
+    "pairing_enter_pin": "サンシャインでこのPINを入力してください: $(pin)",
+    "pairing_success": "成功したペアリング",
+    "pairing_force_warning": "ホストは忙しい: 対を強制する。 失敗した場合は、PCでサインし、もう一度お試しください。",
+    "active_session_mismatch": "このホストは、アクティブなセッション($(app))を報告しますが、デバイスペアリングを認識しません。 ホストを忘れて、ペアリング状態をリセットできます。",
+    "button_forget_host": "Forget ホスト",
+    "forgot_host": "ホスト忘れ",
+    "forget_failed": "ホストを忘れずに",
+    "pairing_error_init": "ホストへの接続の初期化エラー",
+    "pairing_error": "ペアリングエラー: $(error)",
+    "error_host_busy": "ホストはアクティブなセッションを持っています。 PCに閉じたり、終了するのを待ちたり、起動する前にこのクライアントをペアリングしたりします。",
+    "notification_deleted": "ホストが正常に削除された",
+    "change_ip_title": "ホストIPの更新",
+    "change_ip_hint": "新しい IP または IP:Port を入力してください。",
+    "change_ip_empty_error": "IP は空にすることはできません",
+    "change_ip_same": "IP は既に設定されている",
+    "change_ip_success": "ホストIPの更新",
+    "change_ip_failure": "ホストIPを更新できません",
+    "edit_host_title": "編集ホスト",
+    "edit_host_name_hint": "ホスト名",
+    "edit_host_ip_hint": "ホストIPまたはIP:ポート",
+    "edit_host_save": "変更を保存",
+    "edit_host_name_empty_error": "ホスト名は空にすることはできません",
+    "edit_host_ip_empty_error": "ホストIPは空にすることはできません",
+    "edit_host_success": "ホストの更新成功",
+    "edit_host_failure": "ホストを更新できなかった",
+    "actions": {
+        "refresh": "ホストをリフレッシュ"
+    },
+    "connection_test": {
+        "title": "関係の診断",
+        "testing": "接続のテスト...",
+        "cancelling": "キャンセル...",
+        "cancel": "キャンセル",
+        "report_title": "接続レポート",
+        "quality": "全体的な質:",
+        "avg_latency": "平均レイテンシ:",
+        "jitter": "ジッタ:",
+        "packet_loss": "パケット損失:",
+        "speed": "バンド幅:",
+        "recommendation": "推薦:",
+        "host_server": "ホスト サーバー:",
+        "host_state": "ホストの状態:",
+        "state_busy": "busy(アクティブストリーミングセッション)",
+        "state_ready": "無料 (接続する準備)"
+    }
+}

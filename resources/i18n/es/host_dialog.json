@@ -1,10 +1,10 @@
 {
   "dialog": {
+    "title": "Menú del host",
+    "close": "Cerrar",
     "connect": "Conectar",
     "info": "Información",
     "settings": "Ajustes",
-    "close": "Cerrar",
-    "title": "Menú del host",
     "ok": "Aceptar",
     "test_connection": "Probar conexión"
   },
@@ -27,9 +27,6 @@
     "delete": "Eliminar host",
     "pair_online": "Emparejar online fuera de casa",
     "title": "Acciones para"
-  },
-  "actions": {
-    "refresh": "Actualizar hosts"
   },
   "connecting": "Generando certificados...",
   "host_list_empty": "No hay hosts guardados",
@@ -57,8 +54,7 @@
   "change_ip_empty_error": "La IP no puede estar vacía",
   "change_ip_same": "La IP ya está configurada con ese valor",
   "change_ip_success": "IP del host actualizada",
-  "change_ip_failure": "No se pudo actualizar la IP del host"
-  ,
+  "change_ip_failure": "No se pudo actualizar la IP del host",
   "edit_host_title": "Editar Host",
   "edit_host_name_hint": "Nombre del host",
   "edit_host_ip_hint": "IP del host o IP:Puerto",
@@ -67,21 +63,24 @@
   "edit_host_ip_empty_error": "La IP del host no puede estar vacía",
   "edit_host_success": "Host actualizado correctamente",
   "edit_host_failure": "Error al actualizar el host",
-    "connection_test": {
-      "title": "Diagnóstico de Conexión",
-      "testing": "Probando conexión...",
-      "cancelling": "Cancelando...",
-      "cancel": "Cancelar",
-      "report_title": "Reporte de Conexión",
-      "quality": "Calidad General: ",
-      "avg_latency": "Latencia Promedio: ",
-      "jitter": "Jitter: ",
-      "packet_loss": "Pérdida de Paquetes: ",
-      "speed": "Ancho de Banda: ",
-      "recommendation": "Recomendación: ",
-      "host_server": "Servidor Host: ",
-      "host_state": "Estado del Host: ",
-      "state_busy": "Ocupado (Streaming activo)",
-      "state_ready": "Libre (Listo para conectar)"
-    }
+  "actions": {
+    "refresh": "Actualizar hosts"
+  },
+  "connection_test": {
+    "title": "Diagnóstico de Conexión",
+    "testing": "Probando conexión...",
+    "cancelling": "Cancelando...",
+    "cancel": "Cancelar",
+    "report_title": "Reporte de Conexión",
+    "quality": "Calidad General: ",
+    "avg_latency": "Latencia Promedio: ",
+    "jitter": "Jitter: ",
+    "packet_loss": "Pérdida de Paquetes: ",
+    "speed": "Ancho de Banda: ",
+    "recommendation": "Recomendación: ",
+    "host_server": "Servidor Host: ",
+    "host_state": "Estado del Host: ",
+    "state_busy": "Ocupado (Streaming activo)",
+    "state_ready": "Libre (Listo para conectar)"
+  }
 }

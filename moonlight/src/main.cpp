@@ -248,16 +248,8 @@ int main(int argc, char* argv[])
 #endif
     if (!lang.empty())
     {
-        moonlight::settings::applyLanguageEnv(lang); // <-- Force locale only if there is config
-        // Set default locale on platform before init
-        if (lang == "es")
-        {
-            brls::Platform::APP_LOCALE_DEFAULT = "es";
-        }
-        else if (lang == "en-US")
-        {
-            brls::Platform::APP_LOCALE_DEFAULT = "en-US";
-        }
+        moonlight::settings::applyLanguageEnv(lang);
+        brls::Platform::APP_LOCALE_DEFAULT = lang;
     }
 
     // We recommend to use INFO for real apps

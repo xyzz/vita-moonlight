@@ -1,0 +1,488 @@
+{
+    "title": "Moonlight Vita",
+    "tabs": {
+        "settings": "Configurações",
+        "about": "Sobre a Lua Vita",
+        "add_host": "Adicionar máquina",
+        "hosts": "Máquinas"
+    },
+    "capunlocker_notify": "CapDesblocker detectado! Todos os 4 núcleos e RAM estendida serão ativados.",
+    "welcome": "Bem-vindo ao Moonlight Vita! Explore livremente os recursos do aplicativo.",
+    "components": {
+        "buttons_header": "Botões",
+        "button_primary": "Botão primário",
+        "button_highlight": " Botão de realce",
+        "button_wrapping": "Botão padrão com texto de embrulho",
+        "button_bordered": "Botão Contornado",
+        "button_borderless": "Botão sem bordas",
+        "slider_header": "Barra deslizante",
+        "labels_header": "Rótulos",
+        "regular_label": "Isto é uma etiqueta. Por padrão, eles vão automaticamente embrulhar e expandir sua altura, caso o espaço vertical remanescente permita. Caso contrário, eles serão truncados, como algumas das abas da barra lateral.\nIsto é uma etiqueta. Por padrão, eles vão automaticamente embrulhar e expandir sua altura, caso o espaço vertical remanescente permita. Caso contrário, eles serão truncados, como algumas das abas da barra lateral.",
+        "label_left": "Este rótulo é alinhado à esquerda",
+        "label_center": "Esta etiqueta é central",
+        "label_right": "Este rótulo é alinhado à direita",
+        "images_header_title": "Imagens",
+        "images_header_subtitle": "Foque-os para ver o método de escala",
+        "images_downscaled": "Diminuição",
+        "images_original": "Original",
+        "images_upscaled": "Upscaled",
+        "images_stretched": "Esticado",
+        "images_cropped": "Recortado"
+    },
+    "about": {
+        "title": "Moonlight Vita",
+        "description": "Cliente NVIDIA GameStream para PlayStation Vita. Transmita seus jogos de PC com Sunshine ou GeForce Experience.",
+        "author": "Autor: AorsiniYT",
+        "original_creators": "Port original para Vita: xyzz, d3m3vilurr, cgutman",
+        "moonlight_repo": "Original Moonlight: github.com/moonlight-stream",
+        "github": "Código-fonte: github.com/xyzz/vita-moonlight",
+        "licence": "Licença: GPLv3",
+        "logo_credit": "Logotipo e UI adaptado para Vita. Baseado em Borealis."
+    },
+    "settings": {
+        "add_host": "Adicionar máquina",
+        "add_host_desc": "Adicionar um novo PC para transmissão",
+        "add_host_title": "Adicionar máquina",
+        "add_host_manual": "Nome da máquina",
+        "add_host_auto": "Procurar o PC automaticamente",
+        "add_host_manual_msg": "Função para adicionar PC manualmente (pendente)",
+        "add_host_auto_msg": "Função para pesquisar PC automaticamente (pendente)",
+        "add_host_ip_placeholder": "Por exemplo, 192.168.1.100",
+        "add_host_name_placeholder": "Nome da máquina",
+        "add_host_missing_fields": "Você deve digitar IP e nome",
+        "add_host_added": "Máquina adicionada",
+        "add_host_not_implemented": "(Ainda não implementado)",
+        "ip": "IP",
+        "dns": "DNS",
+        "notify": "Publicar uma notificação",
+        "language": "Idioma",
+        "add_host_connection_type": "Tipo de conexão",
+        "add_host_lan": "LAN (local)",
+        "add_host_online": "Online (externo)",
+        "hosts_list_title": "PCs salvos",
+        "hosts_list_empty": "Nenhum PC salvo",
+        "rear_touch_detail": "Configurar zonas de toque traseiro e ações",
+        "front_touch_detail": "Zonas e ações",
+        "add_host_connect_question_dialog": "Ligar ao $(name) no $(ip)?",
+        "add_host_connect": "Ligar",
+        "add_host_cancel": "Cancelar"
+    },
+    "settings_tab": {
+        "header": "Configuração da transmissão",
+        "controls_header": "Controlos",
+        "system_header": "Sistema",
+        "render_mode": {
+            "title": "Modo de renderização",
+            "legacy_option": "Legado (SceVideodec)",
+            "modern_option": "Moderno (FFmpeg)",
+            "legacy_name": "Legado",
+            "modern_name": "Moderno",
+            "unknown_name": "Desconhecido",
+            "notify": "Modo de renderização: {0}"
+        },
+        "pixel_format": {
+            "title": "Formato pixel",
+            "rgba": "RGBA direto",
+            "yuv": "YUV420 (hardware CSC)",
+            "notify": "Formato Pixel: {0}"
+        },
+        "stream_resolution": {
+            "title": "Resolução da transmissão",
+            "options": {
+                "0": "848x480 (Baixa largura de banda)",
+                "1": "960x540",
+                "2": "960x544 (Nativo)",
+                "3": "1024x576",
+                "4": "1152x648",
+                "5": "1280x540",
+                "6": "1280x720",
+                "7": "1366x768",
+                "8": "1600x900",
+                "9": "1920x1080"
+            },
+            "saved": "Resolução de fluxo salva"
+        },
+        "resolution": {
+            "title": "Resolução do monitor do host",
+            "description": "Controla a resolução do monitor. A resolução do fluxo é configurada separadamente.",
+            "options": {
+                "0": "Auto (host atual)",
+                "1": "960x544",
+                "2": "1024x576",
+                "3": "1152x648",
+                "4": "1280x540",
+                "5": "1280x720",
+                "6": "1366x768",
+                "7": "1600x900",
+                "8": "1920x1080"
+            },
+            "saved": "Resolução do monitor da máquina salva"
+        },
+        "fps": {
+            "title": "FPS",
+            "options": {
+                "0": "24 FPS (Cinema)",
+                "1": "30 FPS (Padrão)",
+                "2": "40 FPS",
+                "3": "50 FPS (PAL)",
+                "4": "60 FPS (NTSC)"
+            },
+            "saved": "FPS salvo"
+        },
+        "bitrate": {
+            "title": "Taxa de bits (Kbps)",
+            "options": {
+                "0": "Auto (Recomendado)",
+                "1": "2000 Kbps (baixo)",
+                "2": "5000 Kbps (Standard)",
+                "3": "8000 Kbps (HD)",
+                "4": "10000 Kbps (HD+)",
+                "5": "15000 Kbps ( Full HD)",
+                "6": "20000 Kbps (Full HD+)",
+                "7": "30000 Kbps (Ultra HD)",
+                "8": "50000 Kbps (Máximo)"
+            },
+            "saved": "Taxa de bits salva"
+        },
+        "sops_title": "Otimização do fluxo",
+        "network_opt_title": "Otimizações de rede",
+        "network_opt_enabled": "Otimizações de rede habilitadas",
+        "network_opt_disabled": "Otimizações de rede desactivadas",
+        "local_audio_title": "Áudio local",
+        "fullscreen_title": "Tela cheia",
+        "frame_pacer_title": "Marcador de quadros",
+        "settings_background_opacity": "Configuração da opacidade de fundo",
+        "keep_awake_while_streaming": "Manter o Vita ativo durante a transmissão",
+        "center_region_title": "Apenas a região central",
+        "show_fps_title": "Mostrar FPS",
+        "save_debug_log_title": "Gravar o registo de depuração",
+        "ref_frame_title": "Invalidação do quadro de referência",
+        "swap_interval": {
+            "title": "V-Sync (Intervalo de troca)",
+            "options": {
+                "0": "V-Sync OFF (Ilimitado)",
+                "1": "V-Sync ON (60 FPS)",
+                "2": "V-Sync 2x (30 FPS)",
+                "3": "V-Sync 3x (20 FPS)",
+                "4": "V-Sync 4x (15 FPS)"
+            },
+            "saved": "V- Sync gravado"
+        },
+        "motion_controls_title": "Giroscópio",
+        "double_tap_sprint_title": "Toque duplo para correr",
+        "touchscreen_mode": {
+            "title": "Modo touchscreen",
+            "options": {
+                "0": "Desactivado",
+                "1": "Trackpad relativo",
+                "2": "Touchpad DS4 (somente para PS4)",
+                "3": "rato absoluto",
+                "4": "Comprimido multitouch"
+            },
+            "saved": "Modo touchscreen salvo",
+            "changed": "Modo touchscreen alterado para:"
+        },
+        "gamepad_type": {
+            "title": "Tipo de controlador",
+            "options": {
+                "xbox": "Xbox 360",
+                "ps4": "PlayStation 4"
+            },
+            "notify_prefix": "O tipo de controlador foi alterado para:"
+        },
+        "swap_shoulder_buttons": {
+            "title": "Troca R1/L1 <-> R2/L2",
+            "notify_enabled": "Trocar os botões do ombro activados",
+            "notify_disabled": "Trocar os botões do ombro desabilitados"
+        },
+        "mouse_accel": {
+            "title": "Aceleração do rato"
+        },
+        "keyboard_layout": {
+            "title": "Disposição do teclado",
+            "saved": "A disposição do teclado foi salva"
+        },
+        "language_changed": "Idioma salvo. Reinicie o Moonlight Vita para aplicar.",
+        "language_restarting": "Reiniciando o Moonlight Vita...",
+        "language_save_failed": "Não foi possível salvar o idioma",
+        "language_restart_failed": "Não foi possível reiniciar. Reinicie o Moonlight Vita manualmente.",
+        "moonmic_header": "Moonmic",
+        "moonmic_requirement": "Requer execução do Moonmic na máquina",
+        "microphone_enabled_title": "Ativar microfone",
+        "microphone_description": "Envia o áudio do microfone ao host e tenta reconectar a cada 10 s",
+        "microphone_enabled": "[OK] O microfone será iniciado com a transmissão",
+        "microphone_disabled": "[X] Microfone desativado",
+        "microphone_configure_title": "Configurar microfone",
+        "microphone_configure_detail": "Ajuste o ganho, o codec e os testes"
+    },
+    "microphone": {
+        "title": "Configuração do microfone",
+        "subtitle": "Requer MoonMic: https://github.com/AorsiniYT/libmoonmic",
+        "gain_header": "Configuração de ganho",
+        "gain_description": "Amplificar a entrada do microfone (1x-50x). Valores mais elevados aumentam o volume.",
+        "gain_label": "Ganho: {0}x",
+        "format_header": "Formato de áudio",
+        "opus_toggle": "Usar compressão Opus",
+        "opus_description": "Reduz a largura de banda por meio de compressão",
+        "test_header": "Testes",
+        "test_description": "Fale no microfone. Você deverá ouvir sua voz pelos alto-falantes do Vita.",
+        "test_toggle": "Testar microfone (local)",
+        "test_remote_toggle": "Testar microfone (remoto)",
+        "notify_local_started": "Teste local iniciado",
+        "notify_local_failed": "Falha ao iniciar o teste local",
+        "notify_local_stopped": "Teste local interrompido",
+        "notify_remote_started": "Teste remoto iniciado",
+        "notify_remote_connecting": "Conectando ao host...",
+        "notify_remote_stopped": "Teste remoto interrompido",
+        "notify_opus_enabled": "Compressão Opus ativada",
+        "notify_opus_disabled": "PCM sem compressão ativado",
+        "host_selector_title": "Selecionar host para o teste remoto",
+        "no_hosts": "Nenhum host pareado disponível",
+        "notify_no_host": "Nenhum host selecionado. Pareie um primeiro",
+        "port_header": "Configuração da Porta",
+        "port_title": "Porta do Microfone",
+        "port_hint": "Porta UDP (padrão: 48100)"
+    },
+    "keyboard": {
+        "title": "Configurar o Teclado",
+        "configure_title": "Configurar o Teclado",
+        "configure_detail": "Disposição, temas e personalização",
+        "header_mode": "Modo do Teclado",
+        "header_layout": "Disposição do Teclado",
+        "header_modern": "Opções Modernas",
+        "header_theme": "Aparência (em breve)",
+        "mode_title": "Tipo de teclado",
+        "mode_legacy": "Legado (Sistema IME)",
+        "mode_modern": "Moderno (Sobreposição Personalizada)",
+        "mode_saved": "Modo de teclado salvo",
+        "numbers_row_title": "Mostrar a linha de números",
+        "arrows_title": "Mostrar as setas",
+        "theme_preview_title": "Tema atual",
+        "theme_editor_title": "Editor de Temas",
+        "theme_info": "Os temas personalizados do teclado estarão disponíveis em uma atualização futura. Você será capaz de criar e compartilhar seus próprios projetos de teclado!",
+        "input_mode_title": "Modo de entrada do teclado (UTF-8)",
+        "input_mode_utf8": "Entrada UTF-8 ativada",
+        "input_mode_vk": "Entrada VK ativada (padrão)",
+        "theme_default": "Padrão",
+        "theme_selection_future": "A seleção de temas estará disponível em breve",
+        "theme_not_available": "Não disponível",
+        "theme_editor_future": "O editor de temas estará disponível em breve"
+    },
+    "shortcuts": {
+        "title": "Configuração do Atalho",
+        "configure_title": "Configurar atalhos",
+        "configure_detail": "Personalizar combinações de pausa e teclado",
+        "pause_combo_title": "Atalho de pausa",
+        "keyboard_combo_title": "Atalho do teclado",
+        "custom_shortcut_title": "Atalho",
+        "button_slot_1": "Botão 1",
+        "button_slot_2": "Botão 2",
+        "button_slot_3": "Botão 3",
+        "add_shortcut_title": "Adicionar um atalho",
+        "add_shortcut_detail": "Criar uma nova combinação personalizada",
+        "editor_action_title": "Ação",
+        "editor_name_title": "Nome",
+        "editor_name_hint": "Nome opcional para este atalho",
+        "action_pause": "Pausa",
+        "action_keyboard": "Teclado",
+        "disabled_combo": "Desativado",
+        "clear_combo_title": "Limpar a combinação",
+        "clear_combo_detail": "Define os botões 1, 2 e 3 como Nenhum",
+        "delete_shortcut_title": "Apagar atalho",
+        "delete_shortcut_detail": "Remover este atalho personalizado",
+        "save_shortcut_title": "Salvar alterações",
+        "save_shortcut_detail": "Aplicar esta configuração de atalho",
+        "reset_defaults_title": "Restaurar os padrões",
+        "reset_defaults_detail": "Pausa: START + L1 + R1 | Teclado: START + LEFT",
+        "notify_saved": "Atalho gravado",
+        "notify_invalid_combo": "Selecione pelo menos um botão",
+        "notify_defaults_restored": "Atalhos padrão restaurados",
+        "notify_deleted": "Atalho apagado",
+        "notify_cleared": "Combinação limpa"
+    },
+    "rear_touch": {
+        "title": "Toque traseiro",
+        "toggle": "Toque traseiro",
+        "calibrate": "Calibrar o toque traseiro",
+        "calibration_zone_title": "Zona activa",
+        "calibration_zone_detail": "Ajuste as margens com calibração",
+        "actions_header": "Acções no canto",
+        "swap_warning": "A troca R1/L1 <-> R2/L2 está ativa. NW/NE -> L1/R1, SW/SE -> L3/R3. As ações de canto personalizadas estão desabilitadas.",
+        "action_nw": "Acção canto noroeste",
+        "action_ne": "Acção no canto nordeste",
+        "action_sw": "Acção no canto sudoeste",
+        "action_se": "Acção no canto sudeste",
+        "notify_enabled": "Toque traseiro ativado",
+        "notify_disabled": "Desactivado o toque traseiro",
+        "notify_action_saved": "Ação de toque traseiro salva",
+        "notify_calibration_saved": "Calibração do toque traseiro salva",
+        "detail_top": "Topo",
+        "detail_bottom": "Fundo",
+        "detail_left": "Esquerda",
+        "detail_right": "Direita",
+        "calibration": {
+            "title": "Calibrar o toque traseiro",
+            "overlay_title": "Ajuste do toque traseiro",
+            "status_enabled": "Estado: Activado",
+            "status_disabled": "Estado: Desactivado",
+            "selected_edge": "Margem selecionada:",
+            "current_action": "Acção actual:",
+            "margins": "Margens (px)",
+            "margins_format": "{0} - {1}: {2} | {3}: {4} | {5}: {6} | {7}: {8}",
+            "assignments_prefix": "Atribuição",
+            "assignments_top_format": "{0} - {1}: {2} | {3}: {4}",
+            "assignments_bottom_format": "{0}: {1} | {2}: {3}",
+            "instructions": "• Ajustar a margem • A acção de alteração L/R • Ativar o toque",
+            "zone_labels": {
+                "nw": "NW",
+                "ne": "NE",
+                "sw": "SW",
+                "se": "SE"
+            },
+            "edge_labels": [
+                "Topo",
+                "Direita",
+                "Fundo",
+                "Esquerda"
+            ],
+            "actions": {
+                "save": "Gravar",
+                "cancel": "Cancelar",
+                "next_edge": "Próxima borda",
+                "prev_edge": "Borda anterior",
+                "increase_margin": "Aumento da margem",
+                "decrease_margin": "Diminuir a margem",
+                "next_action": "Próxima ação",
+                "prev_action": "Acção anterior",
+                "toggle_enabled": "Alternar Activado",
+                "reset": "Reiniciar"
+            }
+        }
+    },
+    "front_touch": {
+        "title": "Zonas de toque frontal",
+        "toggle": "Zonas de toque frontal",
+        "offset": "Deslocamento da zona",
+        "offset_detail": "Distância da borda do ecrã",
+        "size": "Dimensão da zona",
+        "size_detail": "Largura/altura da zona quadrada",
+        "preview": "Zonas de visualização",
+        "preview_detail": "Visualizar e testar zonas de canto",
+        "zones_description": "Toque nos cantos do ecrã para activar as acções durante a transmissão",
+        "actions_header": "Acções no canto",
+        "action_nw": "Acção canto noroeste",
+        "action_ne": "Acção no canto nordeste",
+        "action_sw": "Acção no canto sudoeste",
+        "action_se": "Acção no canto sudeste",
+        "notify_enabled": "Zonas de toque frontal habilitadas",
+        "notify_disabled": "Zonas de toque frontal desactivadas",
+        "notify_action_saved": "Ação de toque frontal salva"
+    },
+    "hints": {
+        "cancel": "Cancelar"
+    },
+    "host_dialog/connecting": "Gerando certificados...",
+    "main": {
+        "cancel": "Cancelar"
+    },
+    "trackpad": {
+        "header": "Configuração do Trackpad",
+        "pointer_speed": {
+            "title": "Velocidade do ponteiro",
+            "detail": "Ajuste o multiplicador de velocidade do cursor ao passar"
+        },
+        "tap_to_click": {
+            "title": "Toque em para clicar",
+            "detail": "Clique tocando no trackpad sem pressionar",
+            "enabled": "Toque em para clicar ativado",
+            "disabled": "Toque em para clicar em desabilitado"
+        },
+        "gestures_header": "Gestos e Opções de Clique",
+        "two_finger_right_click": {
+            "title": "Botão direito de dois dedos",
+            "detail": "Execute o clique direito com dois dedos",
+            "enabled": "Botão direito de dois dedos activado",
+            "disabled": "Botão direito de dois dedos desativado"
+        },
+        "two_finger_scroll": {
+            "title": "Rolagem de dois dedos",
+            "detail": "Rolar passando com dois dedos",
+            "enabled": "Deslocamento de dois dedos habilitado",
+            "disabled": "Deslocamento de dois dedos desativado"
+        },
+        "invert_scroll": {
+            "title": "Inverter a direcção de rolagem",
+            "detail": "Usar rolagem natural (estilo iOS) ou tradicional",
+            "natural": "Deslocamento natural ativado (estilo iOS)",
+            "traditional": "Deslocamento tradicional habilitado"
+        },
+        "multi_touch": {
+            "title": "gestos multi-toque",
+            "detail": "Activar gestos avançados como o 'pinch' para ampliar",
+            "enabled": "Gestos multi- toque activados",
+            "disabled": "Gestos multi- toque desactivados"
+        },
+        "advanced_header": "Opções Avançadas",
+        "edge_zone": {
+            "title": "Zonas mortas de borda",
+            "detail": "Definir zonas nas bordas para ignorar os toques acidentais"
+        },
+        "dead_zone": {
+            "title": "Zona morta de movimento",
+            "detail": "Limiar mínimo de movimento antes de se registar como um deslize"
+        }
+    },
+    "gyro": {
+        "title": "Configuração do giroscópio",
+        "header": "Giroscópio",
+        "toggle": "Activar o giroscópio",
+        "settings_entry": "Configuração do giroscópio",
+        "settings_detail": "Ajuste escalares e teste",
+        "scalars_header": "Escalares de sensibilidade",
+        "scalars_description": "Ajuste a sensibilidade por eixo (0,1x - 3,0x). Mais alto = mais sensível.",
+        "scalar_suffix": "Escala",
+        "test_header": "& Calibração de Teste",
+        "test_description": "Abre uma vista com uma silhueta PS Vita que se move de acordo com os sensores.",
+        "test_button": "Sensores de ensaio",
+        "test_detail": "Abrir teste visual",
+        "test_title": "Ensaio do sensor",
+        "notify_enabled": "Giroscópio ativado",
+        "notify_disabled": "Giroscópio desativado"
+    },
+    "session": {
+        "pause": {
+            "title": "O Menu Pausa",
+            "keyboard": "Teclado",
+            "resume": "Continuar",
+            "disconnect": "Desligar",
+            "close_app": "Fechar aplicativo",
+            "notify_disconnected": "Desligado da máquina",
+            "notify_app_closed": "Aplicativo fechado na máquina"
+        },
+        "app_select": {
+            "subtitle": "Selecione uma aplicação para iniciar",
+            "connecting": "Conectando...",
+            "reconnecting": "Reconectando...",
+            "reconnect_failed": "Não foi possível reconectar ao fluxo",
+            "starting": "A começar...",
+            "error_no_host": "Erro: A informação da máquina não foi encontrada.",
+            "no_apps": "Nenhuma aplicação encontrada nesta máquina.",
+            "running_session": "Sessão em execução",
+            "error_connect": "Erro ao se conectar ao servidor",
+            "paired": "Emparelhado",
+            "pairing_failed": "Emparelhamento cancelado/falhado",
+            "error_start_app": "Erro ao iniciar o aplicativo",
+            "error_start_stream": "Erro ao iniciar a transmissão",
+            "active_session_msg": "Sessão ativa: $(app). Queres retomá-lo ou começar um novo?",
+            "button_resume": "Continuar",
+            "button_start_new": "Iniciar novo",
+            "ending_session": "A fechar a sessão na máquina...",
+            "error_end_session": "Falha ao fechar a sessão na máquina",
+            "moonmic_not_connected": "O Moonmic não está ligado",
+            "moonmic_host_active": "A máquina lunar está ativa",
+            "resolution_prompt_body": "O ecrã da máquina irá mudar para $(res) antes de transmitir (pode reiniciar o Sunshine). Continuar?",
+            "resolution_prompt_continue": "Continuar",
+            "resolution_prompt_cancel": "Cancelar"
+        }
+    }
+}

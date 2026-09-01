@@ -1,0 +1,488 @@
+{
+    "title": "Moonlight Vita",
+    "tabs": {
+        "settings": "設定",
+        "about": "Moonlight Vitaについて",
+        "add_host": "ホストを追加",
+        "hosts": "ホスト"
+    },
+    "capunlocker_notify": "CapUnlockerが検出されました! 全4コアと拡張RAMが有効になります。",
+    "welcome": "Moonlight Vitaへようこそ！",
+    "components": {
+        "buttons_header": "ボタン",
+        "button_primary": "プライマリボタン",
+        "button_highlight": "の特長 ハイライトボタン",
+        "button_wrapping": "テキストをラップするデフォルトボタン",
+        "button_bordered": "注文ボタン",
+        "button_borderless": "ボーダーレスボタン",
+        "slider_header": "スライダー",
+        "labels_header": "ラベル",
+        "regular_label": "ラベルです。 デフォルトでは、それらは自動的に高さを包み、拡大します、残りの縦スペースはそれを可能にします。 さもなければ、サイドバーのタブの一部のように、それらは切り捨てられます。\nラベルです。 デフォルトでは、それらは自動的に高さを包み、拡大します、残りの縦スペースはそれを可能にします。 さもなければ、サイドバーのタブの一部のように、それらは切り捨てられます。",
+        "label_left": "このラベルは左揃え",
+        "label_center": "このラベルは中央整列",
+        "label_right": "このラベルは右揃え",
+        "images_header_title": "イメージ",
+        "images_header_subtitle": "スケール方法を見るためにそれらを焦点を合わせて下さい",
+        "images_downscaled": "ダウンスケール",
+        "images_original": "オリジナル",
+        "images_upscaled": "アップスケール",
+        "images_stretched": "ストレッチ",
+        "images_cropped": "クロップド"
+    },
+    "about": {
+        "title": "Moonlight Vita",
+        "description": "PlayStation Vita向けのオープンソースNVIDIA GameStreamクライアントです。SunshineまたはGeForce ExperienceでPCゲームをストリーミングできます。",
+        "author": "投稿者: AorsiniYT",
+        "original_creators": "オリジナルVita移植: xyzz、d3m3vilurr、cgutman",
+        "moonlight_repo": "オリジナルMoonlight: github.com/moonlight-stream",
+        "github": "ソースコード: github.com/xyzz/vita-moonlight",
+        "licence": "ライセンス: GPLv3",
+        "logo_credit": "Vita に適応したロゴと UI 。 Borealis に基づく。"
+    },
+    "settings": {
+        "add_host": "ホストを追加",
+        "add_host_desc": "ストリーミング用の新しいPCを追加",
+        "add_host_title": "ホストを追加",
+        "add_host_manual": "ホスト名",
+        "add_host_auto": "PCを自動的に検索",
+        "add_host_manual_msg": "PCを手動で追加する機能(保留)",
+        "add_host_auto_msg": "PCを自動的に検索する機能(保留)",
+        "add_host_ip_placeholder": "例:192.168.1.100",
+        "add_host_name_placeholder": "ホスト名",
+        "add_host_missing_fields": "IPと名前を入力してください",
+        "add_host_added": "ホスト追加",
+        "add_host_not_implemented": "(未導入)",
+        "ip": "IP",
+        "dns": "DNS",
+        "notify": "通知投稿",
+        "language": "言語",
+        "add_host_connection_type": "接続タイプ",
+        "add_host_lan": "LAN(ローカル)",
+        "add_host_online": "オンライン(外部)",
+        "hosts_list_title": "保存されたPC",
+        "hosts_list_empty": "保存PCなし",
+        "rear_touch_detail": "リアタッチゾーンとアクションの設定",
+        "front_touch_detail": "ゾーンと操作",
+        "add_host_connect_question_dialog": "$(ip)で$(name)に接続する?",
+        "add_host_connect": "接続",
+        "add_host_cancel": "キャンセル"
+    },
+    "settings_tab": {
+        "header": "ストリーミング設定",
+        "controls_header": "コントロール",
+        "system_header": "システム",
+        "render_mode": {
+            "title": "レンダリングモード",
+            "legacy_option": "レガシー(SceVideodec)",
+            "modern_option": "モダン (FFmpeg)",
+            "legacy_name": "レガシー",
+            "modern_name": "モダン",
+            "unknown_name": "不明",
+            "notify": "レンダリングモード: {0}"
+        },
+        "pixel_format": {
+            "title": "ピクセル形式",
+            "rgba": "直接RGBA",
+            "yuv": "YUV420(ハードウェア CSC)",
+            "notify": "ピクセル形式: {0}"
+        },
+        "stream_resolution": {
+            "title": "ストリーム解像度",
+            "options": {
+                "0": "848x480 (低帯域幅)",
+                "1": "960x540",
+                "2": "960x544 (ネイティブ)",
+                "3": "1024x576",
+                "4": "1152x648",
+                "5": "1280x540",
+                "6": "1280x720",
+                "7": "1366x768",
+                "8": "1600x900",
+                "9": "1920x1080"
+            },
+            "saved": "ストリーム解像度を保存しました"
+        },
+        "resolution": {
+            "title": "ホスト画面の解像度",
+            "description": "ホストモニターの解像度を制御します。 ストリームの解像度は別々に設定されます。",
+            "options": {
+                "0": "自動(現在のホスト)",
+                "1": "960x544",
+                "2": "1024x576",
+                "3": "1152x648",
+                "4": "1280x540",
+                "5": "1280x720",
+                "6": "1366x768",
+                "7": "1600x900",
+                "8": "1920x1080"
+            },
+            "saved": "ホスト画面の解像度を保存しました"
+        },
+        "fps": {
+            "title": "FPS",
+            "options": {
+                "0": "24 FPS(シネマ)",
+                "1": "30 FPS(標準)",
+                "2": "40 FPS",
+                "3": "50 FPS(PAL)",
+                "4": "60 FPS (NTSC)"
+            },
+            "saved": "FPSを保存しました"
+        },
+        "bitrate": {
+            "title": "ビットレート (Kbps)",
+            "options": {
+                "0": "自動(推奨)",
+                "1": "2000 Kbps (低)",
+                "2": "5000 Kbps (標準)",
+                "3": "8000 Kbps (HD)",
+                "4": "10000 Kbps (HD+)",
+                "5": "15000 Kbps (フルHD)",
+                "6": "20000 Kbps (フルHD+)",
+                "7": "30000 Kbps (Ultra HD)",
+                "8": "50000 Kbps (最高)"
+            },
+            "saved": "ビットレートを保存しました"
+        },
+        "sops_title": "ストリーム最適化",
+        "network_opt_title": "ネットワーク最適化",
+        "network_opt_enabled": "ネットワークの最適化を有効に",
+        "network_opt_disabled": "ネットワークの最適化 無効化",
+        "local_audio_title": "ローカル音声",
+        "fullscreen_title": "全画面表示",
+        "frame_pacer_title": "フレームペーサー",
+        "settings_background_opacity": "設定画面の背景の不透明度",
+        "keep_awake_while_streaming": "ストリーミング中はVitaをスリープさせない",
+        "center_region_title": "中央領域のみ",
+        "show_fps_title": "FPSを表示する",
+        "save_debug_log_title": "デバッグログを保存",
+        "ref_frame_title": "参照フレームの無効化",
+        "swap_interval": {
+            "title": "V-Sync(スワップインターバル)",
+            "options": {
+                "0": "V-Sync OFF(無制限)",
+                "1": "V-シンクオン(60 FPS)",
+                "2": "V-Sync 2x(30 FPS)",
+                "3": "V-Sync 3x(20 FPS)",
+                "4": "V-Sync 4x(15 FPS)"
+            },
+            "saved": "V-Sync保存"
+        },
+        "motion_controls_title": "ジャイロスコープ",
+        "double_tap_sprint_title": "ダブルタップでスプリント",
+        "touchscreen_mode": {
+            "title": "タッチスクリーンモード",
+            "options": {
+                "0": "無効",
+                "1": "相対的なトラックパッド",
+                "2": "DS4タッチパッド(PS4のみ)",
+                "3": "絶対マウス",
+                "4": "マルチタッチタブレット"
+            },
+            "saved": "タッチスクリーンモード保存",
+            "changed": "タッチスクリーンモードが変更されました:"
+        },
+        "gamepad_type": {
+            "title": "コントローラーのタイプ",
+            "options": {
+                "xbox": "Xbox 360",
+                "ps4": "PlayStation 4"
+            },
+            "notify_prefix": "コントローラタイプ:"
+        },
+        "swap_shoulder_buttons": {
+            "title": "スワップ R1/L1 <-> R2/L2",
+            "notify_enabled": "スワップショルダーボタンを有効にする",
+            "notify_disabled": "スワップショルダーボタン 無効"
+        },
+        "mouse_accel": {
+            "title": "マウスの加速"
+        },
+        "keyboard_layout": {
+            "title": "キーボードレイアウト",
+            "saved": "キーボードレイアウト保存"
+        },
+        "language_changed": "言語を保存しました。適用するには Moonlight Vita を再起動してください。",
+        "language_restarting": "Moonlight Vita を再起動しています...",
+        "language_save_failed": "言語を保存できませんでした",
+        "language_restart_failed": "再起動できませんでした。Moonlight Vita を手動で再起動してください。",
+        "moonmic_header": "Moonmic",
+        "moonmic_requirement": "ホストでMoonmicを実行する必要があります",
+        "microphone_enabled_title": "マイクを有効にする",
+        "microphone_description": "マイク音声をホストPCへ送信します（ホストが見つからない場合は10秒ごとに再試行）",
+        "microphone_enabled": "[OK] ストリーミング開始時にマイクを起動します",
+        "microphone_disabled": "[X] マイクは無効です",
+        "microphone_configure_title": "マイクの設定",
+        "microphone_configure_detail": "ゲイン、コーデック、テストを設定します"
+    },
+    "microphone": {
+        "title": "マイク設定",
+        "subtitle": "MoonMicが必要です: https://github.com/AorsiniYT/libmoonmic",
+        "gain_header": "ゲイン設定",
+        "gain_description": "マイク入力を増幅します（1x〜50x）。値を上げると音量が大きくなります。",
+        "gain_label": "ゲイン: {0}x",
+        "format_header": "オーディオ形式",
+        "opus_toggle": "Opus圧縮を使用",
+        "opus_description": "圧縮して帯域幅の使用量を抑えます",
+        "test_header": "テスト",
+        "test_description": "マイクに話しかけると、Vitaのスピーカーから自分の声が聞こえます。",
+        "test_toggle": "マイクをテスト（ローカル）",
+        "test_remote_toggle": "マイクをテスト（リモート）",
+        "notify_local_started": "ローカルテストを開始しました",
+        "notify_local_failed": "ローカルテストを開始できませんでした",
+        "notify_local_stopped": "ローカルテストを停止しました",
+        "notify_remote_started": "リモートテストを開始しました",
+        "notify_remote_connecting": "ホストに接続中...",
+        "notify_remote_stopped": "リモートテストを停止しました",
+        "notify_opus_enabled": "Opus圧縮を有効にしました",
+        "notify_opus_disabled": "非圧縮PCMを有効にしました",
+        "host_selector_title": "リモートテストのホストを選択",
+        "no_hosts": "ペアリング済みのホストがありません",
+        "notify_no_host": "ホストが選択されていません。先にペアリングしてください",
+        "port_header": "ポート構成",
+        "port_title": "マイクポート",
+        "port_hint": "UDP ポート (デフォルト: 48100)"
+    },
+    "keyboard": {
+        "title": "キーボードの設定",
+        "configure_title": "キーボードの設定",
+        "configure_detail": "レイアウト、テーマ、カスタマイズ",
+        "header_mode": "キーボードモード",
+        "header_layout": "キーボードレイアウト",
+        "header_modern": "モダンなオプション",
+        "header_theme": "外観（近日対応）",
+        "mode_title": "キーボードのタイプ",
+        "mode_legacy": "レガシー(システム IME)",
+        "mode_modern": "モダン(カスタムオーバーレイ)",
+        "mode_saved": "キーボードモード保存",
+        "numbers_row_title": "数字行を表示",
+        "arrows_title": "矢印キーを表示",
+        "theme_preview_title": "現在のテーマ",
+        "theme_editor_title": "テーマエディタ",
+        "theme_info": "カスタムテーマは今後のアップデートで対応予定です。独自のデザインを作成して共有できるようになります。",
+        "input_mode_title": "キーボード入力モード(UTF-8)",
+        "input_mode_utf8": "UTF-8 入力対応",
+        "input_mode_vk": "VK入力を有効にしました(デフォルト)",
+        "theme_default": "デフォルト",
+        "theme_selection_future": "テーマ選択は近日対応予定です",
+        "theme_not_available": "ご利用いただけません",
+        "theme_editor_future": "テーマエディターは近日対応予定です"
+    },
+    "shortcuts": {
+        "title": "ショートカット設定",
+        "configure_title": "ショートカットの設定",
+        "configure_detail": "ポーズとキーボードの組み合わせをカスタマイズ",
+        "pause_combo_title": "一時停止のショートカット",
+        "keyboard_combo_title": "キーボードショートカット",
+        "custom_shortcut_title": "ショートカット",
+        "button_slot_1": "ボタン 1",
+        "button_slot_2": "ボタン2",
+        "button_slot_3": "ボタン3",
+        "add_shortcut_title": "ショートカットを追加",
+        "add_shortcut_detail": "新しいカスタムの組み合わせを作成する",
+        "editor_action_title": "アクション",
+        "editor_name_title": "名前",
+        "editor_name_hint": "このショートカットのオプション名",
+        "action_pause": "一時停止",
+        "action_keyboard": "キーボード",
+        "disabled_combo": "無効",
+        "clear_combo_title": "組み合わせをクリア",
+        "clear_combo_detail": "ボタン1、2、3を「なし」に設定します",
+        "delete_shortcut_title": "ショートカットの削除",
+        "delete_shortcut_detail": "このカスタムショートカットを削除します",
+        "save_shortcut_title": "変更を保存",
+        "save_shortcut_detail": "このショートカットの設定を適用します",
+        "reset_defaults_title": "デフォルトを復元する",
+        "reset_defaults_detail": "一時停止: START + L1 + R1 | キーボード: START + LEFT",
+        "notify_saved": "ショートカット保存",
+        "notify_invalid_combo": "少なくとも1つのボタンを選択",
+        "notify_defaults_restored": "既定のショートカットを復元しました",
+        "notify_deleted": "ショートカット削除",
+        "notify_cleared": "組み合わせをクリアしました"
+    },
+    "rear_touch": {
+        "title": "リアタッチ",
+        "toggle": "リアタッチ",
+        "calibrate": "リアタッチを調整",
+        "calibration_zone_title": "アクティブゾーン",
+        "calibration_zone_detail": "キャリブレーションで余白を調整します",
+        "actions_header": "コーナーアクション",
+        "swap_warning": "スワップ R1/L1 <-> R2/L2 がアクティブです。 NW/NE -> L1/R1, SW/SE -> L3/R3. カスタムコーナーアクションは無効になっています。",
+        "action_nw": "左上のアクション",
+        "action_ne": "右上のアクション",
+        "action_sw": "左下のアクション",
+        "action_se": "右下のアクション",
+        "notify_enabled": "リアタッチを有効にしました",
+        "notify_disabled": "リアタッチを無効にしました",
+        "notify_action_saved": "リアタッチのアクションを保存しました",
+        "notify_calibration_saved": "リアタッチの調整を保存しました",
+        "detail_top": "上",
+        "detail_bottom": "下",
+        "detail_left": "左",
+        "detail_right": "右",
+        "calibration": {
+            "title": "リアタッチの調整",
+            "overlay_title": "リアタッチ調整",
+            "status_enabled": "ステータス: 有効",
+            "status_disabled": "ステータス: 無効",
+            "selected_edge": "選択中の辺:",
+            "current_action": "現在のアクション:",
+            "margins": "マージン(px)",
+            "margins_format": "{0} - {1}: {2} | {3}: {4} | {5}: {6} | {7}: {8}",
+            "assignments_prefix": "割り当て",
+            "assignments_top_format": "{0} - {1}: {2} | {3}: {4}",
+            "assignments_bottom_format": "{0}: {1} | {2}: {3}",
+            "instructions": "▲/▼ 辺を変更 • ◀/▶ 余白を調整 • L/R アクションを変更 • △ タッチの切替 • □ 初期値に戻す",
+            "zone_labels": {
+                "nw": "NW",
+                "ne": "NE",
+                "sw": "SW",
+                "se": "SE"
+            },
+            "edge_labels": [
+                "上",
+                "右",
+                "下",
+                "左"
+            ],
+            "actions": {
+                "save": "保存する",
+                "cancel": "キャンセル",
+                "next_edge": "次のエッジ",
+                "prev_edge": "前のエッジ",
+                "increase_margin": "マージンの増加",
+                "decrease_margin": "余白を減らす",
+                "next_action": "次のアクション",
+                "prev_action": "前のアクション",
+                "toggle_enabled": "有効/無効を切り替え",
+                "reset": "リセット"
+            }
+        }
+    },
+    "front_touch": {
+        "title": "フロントタッチゾーン",
+        "toggle": "フロントタッチゾーン",
+        "offset": "ゾーンオフセット",
+        "offset_detail": "スクリーンの端からの間隔",
+        "size": "ゾーンサイズ",
+        "size_detail": "正方形ゾーンの幅/高さ",
+        "preview": "プレビューゾーン",
+        "preview_detail": "コーナーゾーンの可視化とテスト",
+        "zones_description": "画面コーナーをタップしてストリーミング中にアクションをトリガー",
+        "actions_header": "コーナーアクション",
+        "action_nw": "左上のアクション",
+        "action_ne": "右上のアクション",
+        "action_sw": "左下のアクション",
+        "action_se": "右下のアクション",
+        "notify_enabled": "フロントタッチゾーンが有効",
+        "notify_disabled": "フロントタッチゾーンを無効にしました",
+        "notify_action_saved": "フロントタッチアクション保存"
+    },
+    "hints": {
+        "cancel": "キャンセル"
+    },
+    "host_dialog/connecting": "証明書の生成...",
+    "main": {
+        "cancel": "キャンセル"
+    },
+    "trackpad": {
+        "header": "トラックパッド設定",
+        "pointer_speed": {
+            "title": "ポインター速度",
+            "detail": "スワイプ時にカーソル速度の乗数を調整する"
+        },
+        "tap_to_click": {
+            "title": "タップでクリック",
+            "detail": "プレスなしでトラックパッドをタップするだけでクリック",
+            "enabled": "タップで有効",
+            "disabled": "タップで無効に"
+        },
+        "gestures_header": "ジェスチャーとクリック",
+        "two_finger_right_click": {
+            "title": "2本指で右クリック",
+            "detail": "2本の指で右クリックを実行",
+            "enabled": "右クリックで2フィンガーが有効",
+            "disabled": "右クリック2本 無効"
+        },
+        "two_finger_scroll": {
+            "title": "2 フィンガー スクロール",
+            "detail": "2本の指でスワイプすることでスクロール",
+            "enabled": "2 フィンガー スクロール 有効",
+            "disabled": "2 フィンガー スクロール 無効"
+        },
+        "invert_scroll": {
+            "title": "スクロール方向を反転",
+            "detail": "ナチュラルスクロール（iOS方式）と従来方式を切り替えます",
+            "natural": "自然なスクロールを有効にします。 (iOS スタイル)",
+            "traditional": "従来のスクロールが可能"
+        },
+        "multi_touch": {
+            "title": "マルチタッチジェスチャー",
+            "detail": "ピンチズームなどの高度なジェスチャーを有効にします",
+            "enabled": "マルチタッチジェスチャー対応",
+            "disabled": "マルチタッチジェスチャー 無効"
+        },
+        "advanced_header": "高度なオプション",
+        "edge_zone": {
+            "title": "エッジデッドゾーン",
+            "detail": "エッジのゾーンを定義して、偶然のタッチを無視"
+        },
+        "dead_zone": {
+            "title": "運動デッドゾーン",
+            "detail": "スワイプとして登録する前に最小限の動きのしきい値"
+        }
+    },
+    "gyro": {
+        "title": "ジャイロスコープ設定",
+        "header": "ジャイロスコープ",
+        "toggle": "ジャイロスコープを有効にする",
+        "settings_entry": "ジャイロスコープの設定",
+        "settings_detail": "感度の調整とテスト",
+        "scalars_header": "感度スカラー",
+        "scalars_description": "1軸感度(0.1x～3.0x)を調節します。 高い=より敏感です。",
+        "scalar_suffix": "スケール",
+        "test_header": "テストと調整",
+        "test_description": "センサーに応じて移動するPS Vitaのシルエットでビューを開きます。",
+        "test_button": "テストセンサー",
+        "test_detail": "ビジュアルテストを開く",
+        "test_title": "センサーテスト",
+        "notify_enabled": "ジャイロスコープ対応",
+        "notify_disabled": "ジャイロスコープ 無効"
+    },
+    "session": {
+        "pause": {
+            "title": "一時停止メニュー",
+            "keyboard": "キーボード",
+            "resume": "再開",
+            "disconnect": "接続解除",
+            "close_app": "アプリを閉じる",
+            "notify_disconnected": "ホストから切断",
+            "notify_app_closed": "ホストのAppクローズ"
+        },
+        "app_select": {
+            "subtitle": "アプリを選択して起動します",
+            "connecting": "つながる...",
+            "reconnecting": "再接続...",
+            "reconnect_failed": "ストリームに再接続できない",
+            "starting": "スタート...",
+            "error_no_host": "エラー: ホスト情報が見つかりません。",
+            "no_apps": "このホストに見つかったアプリはありません。",
+            "running_session": "ランニングセッション",
+            "error_connect": "サーバに接続するエラー",
+            "paired": "ペアリング",
+            "pairing_failed": "ペアリング解除/失敗",
+            "error_start_app": "アプリケーションを起動するエラー",
+            "error_start_stream": "ストリーミングを開始するエラー",
+            "active_session_msg": "アクティブなセッション: $(app). 履歴書を返したり、新しいものをスタートさせたいですか?",
+            "button_resume": "ログイン",
+            "button_start_new": "新規登録",
+            "ending_session": "ホストの閉会セッション",
+            "error_end_session": "ホストのセッションを閉じる失敗",
+            "moonmic_not_connected": "Moonmicは接続されていません",
+            "moonmic_host_active": "Moonmicのホストは活動的です",
+            "resolution_prompt_body": "ストリーミング前にホスト画面を$(res)へ切り替えます（Sunshineが再起動する場合があります）。続行しますか？",
+            "resolution_prompt_continue": "続行",
+            "resolution_prompt_cancel": "キャンセル"
+        }
+    }
+}

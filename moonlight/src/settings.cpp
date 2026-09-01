@@ -5,8 +5,10 @@
 */
 #include "settings.hpp"
 
+#include <algorithm>
 #include <borealis.hpp>
 #include <string>
+#include <vector>
 
 #include "ConfigManager.hpp"
 #include "tab/settings_tab.hpp"
@@ -16,35 +18,65 @@ using namespace brls;
 namespace moonlight
 {
 
+const std::vector<LanguageOption>& settings::supportedLanguages()
+{
+    static const std::vector<LanguageOption> languages = {
+        { "en-US", "English" },
+        { "es", "Español" },
+        { "fr", "Français" },
+        { "pt-BR", "Português (Brasil)" },
+        { "ru", "Русский" },
+        { "ja", "日本語" },
+        { "zh-Hant", "繁體中文" },
+    };
+    return languages;
+}
+
+std::string settings::normalizeLanguage(const std::string& lang)
+{
+    if (lang == "es" || lang == "es-ES")
+        return "es";
+    if (lang == "fr" || lang == "fr-FR")
+        return "fr";
+    if (lang == "pt" || lang == "pt-BR" || lang == "pt-PT")
+        return "pt-BR";
+    if (lang == "ru" || lang == "ru-RU")
+        return "ru";
+    if (lang == "ja" || lang == "ja-JP")
+        return "ja";
+    if (lang == "zh" || lang == "zh-CN" || lang == "zh-SG" || lang == "zh-Hans" || lang == "zh-TW" || lang == "zh-HK" || lang == "zh-Hant")
+        return "zh-Hant";
+    return "en-US";
+}
+
+std::size_t settings::languageIndex(const std::string& lang)
+{
+    const std::string locale = normalizeLanguage(lang);
+    const auto& languages    = supportedLanguages();
+    auto found               = std::find_if(languages.begin(), languages.end(), [&locale](const LanguageOption& option)
+                      { return locale == option.locale; });
+    return found == languages.end() ? 0 : static_cast<std::size_t>(found - languages.begin());
+}
+
 void settings::loadSettingsFromConfig()
 {
     ConfigManager config;
     config.load();
-    std::string lang = config.get("general", "language", "en-US");
-    // Adjust visual selector (only after init)
-    if (lang == "es" || lang == "es-ES")
-    {
-        if (SettingsTab::languageSelectorPtr)
-            SettingsTab::languageSelectorPtr->setSelection(0);
-    }
-    else
-    {
-        if (SettingsTab::languageSelectorPtr)
-            SettingsTab::languageSelectorPtr->setSelection(1);
-    }
-    // Here you can load more settings and apply them
+    if (SettingsTab::languageSelectorPtr)
+        SettingsTab::languageSelectorPtr->setSelection(static_cast<int>(languageIndex(config.get("general", "language", "en-US"))));
 }
 
 void settings::saveSettingsToConfig()
 {
     ConfigManager config;
-    // Example: save language
-    int langIdx = 1;
+    config.load();
+    int langIdx = 0;
     if (SettingsTab::languageSelectorPtr)
         langIdx = SettingsTab::languageSelectorPtr->getSelection();
-    std::string lang = (langIdx == 0) ? "es" : "en-US";
-    config.set("general", "language", lang);
-    // Here you can save more settings
+    const auto& languages = supportedLanguages();
+    if (langIdx < 0 || static_cast<std::size_t>(langIdx) >= languages.size())
+        langIdx = 0;
+    config.set("general", "language", languages[langIdx].locale);
     config.save();
 }
 
@@ -52,8 +84,8 @@ std::string settings::getLanguageFromConfig()
 {
     ConfigManager config;
     if (!config.load())
-        return "en-US"; // Default value if unable to load
-    return config.get("general", "language", "en-US");
+        return "en-US";
+    return normalizeLanguage(config.get("general", "language", "en-US"));
 }
 
 void settings::applyLanguageEnv(const std::string& lang)

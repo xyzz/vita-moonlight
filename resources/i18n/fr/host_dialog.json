@@ -1,0 +1,86 @@
+{
+    "dialog": {
+        "title": "Options de l'hôte",
+        "close": "Fermer",
+        "connect": "Se connecter",
+        "info": "Infos",
+        "settings": "Paramètres",
+        "ok": "Très bien.",
+        "test_connection": "Connexion d'essai"
+    },
+    "wol": {
+        "button": "Réseau de réveil",
+        "success": "Pack magique Wake-on-LAN envoyé avec succès",
+        "failure": "Impossible d'envoyer le paquet Wake-on-LAN"
+    },
+    "info": {
+        "title": "Renseignements sur l'hôte",
+        "name": "Nom",
+        "ip": "IP",
+        "mac": "Adresse MAC"
+    },
+    "settings": {
+        "title": "Paramètres"
+    },
+    "dropdown": {
+        "edit_host": "Modifier l'hôte",
+        "delete": "Supprimer l'hôte",
+        "pair_online": "Appairer en ligne (hors domicile)",
+        "title": "Actions pour"
+    },
+    "connecting": "Générer des certificats...",
+    "host_list_empty": "Aucun hôte enregistré",
+    "confirm_delete_msg": "Voulez-vous supprimer l'hôte ?",
+    "yes": "Oui",
+    "no": "Numéro",
+    "add_host_paired_success": "Hôte $(name) jumelé et enregistré avec succès!",
+    "add_host_paired_error_deviceini": "Erreur : device.ini non trouvé après l'appariement.",
+    "add_host_paired_error_failed": "L'appariement a échoué. L'hôte n'a pas été sauvé.",
+    "pairing_title": "Jumelage...",
+    "pairing_connecting": "Connexion à l'hôte et attente de PIN...",
+    "pairing_enter_pin": "Entrez ce NIP dans Sunshine: $(pin)",
+    "pairing_success": "L'appariement réussi",
+    "pairing_force_warning": "L'hôte est occupé : forcer l'appariement. Si elle échoue, signez sur le PC et essayez à nouveau.",
+    "active_session_mismatch": "Cet hôte rapporte une session active ($(app)) mais il ne reconnaît pas l'appariement de votre appareil. Vous pouvez oublier l'hôte pour réinitialiser l'état d'appariement.",
+    "button_forget_host": "Oublie l'hôte",
+    "forgot_host": "Hôte oublié",
+    "forget_failed": "Impossible d'oublier l'hôte",
+    "pairing_error_init": "Erreur d'initialisation de la connexion à l'hôte",
+    "pairing_error": "Erreur d'appariement: $(error)",
+    "error_host_busy": "L'hôte a une session active. Fermez-le sur le PC ou attendez qu'il finisse, ou jumelez ce client avant d'essayer de commencer.",
+    "notification_deleted": "Hôte supprimé avec succès",
+    "change_ip_title": "Mettre à jour l'adresse IP de l'hôte",
+    "change_ip_hint": "Saisissez la nouvelle IP ou IP:Port",
+    "change_ip_empty_error": "L'adresse IP ne peut pas être vide",
+    "change_ip_same": "Cette adresse IP est déjà utilisée",
+    "change_ip_success": "Adresse IP de l'hôte mise à jour",
+    "change_ip_failure": "Impossible de mettre à jour l'adresse IP de l'hôte",
+    "edit_host_title": "Modifier l'hôte",
+    "edit_host_name_hint": "Nom de l'hôte",
+    "edit_host_ip_hint": "IP de l'hôte ou IP:Port",
+    "edit_host_save": "Enregistrer les modifications",
+    "edit_host_name_empty_error": "Le nom de l'hôte ne peut pas être vide",
+    "edit_host_ip_empty_error": "L'adresse IP de l'hôte ne peut pas être vide",
+    "edit_host_success": "Hôte mis à jour avec succès",
+    "edit_host_failure": "Échec de la mise à jour de l'hôte",
+    "actions": {
+        "refresh": "Actualiser les hôtes"
+    },
+    "connection_test": {
+        "title": "Diagnostic de connexion",
+        "testing": "Essai de connexion...",
+        "cancelling": "Annulation...",
+        "cancel": "Annuler",
+        "report_title": "Rapport de connexion",
+        "quality": "Qualité générale :",
+        "avg_latency": "Latence moyenne:",
+        "jitter": "C'est une blague.",
+        "packet_loss": "Perte de paquets:",
+        "speed": "Bande passante :",
+        "recommendation": "Recommandation:",
+        "host_server": "Serveur hôte : ",
+        "host_state": "État hôte :",
+        "state_busy": "Occupé (en streaming actif)",
+        "state_ready": "Gratuit (prêt à se connecter)"
+    }
+}

@@ -59,7 +59,6 @@
             "add_host_connection_type": "Connection type",
             "add_host_lan": "LAN (local)",
             "add_host_online": "Online (external)",
-            "moonlight/settings/language": "Language",
             "hosts_list_title": "Saved PCs",
             "hosts_list_empty": "No saved PCs",
             "rear_touch_detail": "Configure rear touch zones and actions",
@@ -90,8 +89,16 @@
             "stream_resolution": {
                 "title": "Stream Resolution",
                 "options": {
-                    "0": "960x544 (Native)",
-                    "1": "848x480 (Low bandwidth)"
+                    "0": "848x480 (Low bandwidth)",
+                    "1": "960x540",
+                    "2": "960x544 (Native)",
+                    "3": "1024x576",
+                    "4": "1152x648",
+                    "5": "1280x540",
+                    "6": "1280x720",
+                    "7": "1366x768",
+                    "8": "1600x900",
+                    "9": "1920x1080"
                 },
                 "saved": "Stream resolution saved"
             },
@@ -195,11 +202,12 @@
                 "title": "Keyboard layout",
                 "saved": "Keyboard layout saved"
             },
-            "languages": {
-                "es": "Spanish",
-                "en": "English"
-            },
-            "language_changed": "Language changed successfully",
+            "language_changed": "Language saved. Restart Moonlight Vita to apply it.",
+            "language_restarting": "Restarting Moonlight Vita...",
+            "language_save_failed": "Failed to save language",
+            "language_restart_failed": "Restart failed. Restart Moonlight Vita manually.",
+            "moonmic_header": "Moonmic",
+            "moonmic_requirement": "Requires Moonmic running on the host",
             "microphone_enabled_title": "Enable Microphone",
             "microphone_description": "Transmit microphone audio to host PC (auto-retry every 10s if host not found)",
             "microphone_enabled": "[OK] Microphone enabled - will start when streaming begins",
@@ -454,6 +462,8 @@
             "app_select": {
                 "subtitle": "Select an app to launch",
                 "connecting": "Connecting...",
+                "reconnecting": "Reconnecting...",
+                "reconnect_failed": "Unable to reconnect to the stream",
                 "starting": "Starting...",
                 "error_no_host": "Error: Host information not found.",
                 "no_apps": "No apps found on this host.",

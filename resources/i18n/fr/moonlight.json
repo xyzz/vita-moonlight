@@ -1,20 +1,469 @@
 {
+  "title": "Moonlight Vita",
+  "tabs": {
+    "settings": "Paramètres",
+    "about": "À propos de Moonlight Vita",
+    "add_host": "Ajouter un hôte",
+    "hosts": "Hôtes"
+  },
+  "capunlocker_notify": "CapUnlocker détecté ! Les 4 cœurs et la RAM étendue seront activés.",
+  "welcome": "Bienvenue dans Moonlight Vita ! Découvrez librement les possibilités de l'application.",
+  "components": {
+    "buttons_header": "Boutons",
+    "button_primary": "Bouton primaire",
+    "button_highlight": " Bouton surligneur",
+    "button_wrapping": "Bouton par défaut avec texte d'emballage",
+    "button_bordered": "Bouton bordé",
+    "button_borderless": "Bouton sans bordure",
+    "slider_header": "Slider",
+    "labels_header": "Étiquettes",
+    "regular_label": "C'est une étiquette. Par défaut, ils envelopperont et agrandiront automatiquement leur hauteur, si l'espace vertical restant le permet. Sinon, ils seront tronqués, comme certains onglets de la barre latérale.\nC'est une étiquette. Par défaut, ils envelopperont et agrandiront automatiquement leur hauteur, si l'espace vertical restant le permet. Sinon, ils seront tronqués, comme certains onglets de la barre latérale.",
+    "label_left": "Cette étiquette est alignée à gauche",
+    "label_center": "Cette étiquette est alignée au centre",
+    "label_right": "Cette étiquette est alignée à droite",
+    "images_header_title": "Images",
+    "images_header_subtitle": "Concentrez-les pour voir la méthode d'échelle",
+    "images_downscaled": "Baisse",
+    "images_original": "Original: ANGLAIS",
+    "images_upscaled": "Mise à niveau",
+    "images_stretched": "Accroché",
+    "images_cropped": "Récoltes"
+  },
+  "about": {
+    "title": "Moonlight Vita",
+    "description": "Open source NVIDIA GameStream client pour PlayStation Vita. Streamez vos jeux PC avec Sunshine ou GeForce Experience.",
+    "author": "Auteur: AorsiniYT",
+    "original_creators": "Port Vita original: xyzz, d3m3vilurr, cgutman",
+    "moonlight_repo": "Moonlight original : github.com/moonlight-stream",
+    "github": "Code source: github.com/xyzz/vita-moonlight",
+    "licence": "Licence: GPLv3",
+    "logo_credit": "Logo et UI adaptés pour Vita. Basé sur Borealis."
+  },
+  "settings": {
+    "add_host": "Ajouter un hôte",
+    "add_host_desc": "Ajouter un nouveau PC pour le streaming",
+    "add_host_title": "Ajouter un hôte",
+    "add_host_manual": "Nom de l'hôte",
+    "add_host_auto": "Recherche PC automatiquement",
+    "add_host_manual_msg": "Fonction pour ajouter le PC manuellement (en attente)",
+    "add_host_auto_msg": "Fonction pour rechercher automatiquement PC (en attente)",
+    "add_host_ip_placeholder": "par exemple 192.168.1.100",
+    "add_host_name_placeholder": "Nom de l'hôte",
+    "add_host_missing_fields": "Vous devez entrer IP et nom",
+    "add_host_added": "Hôte ajouté",
+    "add_host_not_implemented": "(Non encore mis en œuvre)",
+    "ip": "IP",
+    "dns": "DNS",
+    "notify": "Poster une notification",
+    "language": "Langue",
+    "add_host_connection_type": "Type de connexion",
+    "add_host_lan": "LAN (local)",
+    "add_host_online": "En ligne (externe)",
+    "hosts_list_title": "Enregistré les PC",
+    "hosts_list_empty": "Pas de PC enregistrés",
+    "rear_touch_detail": "Configurer les zones de contact arrière et les actions",
+    "front_touch_detail": "Zones et actions",
+    "add_host_connect_question_dialog": "Se connecter à $(name) à $(ip)?",
+    "add_host_connect": "Connexion",
+    "add_host_cancel": "Annuler"
+  },
+  "settings_tab": {
+    "header": "Paramètres de streaming",
+    "controls_header": "Contrôles",
+    "system_header": "Système",
+    "render_mode": {
+      "title": "Mode rendu",
+      "legacy_option": "Classique (SceVideodec)",
+      "modern_option": "Moderne (FFmpeg)",
+      "legacy_name": "Classique",
+      "modern_name": "Moderne",
+      "unknown_name": "Inconnu",
+      "notify": "Mode rendu: {0}"
+    },
+    "pixel_format": {
+      "title": "Format pixel",
+      "rgba": "RGBA directe",
+      "yuv": "YUV420 (matériel CSC)",
+      "notify": "Format pixel: {0}"
+    },
+    "stream_resolution": {
+      "title": "Résolution du stream",
+      "options": {
+        "0": "848x480 (bande passante basse)",
+        "1": "960x540",
+        "2": "960x544 (Natif)",
+        "3": "1024x576",
+        "4": "1152x648",
+        "5": "1280x540",
+        "6": "1280x720",
+        "7": "1366x768",
+        "8": "1600x900",
+        "9": "1920x1080"
+      },
+      "saved": "Résolution du flux enregistrée"
+    },
+    "resolution": {
+      "title": "Résolution de l’écran hôte",
+      "description": "Contrôle la résolution du moniteur hôte. La résolution du flux est configurée séparément.",
+      "options": {
+        "0": "Automatique (hôte actuel)",
+        "1": "960x544",
+        "2": "1024x576",
+        "3": "1152x648",
+        "4": "1280x540",
+        "5": "1280x720",
+        "6": "1366x768",
+        "7": "1600x900",
+        "8": "1920x1080"
+      },
+      "saved": "Résolution du moniteur d'hôte enregistrée"
+    },
+    "fps": {
+      "title": "FPS",
+      "options": {
+        "0": "24 FPS (Cinéma)",
+        "1": "30 FPS (norme)",
+        "2": "40 FPS",
+        "3": "50 FPS (PAL)",
+        "4": "60 FPS (NTSC)"
+      },
+      "saved": "FPS enregistré"
+    },
+    "bitrate": {
+      "title": "Débit (Kbps)",
+      "options": {
+        "0": "Automatique (Recommandé)",
+        "1": "2000 Kbps (faible)",
+        "2": "5000 Kbps (standard)",
+        "3": "8000 Kbps (HD)",
+        "4": "10000 Kbps (HD+)",
+        "5": "15000 Kbps (en HD)",
+        "6": "20000 Kbps (HD+ complet)",
+        "7": "30000 Kbps (Ultra HD)",
+        "8": "50000 Kbps (maximum)"
+      },
+      "saved": "Débit enregistré"
+    },
+    "sops_title": "Optimisation du flux",
+    "network_opt_title": "Optimisations des réseaux",
+    "network_opt_enabled": "Optimisations réseau activées",
+    "network_opt_disabled": "Optimisations réseau désactivées",
+    "local_audio_title": "Audio local",
+    "fullscreen_title": "Plein écran",
+    "frame_pacer_title": "Stimulateur de cadre",
+    "settings_background_opacity": "Opacité de fond des paramètres",
+    "keep_awake_while_streaming": "Garder la Vita active pendant le streaming",
+    "center_region_title": "Région du centre seulement",
+    "show_fps_title": "Afficher FPS",
+    "save_debug_log_title": "Enregistrer le journal de débogage",
+    "ref_frame_title": "Invalidation du cadre de référence",
+    "swap_interval": {
+      "title": "V-Sync (intervalle de rotation)",
+      "options": {
+        "0": "OFF V-Sync (non limité)",
+        "1": "V-Sync ON (60 FPS)",
+        "2": "V-Sync 2x (30 FPS)",
+        "3": "V-Sync 3x (20 FPS)",
+        "4": "V-Sync 4x (15 FPS)"
+      },
+      "saved": "V-Sync enregistré"
+    },
+    "motion_controls_title": "Gyroscope",
+    "double_tap_sprint_title": "Double pression sur sprint",
+    "touchscreen_mode": {
+      "title": "Mode écran tactile",
+      "options": {
+        "0": "Handicapé",
+        "1": "Piste relative",
+        "2": "Touchpad DS4 (PS4 seulement)",
+        "3": "Souris absolue",
+        "4": "Comprimé multitouch"
+      },
+      "saved": "Mode écran tactile enregistré",
+      "changed": "Le mode écran tactile est devenu :"
+    },
+    "gamepad_type": {
+      "title": "Type de contrôleur",
+      "options": {
+        "xbox": "Xbox 360",
+        "ps4": "PlayStation 4"
+      },
+      "notify_prefix": "Le type de contrôleur est passé à :"
+    },
+    "swap_shoulder_buttons": {
+      "title": "Échange R1/L1 <-> R2/L2",
+      "notify_enabled": "Inverser les boutons d'épaule activés",
+      "notify_disabled": "Couper les boutons d'épaule désactivés"
+    },
+    "mouse_accel": {
+      "title": "Accélération de la souris"
+    },
+    "keyboard_layout": {
+      "title": "Mise en page du clavier",
+      "saved": "Mise en page du clavier enregistrée"
+    },
+    "language_changed": "Langue enregistrée. Redémarrez Moonlight Vita pour l’appliquer.",
+    "language_restarting": "Redémarrage de Moonlight Vita...",
+    "language_save_failed": "Impossible d’enregistrer la langue",
+    "language_restart_failed": "Échec du redémarrage. Redémarrez Moonlight Vita manuellement.",
+    "moonmic_header": "Moonmic",
+    "moonmic_requirement": "Nécessite Moonmic en cours d'exécution sur l'hôte",
+    "microphone_enabled_title": "Activer le microphone",
+    "microphone_description": "Transmet le son du microphone à l'hôte et réessaie la connexion toutes les 10 s",
+    "microphone_enabled": "[OK] Le microphone démarrera avec le streaming",
+    "microphone_disabled": "[X] Microphone désactivé",
+    "microphone_configure_title": "Configurer le microphone",
+    "microphone_configure_detail": "Régler le gain, le codec et le test"
+  },
+  "microphone": {
+    "title": "Configuration du microphone",
+    "subtitle": "Nécessite MoonMic: https://github.com/AorsiniYT/libmoonmic",
+    "gain_header": "Paramètres de gain",
+    "gain_description": "Amplifier l'entrée du microphone (1x-50x). Les valeurs plus élevées augmentent le volume.",
+    "gain_label": "Gain: {0}x",
+    "format_header": "Format audio",
+    "opus_toggle": "Utiliser la compression Opus",
+    "opus_description": "Réduit la bande passante grâce à la compression",
+    "test_header": "Tests",
+    "test_description": "Parlez dans le microphone. Vous devriez entendre votre voix dans les haut-parleurs de la Vita.",
+    "test_toggle": "Tester le microphone (local)",
+    "test_remote_toggle": "Tester le microphone (distant)",
+    "notify_local_started": "Test local démarré",
+    "notify_local_failed": "Impossible de démarrer le test local",
+    "notify_local_stopped": "Test local arrêté",
+    "notify_remote_started": "Test distant démarré",
+    "notify_remote_connecting": "Connexion à l'hôte...",
+    "notify_remote_stopped": "Test distant arrêté",
+    "notify_opus_enabled": "Compression Opus activée",
+    "notify_opus_disabled": "PCM non compressé activé",
+    "host_selector_title": "Sélectionner l'hôte pour le test distant",
+    "no_hosts": "Aucun hôte appairé disponible",
+    "notify_no_host": "Aucun hôte sélectionné. Appairez-en un d'abord",
+    "port_header": "Configuration du port",
+    "port_title": "Port Microphone",
+    "port_hint": "Port UDP (par défaut: 48100)"
+  },
+  "keyboard": {
+    "title": "Configurer le clavier",
+    "configure_title": "Configurer le clavier",
+    "configure_detail": "Disposition, thèmes et personnalisation",
+    "header_mode": "Mode clavier",
+    "header_layout": "Disposition du clavier",
+    "header_modern": "Options modernes",
+    "header_theme": "Apparence (à venir)",
+    "mode_title": "Type de clavier",
+    "mode_legacy": "Classique (IME système)",
+    "mode_modern": "Moderne (interface personnalisée)",
+    "mode_saved": "Mode clavier enregistré",
+    "numbers_row_title": "Afficher la rangée de chiffres",
+    "arrows_title": "Afficher les touches fléchées",
+    "theme_preview_title": "Thème actuel",
+    "theme_editor_title": "Éditeur de thème",
+    "theme_info": "Les thèmes personnalisés seront disponibles dans une prochaine mise à jour. Vous pourrez créer et partager vos propres dispositions.",
+    "input_mode_title": "Mode d'entrée du clavier (UTF-8)",
+    "input_mode_utf8": "Entrée UTF-8 activée",
+    "input_mode_vk": "Entrée VK activée (par défaut)",
+    "theme_default": "Par défaut",
+    "theme_selection_future": "La sélection de thèmes sera bientôt disponible",
+    "theme_not_available": "Non disponible",
+    "theme_editor_future": "L'éditeur de thèmes sera bientôt disponible"
+  },
+  "shortcuts": {
+    "title": "Configuration des raccourcis",
+    "configure_title": "Configurer les raccourcis",
+    "configure_detail": "Personnaliser les combinaisons pause et clavier",
+    "pause_combo_title": "Raccourci de la pause",
+    "keyboard_combo_title": "Raccourci clavier",
+    "custom_shortcut_title": "Raccourci",
+    "button_slot_1": "Bouton 1",
+    "button_slot_2": "Bouton 2",
+    "button_slot_3": "Bouton 3",
+    "add_shortcut_title": "Ajouter un raccourci",
+    "add_shortcut_detail": "Créer une nouvelle combinaison personnalisée",
+    "editor_action_title": "Action",
+    "editor_name_title": "Nom",
+    "editor_name_hint": "Nom optionnel pour ce raccourci",
+    "action_pause": "Pause",
+    "action_keyboard": "Clavier",
+    "disabled_combo": "Désactivé",
+    "clear_combo_title": "Effacer la combinaison",
+    "clear_combo_detail": "Définit les boutons 1, 2 et 3 sur Aucun",
+    "delete_shortcut_title": "Supprimer le raccourci",
+    "delete_shortcut_detail": "Supprimer ce raccourci personnalisé",
+    "save_shortcut_title": "Enregistrer les modifications",
+    "save_shortcut_detail": "Appliquer cette configuration de raccourci",
+    "reset_defaults_title": "Restaurer les valeurs par défaut",
+    "reset_defaults_detail": "Pause : START + L1 + R1 | Clavier : START + LEFT",
+    "notify_saved": "Raccourci enregistré",
+    "notify_invalid_combo": "Sélectionnez au moins un bouton",
+    "notify_defaults_restored": "Raccourcis par défaut restaurés",
+    "notify_deleted": "Raccourci supprimé",
+    "notify_cleared": "Combinaison effacée"
+  },
+  "rear_touch": {
+    "title": "Touche arrière",
+    "toggle": "Touche arrière",
+    "calibrate": "Étalonnage du toucher arrière",
+    "calibration_zone_title": "Zone active",
+    "calibration_zone_detail": "Régler les marges avec l'étalonnage",
+    "actions_header": "Actions du coin",
+    "swap_warning": "L'échange R1/L1 <-> R2/L2 est actif. NW/NE -> L1/R1, SW/SE -> L3/R3. Les actions personnalisées sont désactivées.",
+    "action_nw": "Action du coin nord-ouest",
+    "action_ne": "Action du coin nord-est",
+    "action_sw": "Action du coin sud-ouest",
+    "action_se": "Action du coin sud-est",
+    "notify_enabled": "Touche arrière activée",
+    "notify_disabled": "Touche arrière désactivée",
+    "notify_action_saved": "Action de contact arrière enregistrée",
+    "notify_calibration_saved": "Étalonnage du toucher arrière enregistré",
+    "detail_top": "Haut",
+    "detail_bottom": "Bas",
+    "detail_left": "Gauche",
+    "detail_right": "Droite",
+    "calibration": {
+      "title": "Étalonner la touche arrière",
+      "overlay_title": "Réglage de la touche arrière",
+      "status_enabled": "État : activé",
+      "status_disabled": "Statut: Handicapés",
+      "selected_edge": "Bord sélectionné : ",
+      "current_action": "Action actuelle:",
+      "margins": "Marges (px)",
+      "margins_format": "{0} - {1}: {2}= {3}: {4}= {5}: {6}= {7}: {8}",
+      "assignments_prefix": "Attributions",
+      "assignments_top_format": "{0} - {1}: {2}: {3}: {4}",
+      "assignments_bottom_format": "{0}: {1}: {2}: {3}",
+      "instructions": "• • • • • • • • • •",
+      "zone_labels": {
+        "nw": "NW",
+        "ne": "N°",
+        "sw": "SW",
+        "se": "SE"
+      },
+      "edge_labels": [
+        "Haut",
+        "Droite",
+        "Bas",
+        "Gauche"
+      ],
+      "actions": {
+        "save": "Enregistrer",
+        "cancel": "Annuler",
+        "next_edge": "Bord suivant",
+        "prev_edge": "Bord précédent",
+        "increase_margin": "Augmentation de la marge",
+        "decrease_margin": "Réduction de la marge",
+        "next_action": "Action suivante",
+        "prev_action": "Action précédente",
+        "toggle_enabled": "Activer",
+        "reset": "Réinitialiser"
+      }
+    }
+  },
+  "front_touch": {
+    "title": "Zones de contact avant",
+    "toggle": "Zones de contact avant",
+    "offset": "Zone offset",
+    "offset_detail": "Distance du bord de l'écran",
+    "size": "Taille des zones",
+    "size_detail": "Largeur/hauteur de la zone carrée",
+    "preview": "Zones de prévisualisation",
+    "preview_detail": "Visualiser et tester les zones de coin",
+    "zones_description": "Appuyez sur les coins de l'écran pour déclencher des actions pendant le streaming",
+    "actions_header": "Actions du coin",
+    "action_nw": "Action du coin nord-ouest",
+    "action_ne": "Action du coin nord-est",
+    "action_sw": "Action du coin sud-ouest",
+    "action_se": "Action du coin sud-est",
+    "notify_enabled": "Zones de contact avant activées",
+    "notify_disabled": "Zones de contact avant désactivées",
+    "notify_action_saved": "Action avant tactile enregistrée"
+  },
+  "hints": {
+    "cancel": "Annuler"
+  },
+  "host_dialog/connecting": "Générer des certificats...",
   "main": {
     "cancel": "Annuler"
+  },
+  "trackpad": {
+    "header": "Configuration du trackpad",
+    "pointer_speed": {
+      "title": "Vitesse du pointeur",
+      "detail": "Régler le multiplicateur de vitesse du curseur lors du balayage"
+    },
+    "tap_to_click": {
+      "title": "Appuyez sur pour cliquer",
+      "detail": "Cliquez en appuyant sur le trackpad sans appuyer",
+      "enabled": "Appuyez sur pour cliquer activé",
+      "disabled": "Appuyez sur pour cliquer sur désactivé"
+    },
+    "gestures_header": "Gestures & Cliquez sur Options",
+    "two_finger_right_click": {
+      "title": "Clic droit à deux doigts",
+      "detail": "Faites un clic droit avec deux doigts",
+      "enabled": "Clic droit à deux doigts activé",
+      "disabled": "Deux doigts clic droit désactivé"
+    },
+    "two_finger_scroll": {
+      "title": "Déroulement à deux doigts",
+      "detail": "Faites défiler en balayant avec deux doigts",
+      "enabled": "Le défilement à deux doigts est activé",
+      "disabled": "Défilement à deux doigts désactivé"
+    },
+    "invert_scroll": {
+      "title": "Inverser la direction du rouleau",
+      "detail": "Utilisez le défilement naturel (style iOS) ou traditionnel",
+      "natural": "Défilement naturel activé (style iOS)",
+      "traditional": "Le défilement traditionnel est activé"
+    },
+    "multi_touch": {
+      "title": "Gestes multi-touch",
+      "detail": "Activer des gestes avancés comme pincer pour zoomer",
+      "enabled": "Gestes multi-touch activés",
+      "disabled": "Gestes multi-touch désactivés"
+    },
+    "advanced_header": "Options avancées",
+    "edge_zone": {
+      "title": "Zones mortes bordées",
+      "detail": "Définir des zones aux bords pour ignorer les touches accidentelles"
+    },
+    "dead_zone": {
+      "title": "Zone morte",
+      "detail": "Seuil minimal de déplacement avant l'enregistrement en tant que swipe"
+    }
+  },
+  "gyro": {
+    "title": "Paramètres du gyroscope",
+    "header": "Gyroscope",
+    "toggle": "Activer le gyroscope",
+    "settings_entry": "Paramètres du gyroscope",
+    "settings_detail": "Régler les scalaires et l'essai",
+    "scalars_header": "Scalaires de sensibilité",
+    "scalars_description": "Régler la sensibilité par axe (0,1x - 3,0x). Plus élevé = plus sensible.",
+    "scalar_suffix": "Échelle",
+    "test_header": "Essai et étalonnage",
+    "test_description": "Ouvre une vue avec une silhouette PS Vita qui se déplace selon les capteurs.",
+    "test_button": "Capteurs d'essai",
+    "test_detail": "Essai visuel ouvert",
+    "test_title": "Essai du capteur",
+    "notify_enabled": "Gyroscope activé",
+    "notify_disabled": "Gyroscope désactivé"
   },
   "session": {
     "pause": {
       "title": "Menu de pause",
+      "keyboard": "Clavier",
       "resume": "Reprendre",
       "disconnect": "Déconnecter",
       "close_app": "Fermer l'application",
       "notify_disconnected": "Déconnecté de l'hôte",
       "notify_app_closed": "Application fermée sur l'hôte"
-    }
-  ,
+    },
     "app_select": {
       "subtitle": "Sélectionnez une application à lancer",
       "connecting": "Connexion...",
+      "reconnecting": "Reconnexion...",
+      "reconnect_failed": "Impossible de reconnecter le flux",
       "starting": "Démarrage...",
       "error_no_host": "Erreur: information de l'hôte introuvable.",
       "no_apps": "Aucune application trouvée sur cet hôte.",
@@ -28,7 +477,12 @@
       "button_resume": "Reprendre",
       "button_start_new": "Démarrer nouvelle",
       "ending_session": "Fermeture de la session sur l'hôte...",
-      "error_end_session": "Impossible de fermer la session sur l'hôte"
+      "error_end_session": "Impossible de fermer la session sur l'hôte",
+      "moonmic_not_connected": "Moonmic n'est pas connecté",
+      "moonmic_host_active": "L'hôte Moonmic est actif",
+      "resolution_prompt_body": "L'écran hôte passe à $(res) avant la diffusion (peut redémarrer Sunshine). Continuez ?",
+      "resolution_prompt_continue": "Continuer",
+      "resolution_prompt_cancel": "Annuler"
     }
   }
 }

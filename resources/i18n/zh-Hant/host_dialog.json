@@ -1,0 +1,86 @@
+{
+    "dialog": {
+        "title": "主機選項",
+        "close": "關閉",
+        "connect": "連接",
+        "info": "信息",
+        "settings": "設置",
+        "ok": "確定",
+        "test_connection": "測試連接"
+    },
+    "wol": {
+        "button": "在局域網上醒來",
+        "success": "成功發送了Wake-on-LAN 魔法包",
+        "failure": "發送 Wake- on- LAN 數據包失敗"
+    },
+    "info": {
+        "title": "主機信息",
+        "name": "名稱",
+        "ip": "計程車",
+        "mac": "MAC 地址"
+    },
+    "settings": {
+        "title": "設置"
+    },
+    "dropdown": {
+        "edit_host": "編輯主機",
+        "delete": "刪除主機",
+        "pair_online": "遠程配對（外出）",
+        "title": "操作對象"
+    },
+    "connecting": "正在生成證書...",
+    "host_list_empty": "沒有保存主機",
+    "confirm_delete_msg": "確定刪除主機？",
+    "yes": "對",
+    "no": "沒有",
+    "add_host_paired_success": "主機 $(name) 已成功配對並保存！",
+    "add_host_paired_error_deviceini": "錯誤: 配對後找不到設備.ini 。",
+    "add_host_paired_error_failed": "配對失敗 。 主機未保存 。",
+    "pairing_title": "配對...",
+    "pairing_connecting": "正在連接到主機並等待 PIN...",
+    "pairing_enter_pin": "請在 Sunshine 中輸入此 PIN：$(pin)",
+    "pairing_success": "配對成功",
+    "pairing_force_warning": "主機繁忙:強制配對. 如果失敗,請在PC上簽字,再試一次.",
+    "active_session_mismatch": "此主機報告有活動會話（$(app)），但無法識別此裝置的配對。可以忘記該主機以重置配對情形。",
+    "button_forget_host": "忘記主機",
+    "forgot_host": "宿主忘記了",
+    "forget_failed": "忘記主機失敗",
+    "pairing_error_init": "初始化連接到主機時出錯",
+    "pairing_error": "配對錯誤：$(error)",
+    "error_host_busy": "主機有活動會話。請在PC上關閉或等待結束，也可先配對此客端再開始。",
+    "notification_deleted": "主機已成功刪除",
+    "change_ip_title": "更新主機 IP",
+    "change_ip_hint": "輸入新的 IP 或 IP:端口",
+    "change_ip_empty_error": "IP 不能爲空",
+    "change_ip_same": "該 IP 已經設置",
+    "change_ip_success": "主機 IP 已更新",
+    "change_ip_failure": "無法更新主機 IP",
+    "edit_host_title": "編輯主機",
+    "edit_host_name_hint": "主機名稱",
+    "edit_host_ip_hint": "主機 IP 或 IP:端口",
+    "edit_host_save": "保存更改",
+    "edit_host_name_empty_error": "主機名稱不能爲空",
+    "edit_host_ip_empty_error": "主機 IP 不能爲空",
+    "edit_host_success": "主機更新成功",
+    "edit_host_failure": "更新主機失敗",
+    "actions": {
+        "refresh": "刷新主機"
+    },
+    "connection_test": {
+        "title": "連接診斷",
+        "testing": "測試連接...",
+        "cancelling": "正在取消...",
+        "cancel": "取消",
+        "report_title": "連接報告",
+        "quality": "總體質量:",
+        "avg_latency": "平均延遲 :",
+        "jitter": "抖動 :",
+        "packet_loss": "封包遺失率：",
+        "speed": "帶寬 :",
+        "recommendation": "建議:",
+        "host_server": "主機服務器 :",
+        "host_state": "東道國:",
+        "state_busy": "忙 (主動流線會議)",
+        "state_ready": "自由( 準備連接)"
+    }
+}

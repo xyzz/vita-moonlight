@@ -1,0 +1,86 @@
+{
+    "dialog": {
+        "title": "Menu Máquina",
+        "close": "Fechar",
+        "connect": "Ligar",
+        "info": "Informação",
+        "settings": "Configurações",
+        "ok": "Está bem",
+        "test_connection": "Testar a Ligação"
+    },
+    "wol": {
+        "button": "Wake-on-LAN",
+        "success": "Pacote mágico Wake-on-LAN enviado com sucesso",
+        "failure": "Falha ao enviar o pacote Wake-on-LAN"
+    },
+    "info": {
+        "title": "Informações da Máquina",
+        "name": "Nome",
+        "ip": "IP",
+        "mac": "Endereço MAC"
+    },
+    "settings": {
+        "title": "Configurações"
+    },
+    "dropdown": {
+        "edit_host": "Editar máquina",
+        "delete": "Apagar máquina",
+        "pair_online": "Par online (fora de casa)",
+        "title": "Acções de"
+    },
+    "connecting": "Gerando certificados...",
+    "host_list_empty": "Nenhuma máquina salva",
+    "confirm_delete_msg": "Deseja apagar a máquina?",
+    "yes": "Sim.",
+    "no": "Não",
+    "add_host_paired_success": "Host $(name) emparelhado e salvo com sucesso!",
+    "add_host_paired_error_deviceini": "Erro: o device.ini não foi encontrado após o pareamento.",
+    "add_host_paired_error_failed": "O pareamento falhou. O anfitrião não foi salvo.",
+    "pairing_title": "Emparelhamento...",
+    "pairing_connecting": "A ligar à máquina e à espera do PIN...",
+    "pairing_enter_pin": "Digite este PIN em Sunshine: $(pin)",
+    "pairing_success": "Emparelhamento com sucesso",
+    "pairing_force_warning": "O anfitrião está ocupado: forçando o emparelhamento. Se falhar, assine no PC e tente novamente.",
+    "active_session_mismatch": "Esta máquina relata uma sessão ativa ($(app)) mas não reconhece o emparelhamento do dispositivo. Você pode esquecer a máquina para reiniciar o estado de emparelhamento.",
+    "button_forget_host": "Esquecer a Máquina",
+    "forgot_host": "Máquina esquecida",
+    "forget_failed": "Falha ao esquecer a máquina",
+    "pairing_error_init": "Erro ao inicializar a ligação à máquina",
+    "pairing_error": "Erro de pareamento: $(error)",
+    "error_host_busy": "A máquina tem uma sessão ativa. Feche-o no PC ou espere que ele termine, ou emparelhe este cliente antes de tentar começar.",
+    "notification_deleted": "A máquina foi apagada com sucesso",
+    "change_ip_title": "Actualizar o IP da máquina",
+    "change_ip_hint": "Digite o novo IP ou IP:Port",
+    "change_ip_empty_error": "O IP não pode estar vazio",
+    "change_ip_same": "Esse IP já está definido",
+    "change_ip_success": "IP da máquina atualizado",
+    "change_ip_failure": "Não foi possível atualizar o IP da máquina",
+    "edit_host_title": "Editar máquina",
+    "edit_host_name_hint": "Nome da máquina",
+    "edit_host_ip_hint": "IP da máquina ou IP:Port",
+    "edit_host_save": "Salvar alterações",
+    "edit_host_name_empty_error": "O nome da máquina não pode estar vazio",
+    "edit_host_ip_empty_error": "O IP da máquina não pode estar vazio",
+    "edit_host_success": "A máquina foi atualizada com sucesso",
+    "edit_host_failure": "Falha ao atualizar a máquina",
+    "actions": {
+        "refresh": "Atualizar máquinas"
+    },
+    "connection_test": {
+        "title": "Diagnóstico da Ligação",
+        "testing": "A testar a ligação...",
+        "cancelling": "A cancelar...",
+        "cancel": "Cancelar",
+        "report_title": "Relatório de Ligação",
+        "quality": "Qualidade global:",
+        "avg_latency": "Latência Média:",
+        "jitter": "Jitter:",
+        "packet_loss": "Perda do pacote:",
+        "speed": "Largura de banda:",
+        "recommendation": "Recomendação:",
+        "host_server": "Servidor da máquina:",
+        "host_state": "Estado anfitrião:",
+        "state_busy": "Ocupado (Sessão de transmissão ativa)",
+        "state_ready": "Grátis (Pronto para conectar)"
+    }
+}

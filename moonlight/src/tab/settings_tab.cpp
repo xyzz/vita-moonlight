@@ -37,6 +37,9 @@
 #ifndef _WIN32
 #include <sys/stat.h>
 #endif
+#if defined(__PSV__)
+#include <psp2/appmgr.h>
+#endif
 #ifdef _WIN32
 #include <windows.h>
 #endif
@@ -948,47 +951,55 @@ SettingsTab::SettingsTab()
         brls::Application::notify(notification);
         return true; });
 
-    // Available languages
-    std::vector<std::string> languages = {
-        brls::getStr("moonlight/settings_tab/languages/es"),
-        brls::getStr("moonlight/settings_tab/languages/en")
-    };
-    int currentLang           = 1; // 0: is, 1: en-US
-    std::string currentLocale = brls::Application::getLocale();
-    if (currentLocale == "es" || currentLocale == "es-ES")
-        currentLang = 0;
-    languageSelector->init(brls::getStr("moonlight/settings/language"), languages, currentLang, [this](int selected)
+    std::vector<std::string> languages;
+    const auto& languageOptions = moonlight::settings::supportedLanguages();
+    languages.reserve(languageOptions.size());
+    for (const auto& option : languageOptions)
+        languages.emplace_back(option.label);
+
+    int currentLang = static_cast<int>(moonlight::settings::languageIndex(brls::Application::getLocale()));
+    languageSelector->init(brls::getStr("moonlight/settings/language"), languages, currentLang, [](int selected)
         {
-        std::string locale = (selected == 0) ? "es" : "en-US";
+            const auto& languageOptions = moonlight::settings::supportedLanguages();
+            if (selected < 0 || static_cast<std::size_t>(selected) >= languageOptions.size())
+                return;
+            std::string locale = languageOptions[selected].locale;
+
+            // Create directory if it does not exist
+            std::string configPath = ConfigManager::getConfigPath();
+            size_t pos             = configPath.find_last_of("/\\");
+            if (pos != std::string::npos)
+            {
+                std::string configDir = configPath.substr(0, pos);
 #ifdef _WIN32
-        _putenv_s("LANG", locale.c_str());
-        _putenv_s("BOREALIS_LANG", locale.c_str());
+                CreateDirectoryA(configDir.c_str(), NULL);
 #else
-        setenv("LANG", locale.c_str(), 1);
-        setenv("BOREALIS_LANG", locale.c_str(), 1);
+                mkdir(configDir.c_str(), 0755);
 #endif
+            }
 
-        // Reload translations
-        brls::loadTranslations();
+            ConfigManager config;
+            config.load();
+            config.set("general", "language", locale);
+            if (!config.save())
+            {
+                brls::Application::notify(brls::getStr("moonlight/settings_tab/language_save_failed"));
+                return;
+            }
 
-        // Create directory if it does not exist
-        std::string configPath = ConfigManager::getConfigPath();
-        size_t pos = configPath.find_last_of("/\\");
-        if (pos != std::string::npos) {
-            std::string configDir = configPath.substr(0, pos);
-#ifdef _WIN32
-            CreateDirectoryA(configDir.c_str(), NULL);
+#if defined(__PSV__)
+            brls::Application::notify(brls::getStr("moonlight/settings_tab/language_restarting"));
+            brls::delay(300, []()
+                {
+            int result = sceAppMgrLoadExec("app0:eboot.bin", nullptr, nullptr);
+            if (result < 0) {
+                vita_log::error("[Settings] sceAppMgrLoadExec fallo=0x%X", result);
+                brls::Application::notify(brls::getStr("moonlight/settings_tab/language_restart_failed"));
+            } });
 #else
-            mkdir(configDir.c_str(), 0755);
+            brls::Application::notify(brls::getStr("moonlight/settings_tab/language_changed"));
 #endif
-        }
-
-        // Save the selected language directly
-        ConfigManager config;
-        config.set("general", "language", locale);
-        config.save();
-
-        brls::Application::notify(brls::getStr("moonlight/settings_tab/language_changed")); });
+        });
     SettingsTab::languageSelectorPtr = languageSelector;
 }
 

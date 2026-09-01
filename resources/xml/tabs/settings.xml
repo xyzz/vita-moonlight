@@ -36,10 +36,6 @@
                 title="@i18n/moonlight/settings_tab/stream_resolution/title"/>
 
             <brls:SelectorCell
-                id="resolutionSelector"
-                title="@i18n/moonlight/settings_tab/resolution/title"/>
-
-            <brls:SelectorCell
                 id="fpsSelector"
                 title="@i18n/moonlight/settings_tab/fps/title"/>
 
@@ -79,16 +75,6 @@
                 id="refFrameInvalidationToggle"
                 title="@i18n/moonlight/settings_tab/ref_frame_title"/>
 
-            <!-- MICROPHONE SETTINGS -->
-            <brls:BooleanCell
-                id="microphoneToggle"
-                title="@i18n/moonlight/settings_tab/microphone_enabled_title"/>
-
-            <brls:DetailCell
-                id="microphoneConfigureCell"
-                title="@i18n/moonlight/settings_tab/microphone_configure_title"/>
-
-            <!-- PERFORMANCE & DEBUG -->
             <brls:BooleanCell
                 id="showFpsToggle"
                 title="@i18n/moonlight/settings_tab/show_fps_title"/>
@@ -100,6 +86,23 @@
             <brls:SliderCell
                 id="settingsOpacitySlider"
                 title="@i18n/moonlight/settings_tab/settings_background_opacity"/>
+
+            <!-- MOONMIC -->
+            <brls:Header
+                title="@i18n/moonlight/settings_tab/moonmic_header"
+                subtitle="@i18n/moonlight/settings_tab/moonmic_requirement"/>
+
+            <brls:SelectorCell
+                id="resolutionSelector"
+                title="@i18n/moonlight/settings_tab/resolution/title"/>
+
+            <brls:BooleanCell
+                id="microphoneToggle"
+                title="@i18n/moonlight/settings_tab/microphone_enabled_title"/>
+
+            <brls:DetailCell
+                id="microphoneConfigureCell"
+                title="@i18n/moonlight/settings_tab/microphone_configure_title"/>
 
             <!-- CONTROLS -->
             <brls:Header title="@i18n/moonlight/settings_tab/controls_header"/>

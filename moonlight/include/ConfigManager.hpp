@@ -15,32 +15,16 @@
 // Streaming configuration structure (similar to legacy)
 struct StreamConfiguration
 {
-    int width                 = 1280;
+    int width                 = 1280; // Moonmic host monitor target
     int height                = 720;
     int streamWidth           = 960;
-    int streamHeight          = 544;
+    int streamHeight          = 544; // Encoded stream resolution
     int fps                   = 60;
     int bitrate               = -1; // Automatic bitrate
     int packetSize            = 1024;
     int streamingRemotely     = 0;
     int audioConfiguration    = 2; // AUDIO_CONFIGURATION_STEREO
     int supportedVideoFormats = 1; // VIDEO_FORMAT_H264
-
-    // Method to validate and adjust resolution for PS Vita
-    void validateAndAdjustResolution()
-    {
-#if defined(__PSV__) || defined(__psp2__) || defined(__PSP2__)
-        // Apply PS Vita restrictions: multiples of 16, minimum 64
-        width  = (width < 64) ? 64 : ((width + 15) / 16) * 16;
-        height = (height < 64) ? 64 : ((height + 15) / 16) * 16;
-
-        // Limit to reasonable resolutions for PS Vita
-        if (width > 1920)
-            width = 1920;
-        if (height > 1080)
-            height = 1080;
-#endif
-    }
 };
 
 struct RearTouchSettings

@@ -227,11 +227,43 @@ void ConfigManager::set(const std::string& section, const std::string& key, cons
 StreamConfiguration ConfigManager::getStreamConfig() const
 {
     StreamConfiguration config;
-    config.width        = std::stoi(get("stream", "width", "1280"));
-    config.height       = std::stoi(get("stream", "height", "720"));
+    config.width  = std::stoi(get("stream", "width", "1280"));
+    config.height = std::stoi(get("stream", "height", "720"));
+    // Older builds rounded Moonmic host resolutions to decoder-aligned dimensions.
+    if (config.width == 1152 && config.height == 656)
+        config.height = 648;
+    else if (config.width == 1280 && config.height == 544)
+        config.height = 540;
+    else if (config.width == 1360 && config.height == 768)
+        config.width = 1366;
+    else if (config.width == 1600 && config.height == 896)
+        config.height = 900;
+
     config.streamWidth  = std::stoi(get("stream", "stream_width", "960"));
     config.streamHeight = std::stoi(get("stream", "stream_height", "544"));
-    if (!((config.streamWidth == 960 && config.streamHeight == 544) || (config.streamWidth == 848 && config.streamHeight == 480)))
+
+    static const int supportedStreamResolutions[][2] = {
+        { 848, 480 },
+        { 960, 540 },
+        { 960, 544 },
+        { 1024, 576 },
+        { 1152, 648 },
+        { 1280, 540 },
+        { 1280, 720 },
+        { 1366, 768 },
+        { 1600, 900 },
+        { 1920, 1080 }
+    };
+    bool supportedResolution = false;
+    for (const auto& resolution : supportedStreamResolutions)
+    {
+        if (config.streamWidth == resolution[0] && config.streamHeight == resolution[1])
+        {
+            supportedResolution = true;
+            break;
+        }
+    }
+    if (!supportedResolution)
     {
         config.streamWidth  = 960;
         config.streamHeight = 544;

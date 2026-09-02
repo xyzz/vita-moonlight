@@ -179,17 +179,6 @@ extern uint32_t g_decode_count;
 
 extern volatile bool g_session_stopping;
 
-// ========================================
-// Streaming Configuration Constants
-// ========================================
-extern const int VITA_STREAM_WIDTH;
-extern const int VITA_STREAM_HEIGHT;
-extern const int VITA_STREAM_DEFAULT_FPS;
-extern const int VITA_STREAM_DEFAULT_BITRATE;
-extern const float VITA_STREAM_BITS_PER_PIXEL;
-extern const int VITA_STREAM_MIN_BITRATE;
-extern const int VITA_STREAM_MAX_BITRATE;
-
 // Function declarations
 void vitavideo_update_scaling_settings(int width, int height);
 void vitavideo_configure_screen_resolution(int stream_width);

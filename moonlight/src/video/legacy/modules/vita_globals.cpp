@@ -83,26 +83,6 @@ VideoStatusInfo g_video_status_info = { VITA_VIDEO_NOT_INIT };
 // Video settings snapshot
 // Defined elsewhere
 
-// ========================================
-// Streaming Configuration Constants
-// ========================================
-
-// PS Vita native resolution - ALWAYS used for streaming
-// regardless of user settings (settings control host monitor only)
-const int VITA_STREAM_WIDTH  = 960;
-const int VITA_STREAM_HEIGHT = 544;
-
-// Default streaming parameters
-const int VITA_STREAM_DEFAULT_FPS     = 60;
-const int VITA_STREAM_DEFAULT_BITRATE = 6000; // 6 Mbps
-
-// Bitrate calculation constants (for auto mode)
-const float VITA_STREAM_BITS_PER_PIXEL = 0.2f; // Conservative for H.264
-const int VITA_STREAM_MIN_BITRATE      = 5000; // 5 Mbps minimum
-const int VITA_STREAM_MAX_BITRATE      = 50000; // 50 Mbps maximum
-
-// ========================================
-
 // Features
 void vitavideo_update_scaling_settings(int width, int height)
 {

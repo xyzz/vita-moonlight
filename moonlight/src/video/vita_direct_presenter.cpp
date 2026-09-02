@@ -261,10 +261,15 @@ extern "C"
             oy = image_scaling.offset_y;
         }
 
+        const uint32_t storageWidth  = gxm_texture_get_storage_width(tex);
+        const uint32_t storageHeight = gxm_texture_get_storage_height(tex);
+        const float uMax             = storageWidth > 0 ? (float)gxm_texture_get_width(tex) / storageWidth : 1.0f;
+        const float vMax             = storageHeight > 0 ? (float)gxm_texture_get_height(tex) / storageHeight : 1.0f;
+
         s_vertices[0] = { ox, oy, 0.5f, 0.0f, 0.0f };
-        s_vertices[1] = { ox + dw, oy, 0.5f, 1.0f, 0.0f };
-        s_vertices[2] = { ox, oy + dh, 0.5f, 0.0f, 1.0f };
-        s_vertices[3] = { ox + dw, oy + dh, 0.5f, 1.0f, 1.0f };
+        s_vertices[1] = { ox + dw, oy, 0.5f, uMax, 0.0f };
+        s_vertices[2] = { ox, oy + dh, 0.5f, 0.0f, vMax };
+        s_vertices[3] = { ox + dw, oy + dh, 0.5f, uMax, vMax };
 
         NVGXMwindow* win = gxmGetWindow();
         if (!win || !win->context)

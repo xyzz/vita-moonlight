@@ -18,6 +18,13 @@ using namespace brls;
 namespace moonlight
 {
 
+namespace
+{
+
+    constexpr std::size_t UNSYNCED_FRAME_LIMIT = 61;
+
+}
+
 const std::vector<LanguageOption>& settings::supportedLanguages()
 {
     static const std::vector<LanguageOption> languages = {
@@ -78,6 +85,12 @@ void settings::saveSettingsToConfig()
         langIdx = 0;
     config.set("general", "language", languages[langIdx].locale);
     config.save();
+}
+
+void settings::applySwapInterval(int swapInterval)
+{
+    Application::setSwapInterval(swapInterval);
+    Application::setLimitedFPS(swapInterval == 0 ? UNSYNCED_FRAME_LIMIT : 0);
 }
 
 std::string settings::getLanguageFromConfig()

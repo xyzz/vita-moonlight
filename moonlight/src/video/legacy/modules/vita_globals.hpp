@@ -181,7 +181,6 @@ extern volatile bool g_session_stopping;
 
 // Function declarations
 void vitavideo_update_scaling_settings(int width, int height);
-void vitavideo_configure_screen_resolution(int stream_width);
 void yuv_write_canaries();
 bool yuv_check_canaries();
 uint64_t vita_monotonic_ms();

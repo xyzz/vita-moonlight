@@ -160,30 +160,6 @@ void vitavideo_update_scaling_settings(int width, int height)
     image_scaling.enabled        = true;
 }
 
-void vitavideo_configure_screen_resolution(int stream_width)
-{
-    // Configure screen resolution based on incoming stream width.
-    // FFmpeg path does not depend on any "sharpscale" feature, so we pick
-    // sensible defaults for common stream widths and fall back to the
-    // standard Vita resolution otherwise.
-    switch (stream_width)
-    {
-        case 1920:
-            SCREEN_WIDTH  = 1920;
-            SCREEN_HEIGHT = 1088; // aligned for decoder
-            break;
-        case 1280:
-            SCREEN_WIDTH  = 1280;
-            SCREEN_HEIGHT = 720;
-            break;
-        default:
-            SCREEN_WIDTH  = 960;
-            SCREEN_HEIGHT = 544;
-            break;
-    }
-    VITA_DEBUG_LOG("[Video] Configurada resolución de pantalla: %dx%d para stream %d", SCREEN_WIDTH, SCREEN_HEIGHT, stream_width);
-}
-
 void yuv_write_canaries()
 {
     if (!decoder_yuv_raw || decoder_yuv_total_alloc < 32)

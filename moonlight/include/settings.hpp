@@ -22,6 +22,7 @@ class settings
   public:
     static void loadSettingsFromConfig();
     static void saveSettingsToConfig();
+    static void applySwapInterval(int swapInterval);
     static std::string getLanguageFromConfig();
     static void applyLanguageEnv(const std::string& lang);
     static const std::vector<LanguageOption>& supportedLanguages();

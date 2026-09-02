@@ -343,24 +343,12 @@ int main(int argc, char* argv[])
     brls::Application::getWindowFocusChangedEvent()->subscribe(handleWindowFocusChanged);
 #endif
 
-    // Apply saved V-Sync (swap interval) and frame rate limit to main application menus
     {
         ConfigManager startupCfg;
         startupCfg.load();
         VideoSettings vs = startupCfg.getVideoSettings();
-        brls::Application::setSwapInterval(vs.swap_interval);
-        // When vsync is enabled (swap_interval > 0), hardware limits FPS to refresh rate
-        // When vsync is disabled (swap_interval = 0), use software limiter to prevent 100% CPU
-        if (vs.swap_interval == 0)
-        {
-            brls::Application::setLimitedFPS(61);
-            vita_log::info("[Main] Vsync OFF: software limiter set to 61 FPS (compensates overhead)");
-        }
-        else
-        {
-            brls::Application::setLimitedFPS(0); // Disable software limiter when vsync is enabled
-            vita_log::info("[Main] Vsync ON: hardware limits FPS to refresh rate (swapInterval=%d)", vs.swap_interval);
-        }
+        moonlight::settings::applySwapInterval(vs.swap_interval);
+        vita_log::info("[Main] Display timing: swapInterval=%d", vs.swap_interval);
         vita_log::info("[Main] FPS status enabled: %d", brls::Application::getFPSStatus());
     }
 

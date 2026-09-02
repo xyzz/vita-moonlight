@@ -76,10 +76,6 @@ extern "C" int vitavideo_setup(int videoFormat, int width, int height, int redra
 
         vitavideo_update_scaling_settings(width, height); // define image_scaling based on original resolution
 
-        uint32_t alignedW      = VITA_DECODER_RESOLUTION(width);
-        uint32_t alignedH      = VITA_DECODER_RESOLUTION(height);
-        size_t rowBytesAligned = (size_t)alignedW * 4;
-
         decoder_src_width            = width;
         decoder_src_height           = height;
         decoder_tried_direct_texture = false;
@@ -335,7 +331,11 @@ extern "C" int vitavideo_setup(int videoFormat, int width, int height, int redra
                     goto cleanup;
                 }
             }
-            VITA_DEBUG_LOG("[Video][INIT] Creadas 3 texturas %dx%d fmt=0x%08X", width, height, (unsigned)textureFormat);
+            VITA_DEBUG_LOG("[Video][INIT] Creadas 3 texturas visible=%dx%d storage=%ux%u fmt=0x%08X",
+                width, height,
+                gxm_texture_get_storage_width(frame_textures[0]),
+                gxm_texture_get_storage_height(frame_textures[0]),
+                (unsigned)textureFormat);
 
             if (!texturesOk)
             {

@@ -252,8 +252,9 @@ SettingsTab::SettingsTab()
         { 1280, 540 },
         { 1280, 720 },
         { 1366, 768 },
-        { 1600, 900 },
-        { 1920, 1080 }
+        // Higher modes build up decoder latency instead of sustaining the requested frame rate.
+        // {1600, 900},
+        // {1920, 1080}
     };
     std::vector<std::string> streamResolutions;
     streamResolutions.reserve(streamResolutionValues.size());
@@ -829,7 +830,7 @@ SettingsTab::SettingsTab()
             extern VideoSettings g_video_settings_snapshot;
             g_video_settings_snapshot.swap_interval = selected;
 
-            brls::Application::setSwapInterval(selected);
+            moonlight::settings::applySwapInterval(selected);
             brls::Application::notify(brls::getStr("moonlight/settings_tab/swap_interval/saved"));
         } });
 

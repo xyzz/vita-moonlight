@@ -13,9 +13,8 @@
 struct GxmTexture;
 
 // Resolution macros for PS Vita (legacy)
-#define ROUND_NEAREST_16(x) (vita_round(((double)(x)) / 16) * 16)
 #define VITA_DECODER_RESOLUTION_LOWER_BOUND(x) ((x) < 64 ? 64 : (x))
-#define VITA_DECODER_RESOLUTION(x) (VITA_DECODER_RESOLUTION_LOWER_BOUND(ROUND_NEAREST_16(x)))
+#define VITA_DECODER_RESOLUTION(x) (VITA_DECODER_RESOLUTION_LOWER_BOUND((((x) + 15) / 16) * 16))
 
 // Custom rounding feature for PS Vita
 static inline double vita_round(double x)

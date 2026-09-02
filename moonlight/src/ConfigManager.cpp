@@ -251,8 +251,9 @@ StreamConfiguration ConfigManager::getStreamConfig() const
         { 1280, 540 },
         { 1280, 720 },
         { 1366, 768 },
-        { 1600, 900 },
-        { 1920, 1080 }
+        // 1600x900 and 1920x1080 overload the Vita AVC decoder at streaming frame rates.
+        // {1600, 900},
+        // {1920, 1080}
     };
     bool supportedResolution = false;
     for (const auto& resolution : supportedStreamResolutions)

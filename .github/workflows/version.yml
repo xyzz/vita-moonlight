@@ -1,0 +1,131 @@
+name: Create release
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_mode:
+        description: How the next version is selected
+        required: true
+        default: auto
+        type: choice
+        options:
+          - auto
+          - manual
+      manual_bump:
+        description: Version change used in manual mode
+        required: true
+        default: patch
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    name: Update version and create tag
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Checkout default branch
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          fetch-depth: 0
+          token: ${{ secrets.RELEASE_TOKEN || github.token }}
+
+      - name: Test release helper
+        run: python3 -m unittest discover -s tests
+
+      - name: Calculate and update version
+        id: version
+        env:
+          RELEASE_MODE: ${{ inputs.release_mode }}
+          MANUAL_BUMP: ${{ inputs.manual_bump }}
+        run: |
+          set -euo pipefail
+          git fetch --force --tags origin
+          previous_tag="$(python3 release.py latest)"
+          automatic_version="$(python3 release.py next --bump auto)"
+
+          if [ "$RELEASE_MODE" = "manual" ]; then
+            version="$(python3 release.py next --bump "$MANUAL_BUMP")"
+            selection="manual ($MANUAL_BUMP)"
+          else
+            version="$automatic_version"
+            selection="auto"
+          fi
+
+          python3 release.py update "$version" --previous "$previous_tag"
+          python3 release.py verify "$version"
+
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Preparing Moonlight Vita $version from ${previous_tag:-the initial release}"
+
+          current_version="${previous_tag:-none}"
+          {
+            echo "## Release version"
+            echo
+            echo "| Current | Automatic suggestion | Selection | Release |"
+            echo "| --- | --- | --- | --- |"
+            echo "| \`$current_version\` | \`$automatic_version\` | $selection | \`$version\` |"
+            echo
+            python3 release.py notes "$version"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Commit release files
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          ACTOR_ID: ${{ github.actor_id }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          release_files=(
+            CMakeLists.txt
+            CHANGELOG.md
+            psv/sce_sys/livearea/contents/template.xml
+            resources/changeinfo.xml
+            sce_sys/livearea/contents/template.xml
+          )
+
+          if git diff --quiet -- "${release_files[@]}"; then
+            echo "Release files already describe $VERSION"
+            exit 0
+          fi
+
+          git config user.name "$GITHUB_ACTOR"
+          git config user.email "${ACTOR_ID}+${GITHUB_ACTOR}@users.noreply.github.com"
+          git add -- "${release_files[@]}"
+          git commit -m "chore(release): prepare $VERSION"
+          git push origin "HEAD:$DEFAULT_BRANCH"
+
+      - name: Create release tag
+        env:
+          ACTOR_ID: ${{ github.actor_id }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          if git rev-parse --verify --quiet "refs/tags/$VERSION"; then
+            echo "Tag $VERSION already exists" >&2
+            exit 1
+          fi
+          git config user.name "$GITHUB_ACTOR"
+          git config user.email "${ACTOR_ID}+${GITHUB_ACTOR}@users.noreply.github.com"
+          git tag -a "$VERSION" -m "Moonlight Vita $VERSION"
+          git push origin "refs/tags/$VERSION"
+
+  release:
+    name: Build and publish
+    needs: prepare
+    uses: ./.github/workflows/release.yml
+    with:
+      version: ${{ needs.prepare.outputs.version }}
+    secrets: inherit

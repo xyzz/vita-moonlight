@@ -1,0 +1,127 @@
+name: Build and publish release
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: Existing release tag to build
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Existing release tag (leave empty to use the latest)
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publish-${{ inputs.version || github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build Vita package
+    runs-on: ubuntu-latest
+    env:
+      VITASDK: ${{ github.workspace }}/vitasdk
+      GH_TOKEN: ${{ secrets.RELEASE_TOKEN || github.token }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Select release tag
+        id: release
+        env:
+          REQUESTED_VERSION: ${{ inputs.version }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          set -euo pipefail
+          git fetch --force --tags origin
+          git fetch origin "$DEFAULT_BRANCH"
+
+          version="$REQUESTED_VERSION"
+          if [ -z "$version" ]; then
+            version="$(python3 release.py latest)"
+          fi
+          if ! [[ "$version" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+            echo "Invalid release version: $version" >&2
+            exit 1
+          fi
+          if ! git rev-parse --verify --quiet "refs/tags/$version"; then
+            echo "Release tag $version does not exist" >&2
+            exit 1
+          fi
+          if ! git merge-base --is-ancestor "$version" "origin/$DEFAULT_BRANCH"; then
+            echo "Tag $version is not part of the default branch $DEFAULT_BRANCH" >&2
+            exit 1
+          fi
+
+          git checkout --detach "$version"
+          git submodule sync --recursive
+          git submodule update --init --recursive
+          python3 release.py verify "$version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Install host tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential cmake ninja-build git curl wget unzip \
+            libarchive-tools pkg-config fakeroot patch python3 bzip2 xz-utils
+
+      - name: Install VitaSDK
+        run: |
+          set -euo pipefail
+          git clone --depth 1 https://github.com/vitasdk/vdpm.git "$RUNNER_TEMP/vdpm"
+          "$RUNNER_TEMP/vdpm/bootstrap-vitasdk.sh" --install-dir "$VITASDK"
+          echo "$VITASDK/bin" >> "$GITHUB_PATH"
+
+      - name: Install project dependencies
+        run: ./scripts/prepare/install_all.sh
+
+      - name: Build release VPK
+        run: ./makepsv --gxm --release --clean --no-deploy
+
+      - name: Prepare release asset and notes
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          cp cmake-build-psv-linux-gxm/moonlight.vpk \
+            "dist/moonlight.vpk"
+          python3 release.py notes "$VERSION" > dist/release-notes.md
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: moonlight-vita-${{ steps.release.outputs.version }}
+          path: dist/moonlight_vita-${{ steps.release.outputs.version }}.vpk
+          if-no-files-found: error
+
+      - name: Publish GitHub release
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          set -euo pipefail
+          asset="dist/moonlight.vpk"
+          if gh release view "$VERSION" >/dev/null 2>&1; then
+            gh release upload "$VERSION" "$asset" --clobber
+            gh release edit "$VERSION" \
+              --title "$VERSION" \
+              --notes-file dist/release-notes.md \
+              --latest
+          else
+            gh release create "$VERSION" "$asset" \
+              --verify-tag \
+              --title "$VERSION" \
+              --notes-file dist/release-notes.md \
+              --latest
+          fi

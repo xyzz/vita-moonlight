@@ -62,6 +62,8 @@ fi
 # vita-makepkg still defaults to $VITASDK/bin/pacman.
 if [ -x "$VITASDK/bin/pacman" ]; then
     PACMAN="$VITASDK/bin/pacman"
+elif [ -x "$VITASDK/libexec/vdpm/pacman" ]; then
+    PACMAN="$VITASDK/libexec/vdpm/pacman"
 elif [ -x "$VITASDK/share/vdpm/msys/usr/bin/pacman.exe" ]; then
     PACMAN="$VITASDK/share/vdpm/msys/usr/bin/pacman.exe"
 else

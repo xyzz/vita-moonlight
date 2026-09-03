@@ -1,0 +1,63 @@
+#!/usr/bin/env bash
+# Legacy desktop build experiment. See tools/README.md before using it.
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
+
+if [ ! -f "/usr/x86_64-w64-mingw32/include/curl/curl.h" ] || [ ! -f "/usr/x86_64-w64-mingw32/lib/libcurl.a" ]; then
+    read -r -p "curl for MinGW is missing. Install it now? [Y/n] " response
+    if [[ "$response" =~ ^[yY]?$ ]]; then
+        "$SCRIPT_DIR/install_openssl_and_curl_mingw.sh" "$PROJECT_ROOT/openssl-mingw"
+    else
+        echo "Continuing without curl. The build may fail."
+    fi
+fi
+
+if [ ! -f "/usr/x86_64-w64-mingw32/include/expat.h" ] || [ ! -f "/usr/x86_64-w64-mingw32/lib/libexpat.dll.a" ]; then
+    read -r -p "Expat for MinGW is missing. Install it now? [Y/n] " response
+    if [[ "$response" =~ ^[yY]?$ ]]; then
+        "$SCRIPT_DIR/install_expat_mingw.sh"
+    else
+        echo "Continuing without Expat. The build may fail."
+    fi
+fi
+BUILD_DIR="$PROJECT_ROOT/build_mingw"
+OPENSSL_DIR="$PROJECT_ROOT/openssl-mingw"
+
+if [[ ! -d "$OPENSSL_DIR" ]]; then
+    printf 'OpenSSL is missing from %s.\n' "$OPENSSL_DIR"
+    read -r -p "Build it now? [y/N] " response
+    if [[ "$response" =~ ^[yY]$ ]]; then
+        "$SCRIPT_DIR/install_openssl_and_curl_mingw.sh" "$OPENSSL_DIR"
+    else
+        echo "OpenSSL is required for pairing support."
+        exit 1
+    fi
+fi
+
+if [[ "${1:-}" == "clean" ]]; then
+    echo "Removing the previous MinGW build..."
+    rm -rf "$BUILD_DIR"
+fi
+
+mkdir -p "$BUILD_DIR"
+cd "$BUILD_DIR"
+
+export PATH=/usr/x86_64-w64-mingw32/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+if [[ ! -f Makefile ]]; then
+    echo "OPENSSL_ROOT_DIR=$OPENSSL_DIR"
+    echo "OPENSSL_INCLUDE_DIR=$OPENSSL_DIR/include"
+
+    cmake "$PROJECT_ROOT" \
+      -DPLATFORM_DESKTOP=ON \
+      -DCMAKE_BUILD_TYPE=Release \
+      -DCMAKE_TOOLCHAIN_FILE="$PROJECT_ROOT/third_party/borealis/library/cmake/MinGWCross.cmake" \
+      -DCMAKE_MAKE_PROGRAM="$(command -v make)" \
+      -DOPENSSL_ROOT_DIR="$OPENSSL_DIR" \
+      -DOPENSSL_INCLUDE_DIR="$OPENSSL_DIR/include"
+fi
+
+make -j"$(nproc)"

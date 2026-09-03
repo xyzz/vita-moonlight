@@ -7,7 +7,7 @@ source "${ROOTDIR}/scripts/vita-host.sh"
 vita_host_init || exit 1
 BUILD_DIR="$(vita_build_directory "${VITA_BACKEND:-gxm}")"
 
-DUMP_SCRIPT="./dump_psp2core.sh"
+DUMP_SCRIPT="./tools/vita/dump_psp2core.sh"
 # Prefer the unstripped ELF produced by the build (contains DWARF).
 VELF_UNPACKED="${BUILD_DIR}/moonlight_vita"
 VELF_PKG="${BUILD_DIR}/moonlight.velf"
@@ -35,7 +35,7 @@ echo
 # Run the existing dump script and capture output (overwrite previous)
 "$DUMP_SCRIPT" 2>&1 | tee "$OUTDIR/dump_raw.txt" || true
 
-# Find most recent psp2 dump file if present. New dump_psp2core.sh may preserve the
+# Find most recent psp2 dump file if present. The dump helper may preserve the
 # remote filename (psp2core-*.psp2dmp) when KEEP_PSP2DMP=1 or use the temporary
 # name psp2core_tmp.psp2dmp otherwise. Accept both.
 LATEST_DUMP=$(ls -1t psp2core-*.psp2dmp 2>/dev/null | head -n1 || true)

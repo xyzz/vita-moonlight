@@ -1,0 +1,85 @@
+name: Bug report
+description: Report a problem with Moonlight Vita
+title: "[Bug] "
+body:
+  - type: input
+    id: moonlight_version
+    attributes:
+      label: Moonlight Vita version
+      placeholder: "1.0.0"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: vita_model
+    attributes:
+      label: Device
+      options:
+        - PS Vita 1000
+        - PS Vita 2000
+        - PSTV
+    validations:
+      required: true
+
+  - type: input
+    id: host_version
+    attributes:
+      label: Host software and version
+      description: Sunshine or another compatible GameStream host
+      placeholder: "Sunshine 2026.x"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: video_backend
+    attributes:
+      label: Video backend
+      options:
+        - FFmpeg
+        - Legacy
+        - Both
+        - Not applicable
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What happened?
+      description: Include the stream resolution, frame rate and bitrate when relevant.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open...
+        2. Select...
+        3. Start the stream...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Enable file logging in settings and attach ux0:data/moonlight/moonlight.log.
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      options:
+        - label: I tested with the latest available release.
+          required: true
+        - label: I checked that the same issue has not already been reported.
+          required: true

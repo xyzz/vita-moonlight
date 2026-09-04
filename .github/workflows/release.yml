@@ -30,7 +30,7 @@ jobs:
       GH_TOKEN: ${{ secrets.RELEASE_TOKEN || github.token }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7.0.1
         with:
           ref: ${{ github.event.repository.default_branch }}
           fetch-depth: 0
@@ -100,7 +100,7 @@ jobs:
           python3 release.py notes "$VERSION" > dist/release-notes.md
 
       - name: Upload build artifact
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v7.0.1
         with:
           name: moonlight-vita-${{ steps.release.outputs.version }}
           path: dist/moonlight_vita-${{ steps.release.outputs.version }}.vpk

@@ -3,15 +3,7 @@
 #include <psp2/touch.h>
 #include <stdint.h>
 
-// Enumeration of touch modes
-enum TouchscreenMode
-{
-    TOUCHSCREEN_MODE_OFF            = 0, // No touch input
-    TOUCHSCREEN_MODE_TRACKPAD       = 1, // Trackpad (relative movement)
-    TOUCHSCREEN_MODE_DS4_TOUCHPAD   = 2, // DS4 touchpad (only with PS4 gamepad)
-    TOUCHSCREEN_MODE_MOUSE_ABSOLUTE = 3, // Mouse absoluto
-    TOUCHSCREEN_MODE_TABLET         = 4 // Tablet/Sunshine
-};
+#include "controller/touchscreen_modes.hpp"
 
 class TouchInputManager
 {

@@ -1,0 +1,10 @@
+#pragma once
+
+enum TouchscreenMode
+{
+    TOUCHSCREEN_MODE_OFF            = 0,
+    TOUCHSCREEN_MODE_TRACKPAD       = 1,
+    TOUCHSCREEN_MODE_DS4_TOUCHPAD   = 2,
+    TOUCHSCREEN_MODE_MOUSE_ABSOLUTE = 3,
+    TOUCHSCREEN_MODE_TABLET         = 4
+};

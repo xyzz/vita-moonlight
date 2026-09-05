@@ -19,6 +19,31 @@
 
 #include "debug.hpp"
 
+namespace
+{
+
+constexpr int TOUCHSCREEN_MODE_SCHEMA = 2;
+
+int migrateLegacyTouchscreenMode(int mode)
+{
+    switch (mode)
+    {
+        case 0:
+            return TOUCHSCREEN_MODE_OFF;
+        case 1:
+            return TOUCHSCREEN_MODE_DS4_TOUCHPAD;
+        case 2:
+            return TOUCHSCREEN_MODE_MOUSE_ABSOLUTE;
+        case 3:
+        case 4:
+            return TOUCHSCREEN_MODE_TABLET;
+        default:
+            return TOUCHSCREEN_MODE_TRACKPAD;
+    }
+}
+
+}
+
 // Out-of-class definition for static std::string ConfigManager::getConfigPath();
 #ifdef _WIN32
 #include <windows.h>
@@ -335,28 +360,41 @@ VideoSettings ConfigManager::getVideoSettings() const
     settings.enable_vita_vblank_wait       = get("video", "enable_vita_vblank_wait", "false") == "true";
     settings.enable_motion_controls        = get("video", "enable_motion_controls", "false") == "true";
     settings.enable_double_tap_sprint      = get("video", "enable_double_tap_sprint", "false") == "true";
-    settings.absolute_mouse                = get("video", "absolute_mouse", "false") == "true";
-    std::string touchscreenStr             = get("video", "touchscreen_mode", "1");
-    if (touchscreenStr == "true")
+    const bool legacyAbsoluteMouse         = get("video", "absolute_mouse", "false") == "true";
+    const std::string touchscreenStr       = get("video", "touchscreen_mode", "");
+    const std::string touchscreenSchema    = get("video", "touchscreen_mode_schema", "");
+    const bool hasTrackpadConfiguration    = !get("trackpad", "pointer_speed", "").empty();
+    const bool usesCurrentTouchscreenIds   = touchscreenSchema == std::to_string(TOUCHSCREEN_MODE_SCHEMA) || hasTrackpadConfiguration;
+
+    if (touchscreenSchema != std::to_string(TOUCHSCREEN_MODE_SCHEMA) && legacyAbsoluteMouse)
     {
-        settings.touchscreen_mode = 3;
+        settings.touchscreen_mode = TOUCHSCREEN_MODE_MOUSE_ABSOLUTE;
+    }
+    else if (touchscreenStr.empty())
+    {
+        settings.touchscreen_mode = TOUCHSCREEN_MODE_TRACKPAD;
+    }
+    else if (touchscreenStr == "true")
+    {
+        settings.touchscreen_mode = TOUCHSCREEN_MODE_MOUSE_ABSOLUTE;
     }
     else if (touchscreenStr == "false")
     {
-        settings.touchscreen_mode = 0;
+        settings.touchscreen_mode = TOUCHSCREEN_MODE_OFF;
     }
     else
     {
         try
         {
-            settings.touchscreen_mode = std::stoi(touchscreenStr);
+            const int storedMode      = std::stoi(touchscreenStr);
+            settings.touchscreen_mode = usesCurrentTouchscreenIds ? storedMode : migrateLegacyTouchscreenMode(storedMode);
         }
         catch (...)
         {
-            settings.touchscreen_mode = 1;
+            settings.touchscreen_mode = TOUCHSCREEN_MODE_TRACKPAD;
         }
     }
-    settings.touchscreen_mode             = std::max(0, std::min(4, settings.touchscreen_mode));
+    settings.touchscreen_mode             = std::max(static_cast<int>(TOUCHSCREEN_MODE_OFF), std::min(static_cast<int>(TOUCHSCREEN_MODE_TABLET), settings.touchscreen_mode));
     settings.enable_network_optimizations = get("video", "enable_network_optimizations", "true") == "true";
     settings.double_tap_sprint_step_time  = std::stoi(get("video", "double_tap_sprint_step_time", "200"));
     settings.motion_controls_scalar_x     = std::stof(get("video", "motion_controls_scalar_x", "1.2"));
@@ -465,8 +503,9 @@ void ConfigManager::setVideoSettings(const VideoSettings& settings)
     set("video", "enable_vita_vblank_wait", settings.enable_vita_vblank_wait ? "true" : "false");
     set("video", "enable_motion_controls", settings.enable_motion_controls ? "true" : "false");
     set("video", "enable_double_tap_sprint", settings.enable_double_tap_sprint ? "true" : "false");
-    set("video", "absolute_mouse", settings.absolute_mouse ? "true" : "false");
     set("video", "touchscreen_mode", std::to_string(settings.touchscreen_mode));
+    set("video", "touchscreen_mode_schema", std::to_string(TOUCHSCREEN_MODE_SCHEMA));
+    data["video"].erase("absolute_mouse");
     set("video", "enable_network_optimizations", settings.enable_network_optimizations ? "true" : "false");
     set("video", "double_tap_sprint_step_time", std::to_string(settings.double_tap_sprint_step_time));
     set("video", "motion_controls_scalar_x", std::to_string(settings.motion_controls_scalar_x));

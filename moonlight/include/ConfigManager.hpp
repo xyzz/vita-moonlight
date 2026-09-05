@@ -11,6 +11,7 @@
 #include "../../third_party/moonmic/moonmic.h" // For MOONMIC_DEFAULT_* constants
 #include "controller/input_types.hpp"
 #include "controller/special_inputs.hpp"
+#include "controller/touchscreen_modes.hpp"
 
 // Streaming configuration structure (similar to legacy)
 struct StreamConfiguration
@@ -61,9 +62,8 @@ struct VideoSettings
     bool enable_vita_vblank_wait       = false;
     bool enable_motion_controls        = false;
     bool enable_double_tap_sprint      = false;
-    bool absolute_mouse                = false;
     bool enable_network_optimizations  = true; // Network optimizations (IDR smart, pacing, etc.)
-    int touchscreen_mode               = 1; // 0=Off, 1=Trackpad relativo, 2=DS4 Touchpad, 3=Mouse Absoluto, 4=Tableta Multitouch
+    int touchscreen_mode               = TOUCHSCREEN_MODE_TRACKPAD;
     int double_tap_sprint_step_time    = 200;
     float motion_controls_scalar_x     = 1.2f;
     float motion_controls_scalar_y     = 0.8f;

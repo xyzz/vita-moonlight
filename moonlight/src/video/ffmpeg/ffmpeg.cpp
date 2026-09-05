@@ -32,9 +32,12 @@ extern "C"
 #include <psp2/kernel/processmgr.h>
 #include <psp2/kernel/threadmgr.h>
 
-#include <borealis/core/application.hpp>
-
+// Limelight button macros must be undefined before Borealis declares ControllerButton.
+// clang-format off
 #include "legacy/modules/vita_globals.hpp"
+#include <borealis/core/application.hpp>
+// clang-format on
+
 #include "network/NetworkOptimizations.hpp"
 #include "session/vita_session.hpp"
 #include "video/VitaVideoRenderer.hpp"

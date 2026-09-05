@@ -122,10 +122,97 @@ jobs:
           git tag -a "$VERSION" -m "Moonlight Vita $VERSION"
           git push origin "refs/tags/$VERSION"
 
-  release:
+  publish:
     name: Build and publish
     needs: prepare
-    uses: ./.github/workflows/release.yml
-    with:
-      version: ${{ needs.prepare.outputs.version }}
-    secrets: inherit
+    runs-on: ubuntu-latest
+    env:
+      VITASDK: ${{ github.workspace }}/vitasdk
+      GH_TOKEN: ${{ secrets.RELEASE_TOKEN || github.token }}
+      VERSION: ${{ needs.prepare.outputs.version }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7.0.1
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Checkout release tag
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          set -euo pipefail
+          git fetch --force --tags origin
+          git fetch origin "$DEFAULT_BRANCH"
+
+          if ! [[ "$VERSION" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+            echo "Invalid release version: $VERSION" >&2
+            exit 1
+          fi
+          if ! git rev-parse --verify --quiet "refs/tags/$VERSION"; then
+            echo "Release tag $VERSION does not exist" >&2
+            exit 1
+          fi
+          if ! git merge-base --is-ancestor "$VERSION" "origin/$DEFAULT_BRANCH"; then
+            echo "Tag $VERSION is not part of the default branch $DEFAULT_BRANCH" >&2
+            exit 1
+          fi
+
+          git checkout --detach "$VERSION"
+          git submodule sync --recursive
+          git submodule update --init --recursive
+          python3 release.py verify "$VERSION"
+
+      - name: Install host tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential cmake ninja-build git curl wget unzip \
+            libarchive-tools pkg-config fakeroot patch python3 bzip2 xz-utils
+
+      - name: Install VitaSDK
+        run: |
+          set -euo pipefail
+          git clone --depth 1 https://github.com/vitasdk/vdpm.git "$RUNNER_TEMP/vdpm"
+          "$RUNNER_TEMP/vdpm/bootstrap-vitasdk.sh" --install-dir "$VITASDK"
+          echo "$VITASDK/bin" >> "$GITHUB_PATH"
+
+      - name: Install project dependencies
+        run: ./scripts/prepare/install_all.sh
+
+      - name: Build release VPK
+        run: ./makepsv --gxm --release --clean --no-deploy
+
+      - name: Prepare release asset and notes
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          cp cmake-build-psv-linux-gxm/moonlight.vpk \
+            "dist/moonlight.vpk"
+          python3 release.py notes "$VERSION" > dist/release-notes.md
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: moonlight-vita-${{ needs.prepare.outputs.version }}
+          path: dist/moonlight_vita-${{ needs.prepare.outputs.version }}.vpk
+          if-no-files-found: error
+
+      - name: Publish GitHub release
+        run: |
+          set -euo pipefail
+          asset="dist/moonlight.vpk"
+          if gh release view "$VERSION" >/dev/null 2>&1; then
+            gh release upload "$VERSION" "$asset" --clobber
+            gh release edit "$VERSION" \
+              --title "$VERSION" \
+              --notes-file dist/release-notes.md \
+              --latest
+          else
+            gh release create "$VERSION" "$asset" \
+              --verify-tag \
+              --title "$VERSION" \
+              --notes-file dist/release-notes.md \
+              --latest
+          fi

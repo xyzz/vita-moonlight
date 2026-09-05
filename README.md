@@ -23,7 +23,7 @@ Embedded. It streams games and applications from a Sunshine-compatible host.
 
 ## Installation
 
-1. Copy `moonlight.vpk` to the Vita.
+1. Download `moonlight.vpk` from the release page and copy it to the Vita.
 2. Install the package with VitaShell.
 3. Start Moonlight from LiveArea and pair it with the host.
 

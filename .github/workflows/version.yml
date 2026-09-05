@@ -189,14 +189,14 @@ jobs:
           set -euo pipefail
           mkdir -p dist
           cp cmake-build-psv-linux-gxm/moonlight.vpk \
-            "dist/moonlight.vpk"
+            dist/moonlight.vpk
           python3 release.py notes "$VERSION" > dist/release-notes.md
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v7.0.1
         with:
           name: moonlight-vita-${{ needs.prepare.outputs.version }}
-          path: dist/moonlight_vita-${{ needs.prepare.outputs.version }}.vpk
+          path: dist/moonlight.vpk
           if-no-files-found: error
 
       - name: Publish GitHub release

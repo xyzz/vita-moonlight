@@ -31,6 +31,7 @@ backend_suffix="gxm"
 [ "$USE_GXM" = "OFF" ] && backend_suffix="gl"
 BUILD_DIR="$(vita_build_directory "$backend_suffix")"
 EBOOT_PATH="$BUILD_DIR/moonlight.self"
+VPK_PATH="$BUILD_DIR/moonlight.vpk"
 
 vita_require_tools cmake git make pkg-config curl sed grep || exit 2
 vita_require_sdk || exit 2
@@ -52,7 +53,13 @@ if [ ! -f "$EBOOT_PATH" ]; then
     exit 5
 fi
 
+if [ ! -f "$VPK_PATH" ]; then
+    echo "[makefast] $VPK_PATH was not produced." >&2
+    exit 5
+fi
+
 echo "[makefast] Build successful: $EBOOT_PATH"
+echo "[makefast] VPK: $VPK_PATH"
 [ "$DO_DEPLOY" -eq 0 ] && exit 0
 
 IP_FILE="$(pwd)/ip_vita.txt"
@@ -67,7 +74,7 @@ if [ -z "$PSVITAIP" ]; then
 fi
 TITLEID="$(vita_title_id)"
 if [ -z "$TITLEID" ]; then
-    echo "[makefast] Could not read PSN_TITLE_ID from CMakeLists.txt." >&2
+    echo "[makefast] Could not read TITLE_ID from CMakeLists.txt." >&2
     exit 6
 fi
 

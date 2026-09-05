@@ -236,7 +236,7 @@ vita_print_environment() {
 }
 
 vita_title_id() {
-    sed -nE 's/.*set\(PSN_TITLE_ID[[:space:]]+"?([^" )]+)"?.*/\1/p' CMakeLists.txt | head -n1
+    sed -nE 's/.*set\(TITLE_ID[[:space:]]+"?([^" )]+)"?.*/\1/p' CMakeLists.txt | head -n1
 }
 
 vita_ping() {

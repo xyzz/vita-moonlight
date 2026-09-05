@@ -46,8 +46,8 @@ set(VERSION_MAJOR "1")
 set(VERSION_MINOR "0")
 set(VERSION_ALTER "0")
 set(VERSION_BUILD "0")
-set(PSN_TITLE_ID  "MNLHTVITA")
-set(PSN_VERSION  "01.00")
+set(TITLE_ID "XYZZ00002")
+set(PSN_VERSION "01.00")
 set(PROJECT_AUTHOR "AorsiniYT")
 set(PROJECT_ICON ${CMAKE_CURRENT_SOURCE_DIR}/resources/img/icon.jpg)
 set(PROJECT_RESOURCES ${CMAKE_CURRENT_SOURCE_DIR}/resources)
@@ -60,6 +60,7 @@ set(USE_MBEDTLS ON CACHE BOOL "Use MbedTLS instead of OpenSSL" FORCE)
 
 add_subdirectory(third_party)
 
+# Vita libc does not export flockfile/funlockfile.
 if(PLATFORM_PSV)
     if(TARGET fmt)
         message(STATUS "Applying PSV patch to fmt: forcing fallback file handling (no flockfile)")
@@ -188,7 +189,7 @@ elseif (PLATFORM_PSV)
     if (USE_VITA_SHARK)
         list(APPEND PSV_ASSETS_FILES "${CMAKE_BINARY_DIR}/vendor/SceShaccCg" module)
     endif ()
-    vita_create_vpk(${PROJECT_NAME}.vpk ${PSN_TITLE_ID} ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}.self
+    vita_create_vpk(${PROJECT_NAME}.vpk ${TITLE_ID} ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}.self
             VERSION ${PSN_VERSION}
             NAME ${TITLE}
             FILE ${PSV_ASSETS_FILES}

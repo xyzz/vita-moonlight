@@ -9,7 +9,7 @@ BUILD_DIR="$(vita_build_directory "${VITA_BACKEND:-gxm}")"
 
 DUMP_SCRIPT="./tools/vita/dump_psp2core.sh"
 # Prefer the unstripped ELF produced by the build (contains DWARF).
-VELF_UNPACKED="${BUILD_DIR}/moonlight_vita"
+VELF_UNPACKED="${BUILD_DIR}/moonlight"
 VELF_PKG="${BUILD_DIR}/moonlight.velf"
 if [ -f "$VELF_UNPACKED" ]; then
     SYMFILE="$VELF_UNPACKED"
@@ -252,7 +252,7 @@ if OBJDUMP and os.path.exists(OBJDUMP):
     except Exception:
         objdump_text = ''
 
-# extract module mappings like: 0x81aca0ab (moonlight_vita@1 + 0xa8f0ab
+# extract module mappings like: 0x81aca0ab (moonlight@1 + 0xa8f0ab
 module_bases = {}
 for m in re.finditer(r'(0x[0-9a-fA-F]+) \(([^@\s]+)@(\d+) \+ (0x[0-9a-fA-F]+)', raw):
     addr_s, modname, modid, off_s = m.group(1), m.group(2), m.group(3), m.group(4)
@@ -335,7 +335,7 @@ with open(REPORT, 'a') as rep:
             rep.write(f'  Assigned module: {modname} base={fmt_hex(base)}\n')
             offset = addr_val - base
             rep.write(f'  Module offset: {fmt_hex(offset)}\n')
-            if 'moonlight_vita' in modname:
+            if 'moonlight' in modname:
                 if VELF:
                     # map to local ELF using ELF_MODULE_BASE + offset
                     velf_addr = ELF_MODULE_BASE + offset
@@ -357,7 +357,7 @@ with open(REPORT, 'a') as rep:
                         out = try_cmd(['arm-vita-eabi-objdump','-D','-S','--start-address='+hex(start),'--stop-address='+hex(stop), VELF], timeout=8)
                         rep.write(out + '\n')
                 else:
-                    rep.write('  moonlight_vita module assigned but no local ELF available to resolve DWARF.\n')
+                    rep.write('  moonlight module assigned but no local ELF available to resolve DWARF.\n')
             else:
                 # no local ELF available — try nm_all for nearest symbol
                 rep.write('  No local ELF for this module. Nearest global symbols:\n')
@@ -590,8 +590,8 @@ with open(REPORT, 'a') as rep:
                         runtime_candidates = []
                         for modkey, base in module_bases.items():
                             if base is None: continue
-                            # only consider moonlight_vita modules for mapping into our VELF
-                            if not modkey.startswith('moonlight_vita'):
+                            # only consider moonlight modules for mapping into our VELF
+                            if not modkey.startswith('moonlight'):
                                 continue
                             # runtime = module_base + (call_addr - ELF_MODULE_BASE)
                             try:

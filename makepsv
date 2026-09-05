@@ -68,7 +68,7 @@ backend_suffix="gxm"
 BUILD_DIR="$(vita_build_directory "$backend_suffix")"
 VPK_PATH="$BUILD_DIR/moonlight.vpk"
 
-if ! vita_require_tools cmake git make pkg-config curl sed grep find; then
+if ! vita_require_tools cmake git make pkg-config curl sed grep; then
     exit 3
 fi
 if ! vita_require_sdk; then
@@ -102,17 +102,10 @@ build_project() {
 }
 
 find_vpk() {
-    if [ -f "$VPK_PATH" ]; then
-        return 0
+    if [ ! -f "$VPK_PATH" ]; then
+        echo "[!] $VPK_PATH was not produced." >&2
+        return 1
     fi
-    local found
-    found="$(find "$BUILD_DIR" -maxdepth 1 -type f -name '*.vpk' -print -quit 2>/dev/null)"
-    if [ -n "$found" ]; then
-        VPK_PATH="$found"
-        return 0
-    fi
-    echo "[!] No VPK was produced in $BUILD_DIR" >&2
-    return 1
 }
 
 deploy_to_vita() {
@@ -137,12 +130,11 @@ deploy_to_vita() {
         return 1
     fi
 
-    local title_id vpk_name
+    local title_id
     title_id="$(vita_title_id)"
-    vpk_name="moonlight.vpk"
-    echo "[+] Uploading $VPK_PATH to ux0:/ABM/$vpk_name..."
+    echo "[+] Uploading $VPK_PATH to ux0:/ABM/moonlight.vpk..."
     curl -sSf -m 10 -Q "MKD ux0:/ABM" "ftp://${vita_ip}:${VITA_PORT}/" 2>/dev/null || true
-    curl --ftp-method nocwd -T "$VPK_PATH" "ftp://${vita_ip}:${VITA_PORT}/ux0:/ABM/$vpk_name" --connect-timeout 10 || return 1
+    curl --ftp-method nocwd -T "$VPK_PATH" "ftp://${vita_ip}:${VITA_PORT}/ux0:/ABM/moonlight.vpk" --connect-timeout 10 || return 1
     echo "launch VITASHELL" | nc "$vita_ip" "$VITA_CONTROL_PORT" >/dev/null 2>&1 || true
     echo "[+] VPK uploaded. TITLE_ID=${title_id:-unknown}"
 }

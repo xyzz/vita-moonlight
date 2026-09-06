@@ -1,107 +1,91 @@
+## 1.0.0
+
+### Added
+
+- Replaced the legacy interface with Borealis.
+- Added FFmpeg-vita hardware decoding and direct GXM presentation.
+- Added 480p through 768p stream modes, automatic bitrate and in-stream display controls.
+- Added front and rear touch zones, gyroscope settings and configurable shortcuts.
+- Added legacy and modern virtual keyboards with selectable layouts.
+- Added Moonmic microphone forwarding, diagnostics and host monitor resolution control.
+- Added Japanese, Brazilian Portuguese and Traditional Chinese translations.
+
+### Fixed
+
+- Resynchronize stale decoder output instead of accumulating playback delay.
+- Handle variable-size Opus frames and restore local audio playback.
+- Keep active touch zones separate from mouse and tablet input.
+- Migrate absolute mouse settings from earlier releases.
+- Reconnect the stream and restore controller state after application resume.
+
+### Build
+
+- Use the same build scripts on Linux, WSL and Windows/MSYS2.
+- Install VitaSDK packages and the pinned FFmpeg-vita fork with `scripts/prepare/install_all.sh`.
+- Apply the Borealis Vita patch during CMake configuration.
+
+Full Changelog: `0.13.2...1.0.0`
+
 ## 0.13.2
 
-* added PS button capture
-  - when enabled, double-pressing the PS button will open the menu, single press is passed as PS/Xbox button to Sunshine
-  - This required disabling the safe (-s) flag in `vita-make-fself` and adding the `SceShell` permission (0x2800000000000001)
-* allow enabling/disabling touch zones independent of touch mode (separate setting)
-  - allows using front screen touch zones regardless of touch input mode. when a touch zone is pressed, the touch input is ignored. unused touch zones are ignored and function as normal touch area.
-
-Bug fixes:
-* fixed front touch zone L2/R2 special keys not working
-
-Feature:
-* feat: Implement MAC address handling for devices and remove deprecated MAC retrieval functions
-
-Refactor:
-* fix: Update subproject commits for enet, inih, and moonlight-common-c
-* split `vitainput_process` into multiple smaller functions for better code readability
+- Added optional PS button capture: double press opens the menu; single press is forwarded to Sunshine.
+- Added independent touch-zone settings.
+- Fixed front touch zones for L2/R2.
+- Store host MAC addresses instead of querying them through ARP.
+- Updated enet, inih and moonlight-common-c.
 
 ## 0.13.1
 
-* fix: Split shortcuts into individual files for better code organization and maintainability.
-* fix: Resolved ghost/phantom button presses when handling overlays and shortcuts. Button state is now correctly reset and restored.
+- Reset and restore button state when switching overlays and shortcuts to prevent phantom presses.
 
 ## 0.13.0
 
-* You can now choose between three touchscreen modes: DS4 Touchpad, Absolute Mouse, and Tablet (Sunshine) from the settings menu.
-* "DS4 Touchpad" mode lets you use the Vita screen as a DualShock 4-style multitouch touchpad, compatible with gestures and advanced controls in games and Steam Input.
-* DS4 Touchpad mode is now more sensitive and precise for a smoother experience.
-* Wake-on-LAN (WOL) fully integrated into the host management menu: allows you to power on the remote PC from the Vita using the saved MAC and automatically calculated broadcast address.
-* The host MAC address is now saved and loaded correctly from the device.ini file, with all ARP/legacy logic removed.
-* WOL packet sending is robust and compatible with local networks, with cross-platform MAC parsing and detailed debug logs.
-* Added Python script (`tools/wol_sniffer.py`) to receive and verify Wake-on-LAN packets on the network, useful for testing without powering off the PC.
-* Minor UI fixes and improved visual feedback in the host management menu.
-* Fixed: Combos like L1+L2 and R1+R2 now work correctly even when used together with either touchscreen or backtouch. Pressing both at the same time no longer causes one to be lifted; both can be held simultaneously as expected.
-* Fixed: In absolute touch mode, special button overlays no longer interfere with touch input. If a special button is detected, the corresponding touchscreen input is ignored, allowing for true absolute touch and making all screen corners usable.
+- Added DS4 Touchpad, Absolute Mouse and Tablet (Sunshine) touchscreen modes.
+- Increased DS4 touchpad sensitivity.
+- Added Wake-on-LAN to the host menu using the MAC address stored in `device.ini`.
+- Added `tools/wol_sniffer.py` to inspect Wake-on-LAN packets.
+- Allow L1+L2 and R1+R2 to remain held together when using touch or rear touch.
+- Ignore mouse input in areas occupied by special-button overlays.
 
 ## 0.12.3
 
-* Moonlight now automatically selects and creates the best available folder for config and cache (supports ux0:/data/moonlight, ux0:/moonlight, uma0:/data/moonlight, and fallback to ux0:data).
-* The chosen folder location is logged at startup for easier debugging.
-* The config file (moonlight.conf) is always created in the selected folder, improving compatibility for users with missing folders.
-* Improved error handling and debug logging for folder creation and config file setup.
-* All folder and config path logic is now centralized and robust, reducing crashes and edge cases.
-* Bugfix: Prevented crashes on startup due to buffer or path issues in folder selection logic.
-* New Host Management menu: manage paired hosts with improved status display, unified status text, and direct actions (connect, force connect, change IP/name, delete).
-  - Now allows:
-    - Changing the host name
-    - Changing the host IP
-    - Forcing connection even if the host is not shown as online
-    - Deleting hosts
-* The connection and host management menus now show the port next to the IP (uses httpPort if available, otherwise httpsPort).
-* Host Management menu now shows host status (paired/unpaired, online/offline, IP changed) in a unified way, matching the main menu logic.
-* Visual feedback and menu options for host management are now clearer and more robust.
-* Internal refactor: main.c and check_dir.c now use a shared macro for path buffer size and a helper for folder selection.
+- Select and create a configuration directory on ux0 or uma0, and log the selected path at startup.
+- Create `moonlight.conf` in the selected directory.
+- Prevent startup crashes caused by truncated configuration paths.
+- Added a host menu to connect, force connect, rename, change IP or delete a host.
+- Show the connection port beside the host IP.
+- Show paired, online and pending-IP states in the host menu.
 
 ## 0.12.2
 
-* Added option to swap L1/R1 and L2/R2 button functions from the settings menu.
-* Added option to select gamepad type: Xbox or PlayStation layout, configurable from the settings menu.
-* Improved host scan logic: scan is always restarted cleanly when returning to the main menu or after leaving any submenu.
-* UI and config logic for swap and mapping exclusivity is now robust and bidirectional.
-* Controller type selection in UI now saves/loads correctly and updates immediately.
-* Touch Mouse and Touchscreen toggles now update their subname in the menu immediately after toggling.
-* Main menu always restarts host scan and waits for thread readiness before allowing host selection.
-* Cleaned up and stabilized code, especially around host scan thread handling and function declarations.
-* Many bugfixes and code cleanups.
+- Added shoulder-button swapping and Xbox/PlayStation gamepad layout selection.
+- Restart host discovery after returning to the main menu.
+- Keep shoulder-button swap and controller mapping settings synchronized.
+- Save controller type changes and update touch-mode labels immediately.
+- Wait for the discovery thread before enabling host selection.
 
 ## 0.12.1
 
-* Add support for multi-touch touchscreen mode (Sunshine compatible) and absolute mouse mode.
-* New settings: choose between "Touch Mouse Absolute" (gestures, mouse) and "Touchscreen (Sunshine multitouch)" (tablet mode).
-* In touchscreen mode: true multitouch, native gestures (e.g. zoom), no mouse cursor/ghost, no mouse clicks.
-* In absolute mouse mode: improved gestures (right click with two-finger tap, scroll with two fingers), cursor always follows main finger.
-* Physical controls (gamepad) work in both modes.
-* Improved logic for right click and scroll gestures.
-* Many bugfixes and refinements to touch and gesture experience.
+- Added Sunshine multitouch and absolute mouse modes.
+- Added two-finger right click and scrolling in absolute mouse mode.
+- Keep physical gamepad controls active in both touch modes.
 
 ## 0.11.4
 
-* Host status indicator dots: green (online), yellow (IP change pending), red (offline/disconnected).
-* Robust host status checking with background scan thread and mDNS sniffer.
-* Manual refresh of host status with TRIANGLE (△) in main menu and device search.
-* IP change confirmation dialog now always shows old and new IP, and always asks for confirmation.
-* Host status and menu only refresh when status actually changes or user requests it.
-* Improved debug logging for all host and menu transitions.
-* UI and logic are now robust even if host fields are empty or uninitialized.
-* All UI messages for search device and refresh are now in English.
-* Added screenshots to documentation (see docs/):
-  * keyboard.png: Floating keyboard in a Steam app using Moonlight.
-  * ip1.png: Host waiting for IP update (yellow).
-  * ip2.png: Host online (green).
-  * ip3.png: Host offline/disconnected (red).
-  * ip4.png: IP change confirmation dialog (shows old/new IP).
-  * ip5.png: Search device function showing a found local device.
+- Show green, yellow and red indicators for online, pending-IP and offline hosts.
+- Check host status with a background discovery thread and mDNS sniffer.
+- Refresh hosts with TRIANGLE in the main menu and device search.
+- Show old and new addresses before confirming an IP change.
+- Refresh the menu only when host status changes or on request.
+- Handle empty host fields in status checks.
+- Translate device search and refresh messages to English.
 
 ## 0.11.2
 
-* More reliable and user-friendly automatic pairing.
-* Experimental absolute touch controls (beta).
-* Floating virtual keyboard that no longer covers the main screen.
-* Updated libraries and dependencies for improved compatibility and stability.
-* New modular UDP mDNS sniffer for device discovery (replaces legacy mdns code).
-* Improved debug logging, especially for device search and reconnect flows.
-* Cleanup of legacy code and dependencies.
+- Added automatic pairing and experimental absolute touch controls.
+- Added a floating virtual keyboard.
+- Replaced legacy discovery code with a UDP mDNS sniffer.
+- Added logs for device search and reconnection failures.
 
 ## 0.11.0
 

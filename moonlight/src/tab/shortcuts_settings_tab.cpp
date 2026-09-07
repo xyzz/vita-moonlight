@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "controller/shortcuts.hpp"
+#include "settings.hpp"
 #include "shortcuts/shortcut_manager.hpp"
 
 namespace
@@ -45,12 +46,29 @@ void setComboFromSelectors(shortcuts::ShortcutCombo& combo, int first, int secon
 
 int actionToSelection(shortcuts::ShortcutAction action)
 {
-    return action == shortcuts::ShortcutAction::Pause ? 0 : 1;
+    switch (action)
+    {
+        case shortcuts::ShortcutAction::Pause:
+            return 0;
+        case shortcuts::ShortcutAction::Keyboard:
+            return 1;
+        case shortcuts::ShortcutAction::FrontTouch:
+            return 2;
+    }
+    return 1;
 }
 
 shortcuts::ShortcutAction selectionToAction(int selection)
 {
-    return selection == 0 ? shortcuts::ShortcutAction::Pause : shortcuts::ShortcutAction::Keyboard;
+    if (selection == 0)
+    {
+        return shortcuts::ShortcutAction::Pause;
+    }
+    if (selection == 2)
+    {
+        return shortcuts::ShortcutAction::FrontTouch;
+    }
+    return shortcuts::ShortcutAction::Keyboard;
 }
 
 std::string actionToDisplay(shortcuts::ShortcutAction action)
@@ -58,6 +76,10 @@ std::string actionToDisplay(shortcuts::ShortcutAction action)
     if (action == shortcuts::ShortcutAction::Pause)
     {
         return brls::getStr("moonlight/shortcuts/action_pause");
+    }
+    if (action == shortcuts::ShortcutAction::FrontTouch)
+    {
+        return brls::getStr("moonlight/shortcuts/action_front_touch");
     }
     return brls::getStr("moonlight/shortcuts/action_keyboard");
 }
@@ -155,6 +177,7 @@ ShortcutsSettingsTab::ShortcutsSettingsTab()
     this->actionLabels = {
         brls::getStr("moonlight/shortcuts/action_pause"),
         brls::getStr("moonlight/shortcuts/action_keyboard"),
+        brls::getStr("moonlight/shortcuts/action_front_touch"),
     };
 
     rebuildShortcutList();
@@ -385,9 +408,9 @@ void ShortcutsSettingsTab::openShortcutEditor(std::size_t index, bool creatingNe
     scroll->setScrollingBehavior(brls::ScrollingBehavior::CENTERED);
     scroll->addView(content);
 
-    auto* frame = new brls::AppletFrame(scroll);
-    frame->setTitle(creatingNew ? brls::getStr("moonlight/shortcuts/add_shortcut_title") : shortcutTitleForEntry(index, *editorState));
-    brls::Application::pushActivity(new brls::Activity(frame));
+    moonlight::settings::pushView(
+        scroll,
+        creatingNew ? brls::getStr("moonlight/shortcuts/add_shortcut_title") : shortcutTitleForEntry(index, *editorState));
 }
 
 brls::View* ShortcutsSettingsTab::create()

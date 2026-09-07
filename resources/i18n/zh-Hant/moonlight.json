@@ -190,6 +190,7 @@
             },
             "notify_prefix": "控制器類型改爲:"
         },
+        "capture_ps_button": "將 PS 鍵作為 Guide 鍵",
         "swap_shoulder_buttons": {
             "title": "交換 R1/L1 <- > R2/L2",
             "notify_enabled": "啓用了肩部交換按鈕",
@@ -257,6 +258,9 @@
         "mode_saved": "鍵盤模式已保存",
         "numbers_row_title": "顯示數字行",
         "arrows_title": "顯示箭頭鍵",
+        "fullscreen_title": "全螢幕鍵盤",
+        "text_preview_title": "顯示本機輸入預覽",
+        "mouse_passthrough_title": "將視訊區域作為觸控板",
         "theme_preview_title": "當前主題",
         "theme_editor_title": "主題編輯器",
         "theme_info": "自訂鍵盤主題將在未來更新中提供。可以建立並分享自己的鍵盤設計！",
@@ -285,6 +289,7 @@
         "editor_name_hint": "此快捷鍵的可選名稱",
         "action_pause": "暫停",
         "action_keyboard": "鍵盤",
+        "action_front_touch": "切換正面觸控區域",
         "disabled_combo": "已禁用",
         "clear_combo_title": "清除組合",
         "clear_combo_detail": "將按鈕 1、2 和 3 設為無",

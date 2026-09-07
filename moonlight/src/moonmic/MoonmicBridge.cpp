@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <borealis.hpp>
+#include <chrono>
 #include <cstdio>
 #include <cstring>
 #include <iostream>
@@ -26,6 +27,9 @@ extern "C"
 
 namespace moonmic
 {
+
+static_assert(sizeof(moonmic_focus_request_t) == 32);
+static_assert(sizeof(moonmic_focus_response_t) == 20);
 
 MoonmicBridge::MoonmicBridge()
 {
@@ -168,6 +172,7 @@ MoonmicBridge::SunshineValidationInfo MoonmicBridge::buildSunshineValidation(con
 MoonmicBridge::HandshakeResult MoonmicBridge::sendResolutionHandshake(const std::string& hostIp, int port, bool force)
 {
     HandshakeResult result;
+    setAvailability(hostIp, port, false);
     if (hostIp.empty() || port <= 0)
     {
         vita_log::error("[MoonmicBridge] Invalid host or port for handshake: %s:%d", hostIp.c_str(), port);
@@ -319,6 +324,7 @@ MoonmicBridge::HandshakeResult MoonmicBridge::sendResolutionHandshake(const std:
                     result.current_width  = ack->display_width;
                     result.current_height = ack->display_height;
                     result.mismatch       = (ack->display_width != target_width || ack->display_height != target_height);
+                    setAvailability(hostIp, port, true);
 
                     close(sock);
                     return result;
@@ -345,6 +351,96 @@ MoonmicBridge::HandshakeResult MoonmicBridge::sendResolutionHandshake(const std:
 
     vita_log::info("[MoonmicBridge] Resolution handshake to %s:%d - ACK: TIMEOUT, Mismatch: NO, Current: 0x0", hostIp.c_str(), port);
     close(sock);
+    return result;
+}
+
+bool MoonmicBridge::isAvailable(const std::string& hostIp, int port) const
+{
+    std::lock_guard<std::mutex> lock(availability_mutex_);
+    return available_ && available_host_ == hostIp && available_port_ == port;
+}
+
+void MoonmicBridge::setAvailability(const std::string& hostIp, int port, bool available)
+{
+    std::lock_guard<std::mutex> lock(availability_mutex_);
+    available_host_ = hostIp;
+    available_port_ = port;
+    available_      = available;
+}
+
+MoonmicBridge::TypingFocusResult MoonmicBridge::queryTypingFocus(const std::string& hostIp, int port)
+{
+    TypingFocusResult result;
+    if (hostIp.empty() || port <= 0 || !isAvailable(hostIp, port))
+    {
+        return result;
+    }
+
+    int sock = socket(AF_INET, SOCK_DGRAM, 0);
+    if (sock < 0)
+    {
+        return result;
+    }
+
+    struct timeval timeout = {};
+    timeout.tv_usec        = 120000;
+    setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
+
+    struct sockaddr_in bindAddr = {};
+    bindAddr.sin_family         = AF_INET;
+    bindAddr.sin_port           = htons(0);
+    bindAddr.sin_addr.s_addr    = htonl(INADDR_ANY);
+    if (bind(sock, reinterpret_cast<struct sockaddr*>(&bindAddr), sizeof(bindAddr)) < 0)
+    {
+        close(sock);
+        return result;
+    }
+
+    struct sockaddr_in hostAddr = {};
+    hostAddr.sin_family         = AF_INET;
+    hostAddr.sin_port           = htons(port);
+    if (inet_pton(AF_INET, hostIp.c_str(), &hostAddr.sin_addr) != 1)
+    {
+        close(sock);
+        return result;
+    }
+
+    moonmic_focus_request_t request         = {};
+    request.magic                           = MOONMIC_FOCUS_REQUEST_MAGIC;
+    request.version                         = MOONMIC_FOCUS_PROTOCOL_VERSION;
+    const SunshineValidationInfo validation = buildSunshineValidation(hostIp);
+    request.pair_status                     = static_cast<uint8_t>(std::clamp(validation.pair_status, 0, 1));
+    request.uniqueid_len                    = static_cast<uint8_t>(std::min(validation.uniqueid.size(), sizeof(request.uniqueid)));
+    if (request.uniqueid_len > 0)
+    {
+        memcpy(request.uniqueid, validation.uniqueid.data(), request.uniqueid_len);
+    }
+    request.request_id = static_cast<uint32_t>(
+        std::chrono::steady_clock::now().time_since_epoch().count());
+
+    if (sendto(sock, &request, sizeof(request), 0, reinterpret_cast<struct sockaddr*>(&hostAddr), sizeof(hostAddr)) != sizeof(request))
+    {
+        close(sock);
+        return result;
+    }
+
+    moonmic_focus_response_t response = {};
+    struct sockaddr_in responseAddr   = {};
+    socklen_t responseAddrLen         = sizeof(responseAddr);
+    const int received                = recvfrom(sock, &response, sizeof(response), 0,
+                       reinterpret_cast<struct sockaddr*>(&responseAddr), &responseAddrLen);
+    close(sock);
+
+    const bool validSource = response.source == MOONMIC_FOCUS_SOURCE_CARET || response.source == MOONMIC_FOCUS_SOURCE_POINTER;
+    if (received != sizeof(response) || responseAddr.sin_addr.s_addr != hostAddr.sin_addr.s_addr || responseAddr.sin_port != hostAddr.sin_port || response.magic != MOONMIC_FOCUS_RESPONSE_MAGIC || response.version != MOONMIC_FOCUS_PROTOCOL_VERSION || response.request_id != request.request_id || !validSource)
+    {
+        return result;
+    }
+
+    result.success      = true;
+    result.caret        = response.source == MOONMIC_FOCUS_SOURCE_CARET;
+    result.normalized_x = static_cast<float>(response.normalized_x) / 65535.0f;
+    result.normalized_y = static_cast<float>(response.normalized_y) / 65535.0f;
     return result;
 }
 

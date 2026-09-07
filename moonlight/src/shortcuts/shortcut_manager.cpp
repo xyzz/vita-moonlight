@@ -164,7 +164,7 @@ bool ShortcutManager::triggerVirtualShortcut(std::uint32_t specialKey)
 
 bool ShortcutManager::setActionCombo(ShortcutAction action, const ShortcutCombo& combo, bool persist)
 {
-    if (!isTrackedAction(action))
+    if (action != ShortcutAction::Pause && action != ShortcutAction::Keyboard)
     {
         return false;
     }
@@ -429,7 +429,7 @@ void ShortcutManager::rebuildRuntimeEntries()
 
 bool ShortcutManager::isTrackedAction(ShortcutAction action)
 {
-    return action == ShortcutAction::Pause || action == ShortcutAction::Keyboard;
+    return action == ShortcutAction::Pause || action == ShortcutAction::Keyboard || action == ShortcutAction::FrontTouch;
 }
 
 } // namespace shortcuts

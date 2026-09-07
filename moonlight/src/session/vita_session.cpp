@@ -288,7 +288,6 @@ bool VitaSession::restartConnection(bool renegotiateSession)
     if (g_controllerInput)
     {
         g_controllerInput->setStreamingActive(true);
-        g_controllerInput->lockPSButton();
         g_controllerInput->dropInput();
     }
     notifyGamepadType();

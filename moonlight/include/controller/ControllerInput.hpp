@@ -34,27 +34,22 @@ class ControllerInputManager
     ~ControllerInputManager();
 
     void handleInput();
-
     void dropInput();
-
     void setInputEnabled(bool enabled);
-
     void setTouchscreenMode(int mode);
-
     bool setTouchscreenModeWithValidation(int newMode);
-
     bool setTouchscreenModeRuntime(int newMode);
-
     void sendGamepadState(const GamepadState& state);
-
     void setPauseCallback(const std::function<void()>& cb);
     void setKeyboardShortcutCallback(const std::function<void()>& cb);
+    void setFrontTouchShortcutCallback(const std::function<void()>& cb);
 
     void applyRearTouchSettings(const RearTouchSettings& settings);
     void setRearTouchEnabled(bool enabled);
 
     void applyFrontTouchSettings(const VideoSettings& settings);
     void setFrontTouchEnabled(bool enabled);
+    bool toggleFrontTouchEnabled();
 
     void setSwapShoulderButtons(bool enabled);
     bool getSwapShoulderButtons() const { return swapShoulderButtons; }
@@ -69,6 +64,7 @@ class ControllerInputManager
     void lockPSButton();
     void unlockPSButton();
     void setStreamingActive(bool active);
+    void setPSButtonCapture(bool enabled);
 
   private:
     bool inputEnabled;
@@ -77,6 +73,7 @@ class ControllerInputManager
     bool touchSuppressed          = false;
     uint64_t touchSuppressUntilUs = 0;
     bool lastKeyboardOpen         = false;
+    bool lastKeyboardStreamTouch  = false;
 
     GamepadState lastGamepadState;
     VitaMouseState lastMouseState;
@@ -126,9 +123,9 @@ class ControllerInputManager
     GyroManager* gyroManager = nullptr;
 
     bool psButtonLocked            = false;
-    bool psButtonWasPressed        = false;
     uint64_t psButtonPressedTimeUs = 0;
     bool psButtonSpecialActive     = false;
+    bool capturePSButton           = true;
 
     void initMapping();
     GamepadState buildGamepadState(const SceCtrlData& ctrlData) const;

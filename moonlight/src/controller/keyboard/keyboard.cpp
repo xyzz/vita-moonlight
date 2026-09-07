@@ -6,6 +6,7 @@
 #include <functional>
 #include <iostream>
 #include <sstream>
+#include <thread>
 
 #include "controller/keyboard/keyboard_utf8.hpp"
 #include "controller/keyboard/keyboardloader.hpp"
@@ -21,19 +22,23 @@
 
 #include "ConfigManager.hpp"
 #include "controller/ControllerInput.hpp"
+#include "moonmic/MoonmicBridge.hpp"
+#include "session/vita_session.hpp"
+#include "video/VitaVideoRenderer.hpp"
 
 namespace
 {
 
 constexpr std::uint64_t kRepeatDelayUs    = 400000;
 constexpr std::uint64_t kRepeatIntervalUs = 70000;
+constexpr std::uint64_t kModifierHoldUs   = 400000;
 
-enum ComboModMask : unsigned int
+enum ModifierMask : unsigned int
 {
-    COMBO_MOD_CTRL  = 1u << 0,
-    COMBO_MOD_SHIFT = 1u << 1,
-    COMBO_MOD_ALT   = 1u << 2,
-    COMBO_MOD_WIN   = 1u << 3
+    MOD_CTRL  = 1u << 0,
+    MOD_SHIFT = 1u << 1,
+    MOD_ALT   = 1u << 2,
+    MOD_WIN   = 1u << 3
 };
 
 class KeyTouchRecognizer : public brls::GestureRecognizer
@@ -120,6 +125,9 @@ KeyboardOverlay::KeyboardOverlay(const std::string& cssPath)
         forceUtf8Input         = settings.keyboard_input_mode;
         showNumbersRow         = settings.keyboard_numbers_row;
         showArrowKeys          = settings.keyboard_show_arrows;
+        fullscreen             = settings.keyboard_fullscreen;
+        showTextPreview        = settings.keyboard_text_preview;
+        mousePassthrough       = settings.keyboard_mouse_passthrough;
     }
     initDefaultLayout();
 
@@ -129,48 +137,12 @@ KeyboardOverlay::KeyboardOverlay(const std::string& cssPath)
         const float tapX = position.x;
         const float tapY = position.y;
 
-        const bool overlayActive = comboModeActive && comboOverlayVisible;
-        const bool inOverlay = overlayActive &&
-            (tapX >= comboOverlayX && tapX <= comboOverlayX + comboOverlayW &&
-             tapY >= comboOverlayY && tapY <= comboOverlayY + comboOverlayH);
-        const bool inClear = overlayActive &&
-            (tapX >= comboClearX && tapX <= comboClearX + comboClearW &&
-             tapY >= comboClearY && tapY <= comboClearY + comboClearH);
         const bool inPanel =
             (tapX >= panelX && tapX <= panelX + panelW &&
              tapY >= panelY && tapY <= panelY + panelH);
 
-        if (!inPanel && !inOverlay) {
-            return;
-        }
-
         if (state == brls::GestureState::START) {
-            if ((inClear || inOverlay) && comboHasKey) {
-                if (comboKeyVk >= 0) {
-                    std::vector<int> mods;
-                    if (comboMods & COMBO_MOD_CTRL) mods.push_back(0x11);
-                    if (comboMods & COMBO_MOD_SHIFT) mods.push_back(0x10);
-                    if (comboMods & COMBO_MOD_ALT) mods.push_back(0x12);
-                    if (comboMods & COMBO_MOD_WIN) mods.push_back(0x5B);
-
-                    for (int vk : mods) {
-                        LiSendKeyboardEvent2((short)vk, KEY_ACTION_DOWN, 0, SS_KBE_FLAG_NON_NORMALIZED);
-                    }
-                    LiSendKeyboardEvent2((short)comboKeyVk, KEY_ACTION_DOWN, 0, SS_KBE_FLAG_NON_NORMALIZED);
-                    brls::delay(20, [mods, key = comboKeyVk]() {
-                        LiSendKeyboardEvent2((short)key, KEY_ACTION_UP, 0, SS_KBE_FLAG_NON_NORMALIZED);
-                        for (auto it = mods.rbegin(); it != mods.rend(); ++it) {
-                            LiSendKeyboardEvent2((short)*it, KEY_ACTION_UP, 0, SS_KBE_FLAG_NON_NORMALIZED);
-                        }
-                    });
-                }
-                clearComboSelection();
-                comboOverlayVisible = false;
-                comboModeActive = false;
-                rebuildLayout();
-                return;
-            }
-
+            if (!inPanel) return;
             int row = -1;
             int col = -1;
             if (hitTestKey(tapX, tapY, row, col)) {
@@ -182,8 +154,21 @@ KeyboardOverlay::KeyboardOverlay(const std::string& cssPath)
                 highlightCol = col;
                 highlightFrames = 6;
 
-                sendKeyByLabel(keyRows[row][col].action);
-                startRepeat(keyRows[row][col].action, row, col);
+                const std::string action = keyRows[row][col].action;
+                if (isModifierAction(action))
+                {
+                    pressedModifier      = action;
+                    modifierPressStartUs = static_cast<std::uint64_t>(brls::getCPUTimeUsec());
+                    modifierHoldTriggered = false;
+                    return;
+                }
+
+                const bool modifiedShortcut = (modifiers & (MOD_CTRL | MOD_ALT | MOD_WIN)) != 0;
+                sendKeyByLabel(action);
+                if (!modifiedShortcut)
+                {
+                    startRepeat(action, row, col);
+                }
             }
         } else if (state == brls::GestureState::STAY) {
             if (!pressedActive) return;
@@ -191,12 +176,17 @@ KeyboardOverlay::KeyboardOverlay(const std::string& cssPath)
             int col = -1;
             if (!hitTestKey(tapX, tapY, row, col) || row != pressedRow || col != pressedCol) {
                 stopRepeat();
+                finishModifierPress(false);
                 pressedActive = false;
                 pressedRow = -1;
                 pressedCol = -1;
             }
         } else if (state == brls::GestureState::END || state == brls::GestureState::FAILED || state == brls::GestureState::INTERRUPTED) {
+            int row = -1;
+            int col = -1;
+            const bool sameKey = inPanel && hitTestKey(tapX, tapY, row, col) && row == pressedRow && col == pressedCol;
             stopRepeat();
+            finishModifierPress(state == brls::GestureState::END && sameKey);
             pressedActive = false;
             pressedRow = -1;
             pressedCol = -1;
@@ -214,6 +204,8 @@ KeyboardOverlay::KeyboardOverlay(const std::string& cssPath)
 
 KeyboardOverlay::~KeyboardOverlay()
 {
+    releaseAllKeys();
+    VitaVideoRenderer::instance().clearKeyboardViewport();
     // Unregister
     if (g_controllerInput && g_controllerInput->getActiveKeyboard() == this)
     {
@@ -228,6 +220,7 @@ void KeyboardOverlay::open()
     show();
     visible      = true;
     closePending = false;
+    updateVideoViewport();
 }
 
 void KeyboardOverlay::close()
@@ -240,6 +233,16 @@ bool KeyboardOverlay::isOpen() const
     return visible;
 }
 
+bool KeyboardOverlay::allowsStreamTouch() const
+{
+    return visible && !fullscreen && mousePassthrough;
+}
+
+int KeyboardOverlay::streamTouchHeight() const
+{
+    return allowsStreamTouch() ? static_cast<int>(panelY) : 0;
+}
+
 KeyboardState KeyboardOverlay::getKeyboardState() const
 {
     KeyboardState state;
@@ -249,17 +252,33 @@ KeyboardState KeyboardOverlay::getKeyboardState() const
 
 void KeyboardOverlay::update()
 {
+    releaseExpiredKeys();
+
+    if (pressedActive && !pressedModifier.empty() && !modifierHoldTriggered)
+    {
+        const std::uint64_t nowUs = static_cast<std::uint64_t>(brls::getCPUTimeUsec());
+        if (nowUs >= modifierPressStartUs && nowUs - modifierPressStartUs >= kModifierHoldUs)
+        {
+            toggleModifier(pressedModifier);
+            modifierHoldTriggered = true;
+        }
+    }
+
     if (closePending)
     {
         closePending = false;
         brls::sync([this]()
             {
             stopRepeat();
+            finishModifierPress(false);
             pressedActive = false;
             pressedRow = -1;
             pressedCol = -1;
+            releaseAllKeys();
+            textPreview.clear();
             hide();
             visible = false;
+            VitaVideoRenderer::instance().clearKeyboardViewport();
             if (g_controllerInput && g_controllerInput->getActiveKeyboard() == this) {
                 g_controllerInput->setActiveKeyboard(nullptr);
             }
@@ -428,17 +447,24 @@ void KeyboardOverlay::willAppear(bool resetState)
             {
             }
         }
-        float maxPanelH = screenH * 0.5f;
-        if (panelH > maxPanelH)
+        if (fullscreen)
         {
-            panelH = maxPanelH;
+            panelH = screenH;
+        }
+        else
+        {
+            float maxPanelH = screenH * 0.5f;
+            if (panelH > maxPanelH)
+            {
+                panelH = maxPanelH;
+            }
         }
         panelW = screenW;
         panelX = 0.0f;
-        // Place at the bottom
-        panelY = std::max(0.0f, screenH - panelH);
+        panelY = fullscreen ? 0.0f : std::max(0.0f, screenH - panelH);
 
         recalculateKeyMetrics();
+        updateVideoViewport();
     }
     catch (...)
     {
@@ -489,7 +515,7 @@ void KeyboardOverlay::initDefaultLayout()
         KeyDef("Bksp", "Backspace", 1.5f),
         KeyDef("Spacer", "Spacer") });
 
-    keyRows.push_back({ KeyDef("Combo", "ComboToggle", 1.2f),
+    keyRows.push_back({ fullscreen ? KeyDef("Spacer", "Spacer", 1.2f) : KeyDef("View", "VideoFocus", 1.2f),
         KeyDef("Fn", "FnPage", 1.0f),
         KeyDef("1#1", "SymPage", 1.2f),
         KeyDef("Spacer", "Spacer", 4.0f),
@@ -505,14 +531,7 @@ void KeyboardOverlay::initDefaultLayout()
             KeyDef("<", "Left", 1.1f), KeyDef("v", "Down", 1.1f), KeyDef(">", "Right", 1.1f), KeyDef("^", "Up", 1.2f) });
     }
 
-    // Combo modifiers row
-    if (comboModeActive)
-    {
-        keyRows.push_back({ KeyDef("Ctrl", "Ctrl", 1.2f),
-            KeyDef("Alt", "Alt", 1.2f),
-            KeyDef("Win", "Win", 1.2f),
-            KeyDef("Esc", "Escape", 1.2f) });
-    }
+    keyRows.insert(keyRows.begin(), { KeyDef("Ctrl", "Ctrl", 1.2f), KeyDef("Alt", "Alt", 1.2f), KeyDef("Win", "Win", 1.2f), KeyDef("Esc", "Escape", 1.2f) });
 
     recalculateKeyMetrics();
 }
@@ -564,19 +583,8 @@ void KeyboardOverlay::initSymbolLayout()
         KeyDef("Bksp", "Backspace", 1.5f),
         KeyDef("Spacer", "Spacer") });
 
-    // Function keys row (ESC, Tab, etc.)
-    if (comboModeActive)
-    {
-        keyRows.push_back({ KeyDef("Spacer", "Spacer"),
-            KeyDef("Esc", "Escape"),
-            KeyDef("Tab"),
-            KeyDef("PgUp", "PageUp"),
-            KeyDef("PgDn", "PageDown"),
-            KeyDef("Spacer", "Spacer") });
-    }
-
     keyRows.push_back({ KeyDef("ABC", "LetterPage", 1.2f),
-        KeyDef("Combo", "ComboToggle", 1.2f),
+        fullscreen ? KeyDef("Spacer", "Spacer", 1.2f) : KeyDef("View", "VideoFocus", 1.2f),
         KeyDef("Fn", "FnPage", 1.0f),
         KeyDef("Spacer", "Spacer", 4.0f),
         KeyDef(","),
@@ -591,13 +599,7 @@ void KeyboardOverlay::initSymbolLayout()
             KeyDef("<", "Left", 1.1f), KeyDef("v", "Down", 1.1f), KeyDef(">", "Right", 1.1f), KeyDef("^", "Up", 1.2f) });
     }
 
-    // Combo modifiers row
-    if (comboModeActive)
-    {
-        keyRows.push_back({ KeyDef("Ctrl", "Ctrl", 1.2f),
-            KeyDef("Alt", "Alt", 1.2f),
-            KeyDef("Win", "Win", 1.2f) });
-    }
+    keyRows.insert(keyRows.begin(), { KeyDef("Ctrl", "Ctrl", 1.2f), KeyDef("Alt", "Alt", 1.2f), KeyDef("Win", "Win", 1.2f) });
 
     recalculateKeyMetrics();
 }
@@ -655,19 +657,11 @@ void KeyboardOverlay::initFnLayout()
 
     keyRows.push_back({ KeyDef("ABC", "LetterPage", 1.2f),
         KeyDef("1#1", "SymPage", 1.2f),
-        KeyDef("Combo", "ComboToggle", 1.2f),
+        fullscreen ? KeyDef("Spacer", "Spacer", 1.2f) : KeyDef("View", "VideoFocus", 1.2f),
         KeyDef("Spacer", "Spacer", 4.0f),
         KeyDef(spaceLabel, "Space", 3.4f),
         KeyDef("Enter", "Enter", 1.4f),
         KeyDef("X", "Close", 1.0f) });
-
-    // Combo modifiers row
-    if (comboModeActive)
-    {
-        keyRows.push_back({ KeyDef("Ctrl", "Ctrl", 1.2f),
-            KeyDef("Alt", "Alt", 1.2f),
-            KeyDef("Win", "Win", 1.2f) });
-    }
 
     recalculateKeyMetrics();
 }
@@ -730,7 +724,7 @@ void KeyboardOverlay::recalculateKeyMetrics()
         btnW = minCandidate;
     }
 
-    btnYStart = 8.0f;
+    btnYStart = fullscreen && showTextPreview ? previewHeight + 8.0f : 8.0f;
 
     if (!keyRows.empty())
     {
@@ -738,7 +732,7 @@ void KeyboardOverlay::recalculateKeyMetrics()
         float totalMargins = (float)(keyRows.size() - 1) * btnMargin;
         float maxKeyH      = (availableH - totalMargins) / (float)keyRows.size();
         float targetH      = maxKeyH;
-        if (baseBtnH > 0.0f && targetH > baseBtnH)
+        if (!fullscreen && baseBtnH > 0.0f && targetH > baseBtnH)
         {
             targetH = baseBtnH;
         }
@@ -821,7 +815,7 @@ bool KeyboardOverlay::hitTestKey(float x, float y, int& outRow, int& outCol) con
 
 bool KeyboardOverlay::isRepeatableAction(const std::string& action) const
 {
-    if (action == "Close" || action == "SymPage" || action == "LetterPage" || action == "FnPage" || action == "ComboToggle" || action == "Shift" || action == "Ctrl" || action == "Alt" || action == "Win")
+    if (action == "Close" || action == "SymPage" || action == "LetterPage" || action == "FnPage" || action == "VideoFocus" || action == "Shift" || action == "Ctrl" || action == "Alt" || action == "Win")
     {
         return false;
     }
@@ -844,7 +838,7 @@ void KeyboardOverlay::startRepeat(const std::string& action, int row, int col)
 {
     (void)row;
     (void)col;
-    if (comboModeActive || !isRepeatableAction(action))
+    if (!isRepeatableAction(action))
     {
         return;
     }
@@ -867,74 +861,216 @@ void KeyboardOverlay::sendRepeatAction(const std::string& action)
     sendKeyByLabel(action);
 }
 
-void KeyboardOverlay::clearComboSelection()
-{
-    comboMods = 0;
-    comboKeyLabel.clear();
-    comboKeyVk  = -1;
-    comboHasKey = false;
-}
-
 bool KeyboardOverlay::isSpacerAction(const std::string& action) const
 {
     return action == "Spacer";
 }
 
-void KeyboardOverlay::setComboMode(bool enabled)
-{
-    comboModeActive = enabled;
-    clearComboSelection();
-    shiftActive     = false;
-    keyStates[0x10] = false;
-    stopRepeat();
-    rebuildLayout();
-}
-
-std::string KeyboardOverlay::formatComboLabel() const
-{
-    std::vector<std::string> parts;
-    if (comboMods & COMBO_MOD_CTRL)
-        parts.push_back("Ctrl");
-    if (comboMods & COMBO_MOD_SHIFT)
-        parts.push_back("Shift");
-    if (comboMods & COMBO_MOD_ALT)
-        parts.push_back("Alt");
-    if (comboMods & COMBO_MOD_WIN)
-        parts.push_back("Win");
-
-    std::string keyLabel = comboKeyLabel;
-    if (!keyLabel.empty() && (comboMods & COMBO_MOD_SHIFT))
-    {
-        std::uint32_t cp = 0;
-        if (decode_single_utf8(keyLabel, cp))
-        {
-            std::uint32_t shifted    = apply_shift_to_codepoint(cp);
-            std::string shiftedLabel = utf8_from_codepoint(shifted);
-            if (!shiftedLabel.empty())
-            {
-                keyLabel = shiftedLabel;
-            }
-        }
-    }
-
-    if (!keyLabel.empty())
-    {
-        parts.push_back(keyLabel);
-    }
-
-    std::string out;
-    for (size_t i = 0; i < parts.size(); ++i)
-    {
-        out += parts[i];
-        if (i + 1 < parts.size())
-            out += " + ";
-    }
-    return out;
-}
-
 bool KeyboardOverlay::isModifierAction(const std::string& action) const
 {
     return action == "Ctrl" || action == "Shift" || action == "Alt" || action == "Win";
+}
+
+bool KeyboardOverlay::isModifierLatched(const std::string& action) const
+{
+    if (action == "Ctrl")
+        return (modifiers & MOD_CTRL) != 0;
+    if (action == "Shift")
+        return (modifiers & MOD_SHIFT) != 0;
+    if (action == "Alt")
+        return (modifiers & MOD_ALT) != 0;
+    if (action == "Win")
+        return (modifiers & MOD_WIN) != 0;
+    return false;
+}
+
+void KeyboardOverlay::finishModifierPress(bool activate)
+{
+    if (activate && !pressedModifier.empty() && !modifierHoldTriggered)
+    {
+        pulseModifier(pressedModifier);
+    }
+    pressedModifier.clear();
+    modifierPressStartUs  = 0;
+    modifierHoldTriggered = false;
+}
+
+void KeyboardOverlay::pulseModifier(const std::string& action)
+{
+    int vk = -1;
+    if (action == "Ctrl")
+        vk = 0x11;
+    else if (action == "Shift")
+        vk = 0x10;
+    else if (action == "Alt")
+        vk = 0x12;
+    else if (action == "Win")
+        vk = 0x5B;
+
+    if (vk >= 0)
+    {
+        pulseKey(vk);
+    }
+}
+
+void KeyboardOverlay::toggleModifier(const std::string& action)
+{
+    unsigned int mask = 0;
+    if (action == "Ctrl")
+        mask = MOD_CTRL;
+    else if (action == "Shift")
+        mask = MOD_SHIFT;
+    else if (action == "Alt")
+        mask = MOD_ALT;
+    else if (action == "Win")
+        mask = MOD_WIN;
+
+    if (mask != 0)
+    {
+        modifiers ^= mask;
+        stopRepeat();
+    }
+}
+
+void KeyboardOverlay::clearModifiers()
+{
+    modifiers = 0;
+}
+
+void KeyboardOverlay::applyLatchedModifiers(std::uint64_t releaseAtUs)
+{
+    const struct
+    {
+        unsigned int mask;
+        int vk;
+    } modifierKeys[] = {
+        { MOD_CTRL, 0x11 },
+        { MOD_SHIFT, 0x10 },
+        { MOD_ALT, 0x12 },
+        { MOD_WIN, 0x5B },
+    };
+
+    for (const auto& modifier : modifierKeys)
+    {
+        if ((modifiers & modifier.mask) != 0)
+        {
+            keyStates[modifier.vk]      = true;
+            keyReleaseAtUs[modifier.vk] = releaseAtUs;
+        }
+    }
+}
+
+void KeyboardOverlay::updateTextPreview(const std::string& action)
+{
+    if (!showTextPreview)
+    {
+        return;
+    }
+
+    if (action == "Backspace")
+    {
+        if (!textPreview.empty())
+        {
+            std::size_t pos = textPreview.size() - 1;
+            while (pos > 0 && (static_cast<unsigned char>(textPreview[pos]) & 0xC0) == 0x80)
+            {
+                --pos;
+            }
+            textPreview.erase(pos);
+        }
+        return;
+    }
+    if (action == "Enter")
+    {
+        textPreview.clear();
+        return;
+    }
+    if (action == "Space")
+    {
+        textPreview.push_back(' ');
+    }
+    else
+    {
+        std::uint32_t codepoint = 0;
+        if (!decode_single_utf8(action, codepoint))
+        {
+            return;
+        }
+        if ((modifiers & MOD_SHIFT) != 0)
+        {
+            codepoint = apply_shift_to_codepoint(codepoint);
+        }
+        textPreview += utf8_from_codepoint(codepoint);
+    }
+
+    while (textPreview.size() > 96)
+    {
+        std::size_t count = 1;
+        while (count < textPreview.size() && (static_cast<unsigned char>(textPreview[count]) & 0xC0) == 0x80)
+        {
+            ++count;
+        }
+        textPreview.erase(0, count);
+    }
+}
+
+void KeyboardOverlay::toggleVideoFocus()
+{
+    if (fullscreen)
+    {
+        return;
+    }
+    showBottomVideo = !showBottomVideo;
+    updateVideoViewport();
+
+    ConfigManager config;
+    config.load();
+    const VideoSettings settings = config.getVideoSettings();
+    std::string host             = settings.microphone_host_ip;
+    if (host.empty())
+    {
+        VitaSession* session = VitaSession::active();
+        if (session)
+        {
+            host = session->address();
+        }
+    }
+    if (host.empty())
+    {
+        return;
+    }
+
+    const int port = settings.microphone_port > 0 ? settings.microphone_port : MOONMIC_DEFAULT_PORT;
+    if (!moonmic::MoonmicBridge::getInstance().isAvailable(host, port))
+    {
+        return;
+    }
+
+    std::thread([host, port]()
+        {
+        const auto result = moonmic::MoonmicBridge::getInstance().queryTypingFocus(host, port);
+        if (!result.success)
+        {
+            vita_log::info("[KeyboardOverlay] Moonmic typing focus unavailable; using manual view");
+            return;
+        }
+
+        VitaVideoRenderer::instance().setKeyboardFocus(result.normalized_y);
+        vita_log::info("[KeyboardOverlay] Video focused at y=%.3f (%s)", result.normalized_y,
+            result.caret ? "caret" : "pointer"); })
+        .detach();
+}
+
+void KeyboardOverlay::updateVideoViewport()
+{
+    if (visible && !fullscreen && panelY > 0.0f)
+    {
+        VitaVideoRenderer::instance().setKeyboardViewport(static_cast<int>(panelY), showBottomVideo);
+    }
+    else
+    {
+        VitaVideoRenderer::instance().clearKeyboardViewport();
+    }
 }
 
 bool KeyboardOverlay::mapActionToVk(const std::string& action, int& outVk) const
@@ -1173,24 +1309,66 @@ bool KeyboardOverlay::mapActionToVk(const std::string& action, int& outVk) const
     return false;
 }
 
-void KeyboardOverlay::sendKeyByLabel(const std::string& label)
+void KeyboardOverlay::pulseKey(int vk)
 {
-    // If the Combo toggle button is pressed, enable/disable combo mode
-    if (label == "ComboToggle")
+    if (vk < 0 || vk >= 256)
     {
-        setComboMode(!comboModeActive);
-        comboOverlayVisible = comboModeActive; // show overlay when enabling
         return;
     }
+    const std::uint64_t releaseAt = static_cast<std::uint64_t>(brls::getCPUTimeUsec()) + 50000;
+    const bool isModifierKey      = vk == 0x10 || vk == 0x11 || vk == 0x12 || vk == 0x5B;
+    if (!isModifierKey)
+    {
+        applyLatchedModifiers(releaseAt);
+    }
+    keyStates[vk]      = true;
+    keyReleaseAtUs[vk] = releaseAt;
+
+    for (int modifier : { 0x11, 0x12, 0x5B })
+    {
+        if (keyStates[modifier])
+        {
+            keyReleaseAtUs[modifier] = releaseAt;
+        }
+    }
+    if (!isModifierKey)
+    {
+        clearModifiers();
+    }
+}
+
+void KeyboardOverlay::releaseExpiredKeys()
+{
+    const std::uint64_t nowUs = static_cast<std::uint64_t>(brls::getCPUTimeUsec());
+    for (int vk = 0; vk < 256; ++vk)
+    {
+        if (keyReleaseAtUs[vk] != 0 && nowUs >= keyReleaseAtUs[vk])
+        {
+            keyStates[vk]      = false;
+            keyReleaseAtUs[vk] = 0;
+        }
+    }
+}
+
+void KeyboardOverlay::releaseAllKeys()
+{
+    for (int vk = 0; vk < 256; ++vk)
+    {
+        if (keyStates[vk])
+        {
+            LiSendKeyboardEvent2(static_cast<short>(vk), KEY_ACTION_UP, 0, SS_KBE_FLAG_NON_NORMALIZED);
+        }
+        keyStates[vk]      = false;
+        keyReleaseAtUs[vk] = 0;
+    }
+    finishModifierPress(false);
+    clearModifiers();
+}
+
+void KeyboardOverlay::sendKeyByLabel(const std::string& label)
+{
     if (label == "Close")
     {
-        if (comboModeActive)
-        {
-            clearComboSelection();
-            comboOverlayVisible = false;
-            comboModeActive     = false;
-        }
-        // Defer close so we don't destroy the overlay from the touch callback
         closePending = true;
         return;
     }
@@ -1202,268 +1380,128 @@ void KeyboardOverlay::sendKeyByLabel(const std::string& label)
 
     if (label == "SymPage")
     {
-        // Switch to symbols layout
         initSymbolLayout();
         return;
     }
 
     if (label == "LetterPage")
     {
-        // Switch back to letters layout
         initDefaultLayout();
         return;
     }
 
     if (label == "FnPage")
     {
-        // Switch to function keys layout
         initFnLayout();
         return;
     }
 
-    if (label == "Shift")
+    if (label == "VideoFocus")
     {
-        if (comboModeActive)
-        {
-            // Toggle shift modifier for combo
-            if (comboMods & COMBO_MOD_SHIFT)
-                comboMods &= ~COMBO_MOD_SHIFT;
-            else
-                comboMods |= COMBO_MOD_SHIFT;
-            comboOverlayVisible = true;
-            return;
-        }
-        // Toggle persistent shift (uppercase)
-        this->shiftActive = !this->shiftActive;
-        // Update Shift VK state for polling
-        keyStates[0x10] = this->shiftActive;
-        // Shift acts as a toggle, so we don't auto-release it
+        toggleVideoFocus();
         return;
     }
 
-    if (label == "Ctrl")
+    if (isModifierAction(label))
     {
-        if (comboModeActive)
-        {
-            if (comboMods & COMBO_MOD_CTRL)
-                comboMods &= ~COMBO_MOD_CTRL;
-            else
-                comboMods |= COMBO_MOD_CTRL;
-            comboOverlayVisible = true;
-            return;
-        }
-        // Ctrl = VK 0x11
-        keyStates[0x11] = true;
-        brls::delay(50, [this]()
-            { keyStates[0x11] = false; });
+        toggleModifier(label);
         return;
     }
-
-    if (label == "Alt")
-    {
-        if (comboModeActive)
-        {
-            if (comboMods & COMBO_MOD_ALT)
-                comboMods &= ~COMBO_MOD_ALT;
-            else
-                comboMods |= COMBO_MOD_ALT;
-            comboOverlayVisible = true;
-            return;
-        }
-        // Alt = VK 0x12
-        keyStates[0x12] = true;
-        brls::delay(50, [this]()
-            { keyStates[0x12] = false; });
-        return;
-    }
-
-    if (label == "Win")
-    {
-        if (comboModeActive)
-        {
-            if (comboMods & COMBO_MOD_WIN)
-                comboMods &= ~COMBO_MOD_WIN;
-            else
-                comboMods |= COMBO_MOD_WIN;
-            comboOverlayVisible = true;
-            return;
-        }
-        // Win = VK 0x5B
-        keyStates[0x5B] = true;
-        brls::delay(50, [this]()
-            { keyStates[0x5B] = false; });
-        return;
-    }
-
-    auto trySelectComboKey = [this](const std::string& action) -> bool
-    {
-        if (!comboModeActive || isModifierAction(action))
-        {
-            return false;
-        }
-        int vk = -1;
-        if (mapActionToVk(action, vk))
-        {
-            comboKeyLabel       = action;
-            comboKeyVk          = vk;
-            comboHasKey         = true;
-            comboOverlayVisible = true;
-            return true;
-        }
-        return false;
-    };
 
     if (label == "Tab")
     {
-        if (trySelectComboKey(label))
-        {
-            return;
-        }
-        // Tab = VK 0x09
-        keyStates[0x09] = true;
-        brls::delay(50, [this]()
-            { keyStates[0x09] = false; });
+        pulseKey(0x09);
         return;
     }
 
     if (label == "Escape")
     {
-        if (trySelectComboKey(label))
-        {
-            return;
-        }
-        // Escape = VK 0x1B
-        keyStates[0x1B] = true;
-        brls::delay(50, [this]()
-            { keyStates[0x1B] = false; });
+        pulseKey(0x1B);
         return;
     }
 
     if (label == "Space")
     {
-        if (trySelectComboKey(label))
-        {
-            return;
-        }
-        // Space = VK 0x20
-        keyStates[0x20] = true;
-        brls::delay(50, [this]()
-            { keyStates[0x20] = false; });
+        updateTextPreview(label);
+        pulseKey(0x20);
         return;
     }
     if (label == "Enter")
     {
-        if (trySelectComboKey(label))
-        {
-            return;
-        }
-        // Enter = VK 0x0D
-        keyStates[0x0D] = true;
-        brls::delay(50, [this]()
-            { keyStates[0x0D] = false; });
+        updateTextPreview(label);
+        pulseKey(0x0D);
         return;
     }
     if (label == "Backspace")
     {
-        if (trySelectComboKey(label))
-        {
-            return;
-        }
-        // Backspace = VK 0x08
-        keyStates[0x08] = true;
-        brls::delay(50, [this]()
-            { keyStates[0x08] = false; });
+        updateTextPreview(label);
+        pulseKey(0x08);
         return;
     }
 
-    // Non-text keys (arrows, function keys, etc.)
     std::uint32_t codepoint = 0;
     if (!decode_single_utf8(label, codepoint))
     {
         int vk = -1;
         if (mapActionToVk(label, vk))
         {
-            if (comboModeActive && !isModifierAction(label))
-            {
-                comboKeyLabel       = label;
-                comboKeyVk          = vk;
-                comboHasKey         = true;
-                comboOverlayVisible = true;
-                return;
-            }
-            keyStates[vk] = true;
-            brls::delay(50, [this, vk]()
-                { keyStates[vk] = false; });
-            return;
+            pulseKey(vk);
         }
         return;
     }
 
-    if (comboModeActive)
-    {
-        // In combo mode, selecting a non-modifier key sets the combo target
-        if (!isModifierAction(label))
-        {
-            comboKeyLabel       = label;
-            comboHasKey         = true;
-            comboOverlayVisible = true;
-            int vk              = -1;
-            if (mapActionToVk(label, vk))
-                comboKeyVk = vk;
-            else
-                comboKeyVk = -1;
-        }
-        return;
-    }
-
-    if (this->shiftActive)
+    if ((modifiers & MOD_SHIFT) != 0)
     {
         codepoint = apply_shift_to_codepoint(codepoint);
     }
 
-    // Try VK code mapping first for better Linux compatibility
-    // (Sunshine on Linux uses an unreliable Ctrl+Shift+U hack for UTF-8 text)
-    // If forceUtf8Input is enabled (for Windows hosts), skip VK and go straight to UTF-8
-    if (!forceUtf8Input)
+    const bool needsKeyEvent = (modifiers & (MOD_CTRL | MOD_ALT | MOD_WIN)) != 0;
+    if (!forceUtf8Input || needsKeyEvent)
     {
         VkMapping mapping;
         if (lookup_vk_mapping(static_cast<KeyboardLayout>(currentLayout), codepoint, mapping))
         {
             short vk                = mapping.vk;
-            bool shiftAlreadyActive = keyStates[0x10];
+            bool shiftAlreadyActive = keyStates[0x10] || (modifiers & MOD_SHIFT) != 0;
             bool needShift          = mapping.needs_shift;
             bool needAltGr          = mapping.needs_altgr;
-            bool ctrlAlreadyActive  = keyStates[0x11];
-            bool altAlreadyActive   = keyStates[0x12];
+            bool ctrlAlreadyActive  = keyStates[0x11] || (modifiers & MOD_CTRL) != 0;
+            bool altAlreadyActive   = keyStates[0x12] || (modifiers & MOD_ALT) != 0;
             if (needShift && !shiftAlreadyActive)
             {
-                keyStates[0x10] = true;
+                pulseKey(0x10);
             }
             if (needAltGr)
             {
-                keyStates[0x11] = true; // VK_CONTROL
-                keyStates[0x12] = true; // VK_MENU (Alt)
-            }
-            keyStates[vk] = true;
-            brls::delay(50, [this, vk, needShift, shiftAlreadyActive, needAltGr, ctrlAlreadyActive, altAlreadyActive]()
+                if (!ctrlAlreadyActive)
                 {
-                this->keyStates[vk] = false;
-                if (needShift && !shiftAlreadyActive) {
-                    this->keyStates[0x10] = false;
+                    pulseKey(0x11);
                 }
-                if (needAltGr) {
-                    if (!ctrlAlreadyActive) this->keyStates[0x11] = false;
-                    if (!altAlreadyActive) this->keyStates[0x12] = false;
-                } });
+                if (!altAlreadyActive)
+                {
+                    pulseKey(0x12);
+                }
+            }
+            updateTextPreview(label);
+            pulseKey(vk);
             return;
         }
     }
 
-    // Fall back to UTF-8 text input (works well on Windows Sunshine)
+    if (needsKeyEvent)
+    {
+        vita_log::warning("[KeyboardOverlay] No VK mapping for modified key: %s", label.c_str());
+        clearModifiers();
+        return;
+    }
+
     if (!send_utf8_codepoint(codepoint))
     {
         vita_log::info("[KeyboardOverlay] UTF-8 send failed for key: %s", label.c_str());
+        return;
     }
+    updateTextPreview(label);
+    clearModifiers();
 }
 
 // Custom drawn: key grid
@@ -1473,6 +1511,29 @@ void KeyboardOverlay::draw(NVGcontext* vg, float x, float y, float width, float 
 
     if (keyRows.empty())
         return;
+
+    if (fullscreen && showTextPreview)
+    {
+        const float previewX = panelX + 12.0f;
+        const float previewY = panelY + 8.0f;
+        const float previewW = panelW - 24.0f;
+        const float previewH = previewHeight - 12.0f;
+        nvgBeginPath(vg);
+        nvgRoundedRect(vg, previewX, previewY, previewW, previewH, 5.0f);
+        nvgFillColor(vg, nvgRGBA(8, 10, 14, 230));
+        nvgFill(vg);
+        nvgStrokeColor(vg, nvgRGBA(70, 74, 82, 255));
+        nvgStrokeWidth(vg, 1.0f);
+        nvgStroke(vg);
+        nvgFontSize(vg, 20.0f);
+        nvgFontFaceId(vg, 0);
+        nvgFillColor(vg, nvgRGBA(230, 230, 230, 255));
+        const std::string preview = textPreview.empty() ? "|" : textPreview + "|";
+        nvgSave(vg);
+        nvgScissor(vg, previewX + 8.0f, previewY, previewW - 16.0f, previewH);
+        nvgText(vg, previewX + 10.0f, previewY + 28.0f, preview.c_str(), nullptr);
+        nvgRestore(vg);
+    }
 
     if (highlightFrames > 0)
         highlightFrames--;
@@ -1525,7 +1586,7 @@ void KeyboardOverlay::draw(NVGcontext* vg, float x, float y, float width, float 
             }
 
             // Determine if this key is highlighted
-            bool isHighlighted = (highlightRow == (int)row && highlightCol == (int)c && highlightFrames > 0);
+            bool isHighlighted = (highlightRow == (int)row && highlightCol == (int)c && highlightFrames > 0) || (pressedActive && pressedRow == (int)row && pressedCol == (int)c);
 
             // Key background
             nvgBeginPath(vg);
@@ -1536,21 +1597,13 @@ void KeyboardOverlay::draw(NVGcontext* vg, float x, float y, float width, float 
             {
                 bg = nvgRGBA(100, 180, 255, (int)(this->localPanelAlpha * 255));
             }
-            else if (comboModeActive && (isModifierAction(cols[c].action) || cols[c].action == "ComboToggle"))
-            {
-                // Highlight modifier keys in combo mode if they are selected
-                if ((cols[c].action == "Shift" && (comboMods & COMBO_MOD_SHIFT)) || (cols[c].action == "Ctrl" && (comboMods & COMBO_MOD_CTRL)) || (cols[c].action == "Alt" && (comboMods & COMBO_MOD_ALT)) || (cols[c].action == "Win" && (comboMods & COMBO_MOD_WIN)) || cols[c].action == "ComboToggle")
-                {
-                    bg = nvgRGBA(100, 140, 220, (int)(this->localPanelAlpha * 255));
-                }
-                else
-                {
-                    bg = nvgRGBA(40, 44, 52, (int)(this->localPanelAlpha * 255));
-                }
-            }
-            else if (cols[c].action == "Shift" && this->shiftActive)
+            else if (isModifierLatched(cols[c].action))
             {
                 bg = nvgRGBA(100, 140, 220, (int)(this->localPanelAlpha * 255));
+            }
+            else if (cols[c].action == "VideoFocus")
+            {
+                bg = nvgRGBA(45, 105, 190, (int)(this->localPanelAlpha * 255));
             }
             else if (cols[c].action == "Close")
             {
@@ -1571,9 +1624,13 @@ void KeyboardOverlay::draw(NVGcontext* vg, float x, float y, float width, float 
             // Determine display text
             const std::string& label = cols[c].label;
             std::string display      = label;
+            if (cols[c].action == "VideoFocus")
+            {
+                display = showBottomVideo ? "^" : "v";
+            }
             // If it is a single-codepoint key and Shift is active, show uppercase
             std::uint32_t displayCodepoint = 0;
-            if (this->shiftActive && decode_single_utf8(label, displayCodepoint))
+            if ((modifiers & MOD_SHIFT) != 0 && decode_single_utf8(label, displayCodepoint))
             {
                 const std::uint32_t shifted = apply_shift_to_codepoint(displayCodepoint);
                 if (shifted != displayCodepoint)
@@ -1616,57 +1673,5 @@ void KeyboardOverlay::draw(NVGcontext* vg, float x, float y, float width, float 
 
             keyX += kw + this->btnMargin;
         }
-    }
-
-    // Draw combo overlay in the upper-right area if active
-    if (comboModeActive && comboOverlayVisible)
-    {
-        // Compute overlay geometry: top-right, within upper half of screen
-        float screenW = (float)this->getWidth();
-        float screenH = (float)this->getHeight();
-        comboOverlayW = std::min(panelW * 0.45f, screenW * 0.6f);
-        comboOverlayH = 48.0f;
-        comboOverlayX = panelX + panelW - comboOverlayW - 12.0f;
-        comboOverlayY = std::max(12.0f, panelY * 0.5f - comboOverlayH * 0.5f);
-
-        // Background
-        nvgBeginPath(vg);
-        nvgRoundedRect(vg, comboOverlayX, comboOverlayY, comboOverlayW, comboOverlayH, 6.0f);
-        nvgFillColor(vg, nvgRGBA(30, 34, 42, (int)(this->localPanelAlpha * 230)));
-        nvgFill(vg);
-        nvgStrokeColor(vg, nvgRGBA(80, 84, 92, 200));
-        nvgStrokeWidth(vg, 1.0f);
-        nvgStroke(vg);
-
-        // Send button on the right side of overlay
-        comboClearW = comboClearH = comboOverlayH - 12.0f;
-        comboClearX               = comboOverlayX + comboOverlayW - comboClearW - 8.0f;
-        comboClearY               = comboOverlayY + 6.0f;
-
-        nvgBeginPath(vg);
-        nvgRoundedRect(vg, comboClearX, comboClearY, comboClearW, comboClearH, 4.0f);
-        nvgFillColor(vg, nvgRGBA(180, 60, 60, 220));
-        nvgFill(vg);
-        nvgFillColor(vg, nvgRGBA(255, 255, 255, 220));
-        // Draw send arrow
-        nvgFontSize(vg, 18.0f);
-        float xbounds[4];
-        const char* xtext = "->";
-        float xw          = nvgTextBounds(vg, 0, 0, xtext, nullptr, xbounds);
-        float xtx         = comboClearX + (comboClearW - xw) * 0.5f;
-        float xty         = comboClearY + (comboClearH + (xbounds[3] - xbounds[1])) * 0.5f;
-        nvgText(vg, xtx, xty, xtext, nullptr);
-
-        // Combo label on left area
-        std::string comboText = formatComboLabel();
-        if (comboText.empty())
-            comboText = "Select combo";
-        nvgFontSize(vg, 16.0f);
-        float tb[4];
-        float tw  = nvgTextBounds(vg, 0, 0, comboText.c_str(), nullptr, tb);
-        float ttx = comboOverlayX + 12.0f;
-        float tty = comboOverlayY + (comboOverlayH + (tb[3] - tb[1])) * 0.5f;
-        nvgFillColor(vg, nvgRGBA(220, 220, 220, 230));
-        nvgText(vg, ttx, tty, comboText.c_str(), nullptr);
     }
 }

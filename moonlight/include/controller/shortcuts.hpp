@@ -5,8 +5,9 @@
 #include <functional>
 
 void set_pause_callback(const std::function<void()>& cb);
-
 void set_keyboard_callback(const std::function<void()>& cb);
+
+void set_front_touch_callback(const std::function<void()>& cb);
 
 void reload_shortcuts_config();
 

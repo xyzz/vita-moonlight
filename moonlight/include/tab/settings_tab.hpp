@@ -18,12 +18,16 @@
 
 #pragma once
 
+#include <atomic>
 #include <borealis.hpp>
+#include <cstdint>
+#include <memory>
 
 class SettingsTab : public brls::Box
 {
   public:
     SettingsTab();
+    ~SettingsTab() override;
 
     BRLS_BIND(brls::RadioCell, radio, "radio");
     BRLS_BIND(brls::BooleanCell, boolean, "boolean");
@@ -64,6 +68,7 @@ class SettingsTab : public brls::Box
     BRLS_BIND(brls::BooleanCell, doubleTapSprintToggle, "doubleTapSprintToggle");
     BRLS_BIND(brls::SelectorCell, touchscreenModeSelector, "touchscreenModeSelector");
     BRLS_BIND(brls::SelectorCell, gamepadTypeSelector, "gamepadTypeSelector");
+    BRLS_BIND(brls::BooleanCell, psButtonCaptureToggle, "psButtonCaptureToggle");
     BRLS_BIND(brls::BooleanCell, swapShoulderButtonsToggle, "swapShoulderButtonsToggle");
     BRLS_BIND(brls::DetailCell, keyboardConfigureCell, "keyboardConfigureCell");
     BRLS_BIND(brls::DetailCell, shortcutsConfigureCell, "shortcutsConfigureCell");
@@ -80,6 +85,14 @@ class SettingsTab : public brls::Box
     static brls::View* create();
 
   private:
-    std::shared_ptr<bool> aliveToken = std::make_shared<bool>(true);
+    struct AsyncState
+    {
+        std::atomic<bool> alive { true };
+        std::atomic<std::uint64_t> opacityGeneration { 0 };
+        std::atomic<float> pendingOpacity { 1.0f };
+        std::atomic<bool> opacityDirty { false };
+    };
+
+    std::shared_ptr<AsyncState> asyncState = std::make_shared<AsyncState>();
     void initAsync();
 };

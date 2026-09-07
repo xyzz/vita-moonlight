@@ -58,7 +58,19 @@
 
             <brls:BooleanCell
                 id="keyboard_arrows_toggle"
-                title="@i18n/moonlight/keyboard/arrows_title"
+                title="@i18n/moonlight/keyboard/arrows_title"/>
+
+            <brls:BooleanCell
+                id="keyboard_fullscreen_toggle"
+                title="@i18n/moonlight/keyboard/fullscreen_title"/>
+
+            <brls:BooleanCell
+                id="keyboard_preview_toggle"
+                title="@i18n/moonlight/keyboard/text_preview_title"/>
+
+            <brls:BooleanCell
+                id="keyboard_mouse_toggle"
+                title="@i18n/moonlight/keyboard/mouse_passthrough_title"
                 marginBottom="20"/>
 
             <!-- Theme Settings (Future) -->

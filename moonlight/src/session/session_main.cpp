@@ -45,7 +45,6 @@ SessionMainView::SessionMainView(const HostInfo& host, const RemoteAppInfo& app)
     if (g_controllerInput)
     {
         g_controllerInput->setStreamingActive(true);
-        g_controllerInput->lockPSButton();
     }
 
     // Notify server of gamepad type saved in config
@@ -77,6 +76,16 @@ SessionMainView::SessionMainView(const HostInfo& host, const RemoteAppInfo& app)
             return;
         }
         open_configured_keyboard(); });
+
+    g_controllerInput->setFrontTouchShortcutCallback([]()
+        {
+        if (!g_controllerInput) {
+            return;
+        }
+        const bool enabled = g_controllerInput->toggleFrontTouchEnabled();
+        brls::Application::notify(brls::getStr(enabled
+                ? "moonlight/front_touch/notify_enabled"
+                : "moonlight/front_touch/notify_disabled")); });
 
     // Reset input to avoid residual states of the previous UI
     if (g_controllerInput)

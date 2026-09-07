@@ -112,4 +112,50 @@ void settings::applyLanguageEnv(const std::string& lang)
 #endif
 }
 
+void settings::applyBackground(brls::View* view, float opacity)
+{
+    if (!view)
+    {
+        return;
+    }
+
+    NVGcolor background = Application::getTheme().getColor("brls/background");
+    background.a        = std::max(0.0f, std::min(1.0f, opacity));
+
+    AppletFrame* frame = nullptr;
+    for (View* parent = view->getParent(); parent != nullptr; parent = parent->getParent())
+    {
+        frame = dynamic_cast<AppletFrame*>(parent);
+        if (frame)
+        {
+            break;
+        }
+    }
+
+    if (frame)
+    {
+        view->setBackgroundColor(nvgRGBA(0, 0, 0, 0));
+        frame->setBackgroundColor(background);
+    }
+    else
+    {
+        view->setBackgroundColor(background);
+    }
+}
+
+void settings::pushView(brls::View* view, const std::string& title)
+{
+    if (!view)
+    {
+        return;
+    }
+
+    auto* frame = new AppletFrame(view);
+    ConfigManager config;
+    config.load();
+    applyBackground(view, config.getVideoSettings().settings_background_opacity);
+    frame->setTitle(title);
+    Application::pushActivity(new Activity(frame), TransitionAnimation::FADE);
+}
+
 } // namespace moonlight

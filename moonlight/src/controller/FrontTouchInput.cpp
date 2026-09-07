@@ -44,11 +44,11 @@ void FrontTouchInputManager::updateSettings(const VideoSettings& settings)
 
 void FrontTouchInputManager::setEnabled(bool value)
 {
-    enabled = value;
-    if (!enabled)
+    if (enabled && !value)
     {
-        lastZoneActive.fill(false);
+        dropState();
     }
+    enabled = value;
 }
 
 void FrontTouchInputManager::recalcZones()

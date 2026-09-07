@@ -190,6 +190,7 @@
       },
       "notify_prefix": "Le type de contrôleur est passé à :"
     },
+    "capture_ps_button": "Utiliser la touche PS comme Guide",
     "swap_shoulder_buttons": {
       "title": "Échange R1/L1 <-> R2/L2",
       "notify_enabled": "Inverser les boutons d'épaule activés",
@@ -257,6 +258,9 @@
     "mode_saved": "Mode clavier enregistré",
     "numbers_row_title": "Afficher la rangée de chiffres",
     "arrows_title": "Afficher les touches fléchées",
+    "fullscreen_title": "Clavier en plein écran",
+    "text_preview_title": "Afficher l’aperçu de la saisie",
+    "mouse_passthrough_title": "Utiliser la zone vidéo comme pavé tactile",
     "theme_preview_title": "Thème actuel",
     "theme_editor_title": "Éditeur de thème",
     "theme_info": "Les thèmes personnalisés seront disponibles dans une prochaine mise à jour. Vous pourrez créer et partager vos propres dispositions.",
@@ -285,6 +289,7 @@
     "editor_name_hint": "Nom optionnel pour ce raccourci",
     "action_pause": "Pause",
     "action_keyboard": "Clavier",
+    "action_front_touch": "Activer/désactiver les zones tactiles avant",
     "disabled_combo": "Désactivé",
     "clear_combo_title": "Effacer la combinaison",
     "clear_combo_detail": "Définit les boutons 1, 2 et 3 sur Aucun",

@@ -66,6 +66,16 @@ static std::vector<std::string> NOTIFICATIONS = {
     "Hello\nWorld!"
 };
 
+static void saveSettingsOpacity(float value)
+{
+    ConfigManager config;
+    config.load();
+    VideoSettings settings               = config.getVideoSettings();
+    settings.settings_background_opacity = value;
+    config.setVideoSettings(settings);
+    config.save();
+}
+
 SettingsTab::SettingsTab()
 {
     // Inflate the tab from the XML file
@@ -76,37 +86,32 @@ SettingsTab::SettingsTab()
     StreamConfiguration streamConfig = config.getStreamConfig();
     VideoSettings videoSettings      = config.getVideoSettings();
 
-    NVGcolor settingsBackground = brls::Application::getTheme().getColor("brls/background");
-    settingsBackground.a        = videoSettings.settings_background_opacity;
-    this->setBackgroundColor(settingsBackground);
+    moonlight::settings::applyBackground(this, videoSettings.settings_background_opacity);
 
     settingsOpacitySlider->init(
         brls::getStr("moonlight/settings_tab/settings_background_opacity"),
         videoSettings.settings_background_opacity,
         [this](float value)
         {
-            value               = std::max(0.0f, std::min(1.0f, value));
-            NVGcolor background = brls::Application::getTheme().getColor("brls/background");
-            background.a        = value;
-            if (auto* frame = dynamic_cast<brls::AppletFrame*>(this->getParent()))
-            {
-                this->setBackgroundColor(nvgRGBA(0, 0, 0, 0));
-                frame->setBackgroundColor(background);
-            }
-            else
-            {
-                this->setBackgroundColor(background);
-            }
+            value = std::max(0.0f, std::min(1.0f, value));
+            moonlight::settings::applyBackground(this, value);
             settingsOpacitySlider->setDetailText(fmt::format("{:.0f}%", value * 100.0f));
 
-            ConfigManager config;
-            config.load();
-            VideoSettings settings               = config.getVideoSettings();
-            settings.settings_background_opacity = value;
-            config.setVideoSettings(settings);
-            config.save();
             extern VideoSettings g_video_settings_snapshot;
             g_video_settings_snapshot.settings_background_opacity = value;
+
+            std::shared_ptr<AsyncState> state = asyncState;
+            state->pendingOpacity.store(value, std::memory_order_release);
+            state->opacityDirty.store(true, std::memory_order_release);
+            const std::uint64_t generation = state->opacityGeneration.fetch_add(1, std::memory_order_acq_rel) + 1;
+            brls::delay(250, [state, generation]()
+                {
+                if (!state->alive.load(std::memory_order_acquire) ||
+                    state->opacityGeneration.load(std::memory_order_acquire) != generation ||
+                    !state->opacityDirty.exchange(false, std::memory_order_acq_rel)) {
+                    return;
+                }
+                saveSettingsOpacity(state->pendingOpacity.load(std::memory_order_acquire)); });
         });
     settingsOpacitySlider->setDetailText(fmt::format("{:.0f}%", videoSettings.settings_background_opacity * 100.0f));
 
@@ -548,10 +553,7 @@ SettingsTab::SettingsTab()
         gyroSettingsEntry->registerClickAction([](brls::View*)
             {
             auto* gyroView = new GyroSettingsTab();
-            auto* frame = new brls::AppletFrame(gyroView);
-            frame->setTitle(brls::getStr("moonlight/gyro/title"));
-            auto* act = new brls::Activity(frame);
-            brls::Application::pushActivity(act);
+            moonlight::settings::pushView(gyroView, brls::getStr("moonlight/gyro/title"));
             return true; });
     }
 
@@ -570,13 +572,7 @@ SettingsTab::SettingsTab()
         rearTouchSettingsEntry->registerClickAction([](brls::View*)
             {
             auto* rearTouchView = new RearTouchSettingsTab();
-            // Prefer wrapping the settings view in an AppletFrame so the
-            // standard header / footer are displayed (like in main.xml).
-            // Set the title on the frame so the top header is visible.
-            auto* frame = new brls::AppletFrame(rearTouchView);
-            frame->setTitle(brls::getStr("moonlight/rear_touch/title"));
-            auto* act = new brls::Activity(frame);
-            brls::Application::pushActivity(act);
+            moonlight::settings::pushView(rearTouchView, brls::getStr("moonlight/rear_touch/title"));
             return true; });
     }
 
@@ -586,10 +582,7 @@ SettingsTab::SettingsTab()
         frontTouchSettingsEntry->registerClickAction([](brls::View*)
             {
             auto* frontTouchView = new FrontTouchSettingsTab();
-            auto* frame = new brls::AppletFrame(frontTouchView);
-            frame->setTitle(brls::getStr("moonlight/front_touch/title"));
-            auto* act = new brls::Activity(frame);
-            brls::Application::pushActivity(act);
+            moonlight::settings::pushView(frontTouchView, brls::getStr("moonlight/front_touch/title"));
             return true; });
     }
 
@@ -600,13 +593,7 @@ SettingsTab::SettingsTab()
         trackpadSettingsEntry->registerClickAction([](brls::View*)
             {
             auto* trackpadView = new TrackpadSettingsTab();
-            // Prefer wrapping the settings view in an AppletFrame so the
-            // standard header / footer are displayed (like in main.xml).
-            // Set the title on the frame so the top header is visible.
-            auto* frame = new brls::AppletFrame(trackpadView);
-            frame->setTitle(brls::getStr("moonlight/trackpad/header"));
-            auto* act = new brls::Activity(frame);
-            brls::Application::pushActivity(act);
+            moonlight::settings::pushView(trackpadView, brls::getStr("moonlight/trackpad/header"));
             return true; });
     }
 
@@ -658,6 +645,23 @@ SettingsTab::SettingsTab()
             brls::Application::notify(message);
         } });
 
+    psButtonCaptureToggle->init(
+        brls::getStr("moonlight/settings_tab/capture_ps_button"),
+        videoSettings.capture_ps_button,
+        [](bool value)
+        {
+            ConfigManager config;
+            config.load();
+            VideoSettings settings     = config.getVideoSettings();
+            settings.capture_ps_button = value;
+            config.setVideoSettings(settings);
+            config.save();
+            if (g_controllerInput)
+            {
+                g_controllerInput->setPSButtonCapture(value);
+            }
+        });
+
     // Configure swap shoulder buttons toggle
     swapShoulderButtonsToggle->init(brls::getStr("moonlight/settings_tab/swap_shoulder_buttons/title"), videoSettings.swap_shoulder_buttons, [this](bool value)
         {
@@ -681,10 +685,7 @@ SettingsTab::SettingsTab()
         keyboardConfigureCell->registerClickAction([](brls::View*)
             {
             auto* keyboardView = new KeyboardSettingsTab();
-            auto* frame = new brls::AppletFrame(keyboardView);
-            frame->setTitle(brls::getStr("moonlight/keyboard/title"));
-            auto* act = new brls::Activity(frame);
-            brls::Application::pushActivity(act);
+            moonlight::settings::pushView(keyboardView, brls::getStr("moonlight/keyboard/title"));
             return true; });
     }
 
@@ -694,10 +695,7 @@ SettingsTab::SettingsTab()
         shortcutsConfigureCell->registerClickAction([](brls::View*)
             {
             auto* shortcutsView = new ShortcutsSettingsTab();
-            auto* frame = new brls::AppletFrame(shortcutsView);
-            frame->setTitle(brls::getStr("moonlight/shortcuts/title"));
-            auto* act = new brls::Activity(frame);
-            brls::Application::pushActivity(act);
+            moonlight::settings::pushView(shortcutsView, brls::getStr("moonlight/shortcuts/title"));
             return true; });
     }
 
@@ -728,11 +726,7 @@ SettingsTab::SettingsTab()
     microphoneConfigureCell->registerClickAction([](brls::View* view)
         {
         auto* micView = new MicrophoneSettingsTab();
-        // Wrap in AppletFrame to show standard header/footer (like rear touch settings)
-        auto* frame = new brls::AppletFrame(micView);
-        frame->setTitle(brls::getStr("moonlight/microphone/title"));
-        auto* act = new brls::Activity(frame);
-        brls::Application::pushActivity(act);
+        moonlight::settings::pushView(micView, brls::getStr("moonlight/microphone/title"));
         return true; });
 
     // Configure system options (original)
@@ -895,6 +889,19 @@ SettingsTab::SettingsTab()
     SettingsTab::languageSelectorPtr = languageSelector;
 }
 
+SettingsTab::~SettingsTab()
+{
+    asyncState->alive.store(false, std::memory_order_release);
+    if (asyncState->opacityDirty.exchange(false, std::memory_order_acq_rel))
+    {
+        saveSettingsOpacity(asyncState->pendingOpacity.load(std::memory_order_acquire));
+    }
+    if (languageSelectorPtr == languageSelector)
+    {
+        languageSelectorPtr = nullptr;
+    }
+}
+
 brls::View* SettingsTab::create()
 {
     return new SettingsTab();
@@ -902,17 +909,17 @@ brls::View* SettingsTab::create()
 
 void SettingsTab::initAsync()
 {
-    std::shared_ptr<bool> token = this->aliveToken;
+    std::shared_ptr<AsyncState> state = this->asyncState;
 
-    std::thread([this, token]()
+    std::thread([this, state]()
         {
         // Fetch system info in background (may block on network)
         std::string ip = brls::Application::getPlatform()->getIpAddress();
         std::string dns = brls::Application::getPlatform()->getDnsServer();
         float brightness = brls::Application::getPlatform()->getBacklightBrightness();
 
-        brls::sync([this, token, ip, dns, brightness]() {
-            if (!(*token)) return;
+        brls::sync([this, state, ip, dns, brightness]() {
+            if (!state->alive.load(std::memory_order_acquire)) return;
 
             // Update UI
             ipAddress->setDetailText(ip);

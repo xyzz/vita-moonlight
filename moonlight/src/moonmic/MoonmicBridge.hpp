@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <mutex>
 #include <string>
 #include <utility>
 
@@ -69,11 +70,21 @@ class MoonmicBridge
         uint16_t current_height = 0;
     };
 
+    struct TypingFocusResult
+    {
+        bool success       = false;
+        bool caret         = false;
+        float normalized_x = 0.5f;
+        float normalized_y = 0.5f;
+    };
+
     /**
      * @brief Send raw resolution handshake without starting capture
      * @param force Force update even if resolution differs
      */
     HandshakeResult sendResolutionHandshake(const std::string& hostIp, int port, bool force = false);
+    bool isAvailable(const std::string& hostIp, int port) const;
+    TypingFocusResult queryTypingFocus(const std::string& hostIp, int port);
 
     /**
      * @brief Load configuration from persistent storage
@@ -89,11 +100,17 @@ class MoonmicBridge
     MoonmicBridge();
     ~MoonmicBridge() = default;
 
+    void setAvailability(const std::string& hostIp, int port, bool available);
+
     // Configuration
     uint16_t target_width_  = 1280; // Default: 720p
     uint16_t target_height_ = 720;
 
     std::string config_file_;
+    mutable std::mutex availability_mutex_;
+    std::string available_host_;
+    int available_port_ = 0;
+    bool available_     = false;
 };
 
 } // namespace moonmic

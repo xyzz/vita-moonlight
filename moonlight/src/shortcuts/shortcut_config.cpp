@@ -46,6 +46,8 @@ namespace
                 return "PAUSE";
             case ShortcutAction::Keyboard:
                 return "KEYBOARD";
+            case ShortcutAction::FrontTouch:
+                return "FRONT_TOUCH";
             default:
                 return "KEYBOARD";
         }
@@ -94,6 +96,11 @@ namespace
         if (token == "KEYBOARD")
         {
             outAction = ShortcutAction::Keyboard;
+            return true;
+        }
+        if (token == "FRONT_TOUCH")
+        {
+            outAction = ShortcutAction::FrontTouch;
             return true;
         }
         return false;
@@ -160,7 +167,7 @@ namespace
 
     ShortcutAction sanitizeAction(ShortcutAction action)
     {
-        if (action == ShortcutAction::Pause || action == ShortcutAction::Keyboard)
+        if (action == ShortcutAction::Pause || action == ShortcutAction::Keyboard || action == ShortcutAction::FrontTouch)
         {
             return action;
         }

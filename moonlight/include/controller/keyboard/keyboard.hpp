@@ -43,6 +43,8 @@ class KeyboardOverlay : public BaseOverlay, public IKeyboard
     bool sendsDirectly() const override { return false; }
     bool usesNonNormalizedVk() const override { return true; }
     bool selfDestructs() const override { return true; }
+    bool allowsStreamTouch() const override;
+    int streamTouchHeight() const override;
     void update() override;
 
     bool loadCss(const std::string& path);
@@ -68,12 +70,21 @@ class KeyboardOverlay : public BaseOverlay, public IKeyboard
     void startRepeat(const std::string& action, int row, int col);
     void stopRepeat();
     void sendRepeatAction(const std::string& action);
-    void clearComboSelection();
-    void setComboMode(bool enabled);
     bool isSpacerAction(const std::string& action) const;
-    std::string formatComboLabel() const;
     bool isModifierAction(const std::string& action) const;
+    bool isModifierLatched(const std::string& action) const;
+    void finishModifierPress(bool activate);
+    void pulseModifier(const std::string& action);
+    void toggleModifier(const std::string& action);
+    void clearModifiers();
+    void applyLatchedModifiers(std::uint64_t releaseAtUs);
+    void updateTextPreview(const std::string& action);
+    void toggleVideoFocus();
+    void updateVideoViewport();
     bool mapActionToVk(const std::string& action, int& outVk) const;
+    void pulseKey(int vk);
+    void releaseExpiredKeys();
+    void releaseAllKeys();
 
     float calcRowWidth(const std::vector<KeyDef>& row, float baseW) const;
     void recalculateKeyMetrics();
@@ -83,35 +94,24 @@ class KeyboardOverlay : public BaseOverlay, public IKeyboard
     bool loaded  = false;
     bool visible = false;
 
+    // BaseOverlay keeps panelAlpha private.
     float localPanelAlpha = 1.0f;
     float baseBtnH        = 0.0f;
-
-    // Shift State — toggle when the Shift key is pressed
-    bool shiftActive = false;
 
     int layoutPage = 0;
 
     int currentLayout   = 0;
     bool forceUtf8Input = false;
 
-    bool showNumbersRow = true;
-    bool showArrowKeys  = true;
-
-    // Combo mode state
-    bool comboModeActive   = false;
-    unsigned int comboMods = 0;
-    std::string comboKeyLabel;
-    int comboKeyVk           = -1;
-    bool comboHasKey         = false;
-    float comboOverlayX      = 0.0f;
-    float comboOverlayY      = 0.0f;
-    float comboOverlayW      = 0.0f;
-    float comboOverlayH      = 0.0f;
-    float comboClearX        = 0.0f;
-    float comboClearY        = 0.0f;
-    float comboClearW        = 0.0f;
-    float comboClearH        = 0.0f;
-    bool comboOverlayVisible = false;
+    bool showNumbersRow    = true;
+    bool showArrowKeys     = true;
+    bool fullscreen        = false;
+    bool showTextPreview   = true;
+    bool mousePassthrough  = false;
+    bool showBottomVideo   = false;
+    unsigned int modifiers = 0;
+    std::string textPreview;
+    float previewHeight = 52.0f;
 
     int highlightRow    = -1;
     int highlightCol    = -1;
@@ -120,6 +120,9 @@ class KeyboardOverlay : public BaseOverlay, public IKeyboard
     int pressedRow     = -1;
     int pressedCol     = -1;
     bool pressedActive = false;
+    std::string pressedModifier;
+    std::uint64_t modifierPressStartUs = 0;
+    bool modifierHoldTriggered         = false;
     std::string repeatAction;
     bool repeatActive           = false;
     std::uint64_t repeatStartUs = 0;
@@ -127,4 +130,5 @@ class KeyboardOverlay : public BaseOverlay, public IKeyboard
     bool closePending           = false;
 
     bool keyStates[256];
+    std::uint64_t keyReleaseAtUs[256] {};
 };

@@ -77,14 +77,26 @@ bool TouchInputManager::setTouchMode(int newMode, int gamepadType)
     return true;
 }
 
-void TouchInputManager::handleTouch(int touchscreenMode)
+void TouchInputManager::handleTouch(int touchscreenMode, int activeHeight)
 {
     if (touchscreenMode == TOUCHSCREEN_MODE_OFF)
     {
         return;
     }
 
+    this->activeHeight = std::max(1, std::min(HEIGHT, activeHeight));
     sceTouchPeek(SCE_TOUCH_PORT_FRONT, &touchData, 1);
+
+    const int maxTouchY = this->activeHeight * 2;
+    int filteredCount   = 0;
+    for (int i = 0; i < touchData.reportNum; ++i)
+    {
+        if (touchData.report[i].y < maxTouchY)
+        {
+            touchData.report[filteredCount++] = touchData.report[i];
+        }
+    }
+    touchData.reportNum = filteredCount;
 
     switch (touchscreenMode)
     {
@@ -365,7 +377,7 @@ void TouchInputManager::handleDS4Touch()
         }
 
         float x = (float)report.x / 1920.0f;
-        float y = (float)report.y / 1088.0f;
+        float y = (float)report.y / (float)(this->activeHeight * 2);
         LiSendControllerTouchEvent(0, eventType, report.id, x, y, 1.0f);
     }
 }
@@ -398,7 +410,7 @@ void TouchInputManager::handleMouseAbsolute()
         SceTouchReport report = touchData.report[0];
 
         int screenX = (report.x * WIDTH) / 1920;
-        int screenY = (report.y * HEIGHT) / 1088;
+        int screenY = (report.y * HEIGHT) / (this->activeHeight * 2);
         LiSendMousePositionEvent(screenX, screenY, WIDTH, HEIGHT);
 
         if (absoluteState.fingerCount != 1)
@@ -474,7 +486,7 @@ void TouchInputManager::handleTabletTouch()
         if (!stillPressed)
         {
             float x = ((float)lastReport.x * WIDTH) / 1920.0f / WIDTH; // = lastReport.x / 1920.0f
-            float y = ((float)lastReport.y * HEIGHT) / 1088.0f / HEIGHT; // = lastReport.y / 1088.0f
+            float y = (float)lastReport.y / (float)(this->activeHeight * 2);
 
             LiSendTouchEvent(LI_TOUCH_EVENT_UP, lastReport.id, x, y, 0.0f, 0.0f, 0.0f, LI_ROT_UNKNOWN);
             vita_log::info("[TABLET] UP finger=%d x=%.3f y=%.3f", lastReport.id, x, y);
@@ -502,7 +514,7 @@ void TouchInputManager::handleTabletTouch()
         }
 
         float x = (float)report.x / 1920.0f;
-        float y = (float)report.y / 1088.0f;
+        float y = (float)report.y / (float)(this->activeHeight * 2);
         LiSendTouchEvent(eventType, report.id, x, y, 1.0f, 0.0f, 0.0f, LI_ROT_UNKNOWN);
 
         if (eventType == LI_TOUCH_EVENT_DOWN)
@@ -540,6 +552,8 @@ void TouchInputManager::dropTouch(int touchscreenMode)
         default:
             break;
     }
+    memset(&touchData, 0, sizeof(touchData));
+    memset(&lastTouchData, 0, sizeof(lastTouchData));
 }
 
 void TouchInputManager::setTrackpadSettings(int pointerSpeed, int deadZone, bool tapToClick,

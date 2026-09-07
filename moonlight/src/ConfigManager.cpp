@@ -405,6 +405,10 @@ VideoSettings ConfigManager::getVideoSettings() const
     settings.keyboard_input_mode          = get("video", "keyboard_input_mode", "false") == "true";
     settings.keyboard_numbers_row         = get("video", "keyboard_numbers_row", "true") == "true";
     settings.keyboard_show_arrows         = get("video", "keyboard_show_arrows", "true") == "true";
+    settings.keyboard_fullscreen          = get("video", "keyboard_fullscreen", "false") == "true";
+    settings.keyboard_text_preview        = get("video", "keyboard_text_preview", "true") == "true";
+    settings.keyboard_mouse_passthrough   = get("video", "keyboard_mouse_passthrough", "false") == "true";
+    settings.capture_ps_button            = get("video", "capture_ps_button", "true") == "true";
     settings.render_mode                  = std::stoi(get("video", "render_mode", "0"));
     settings.pixel_format_mode            = std::stoi(get("video", "pixel_format_mode", "1"));
     settings.gamepad_type                 = static_cast<GamepadType>(std::stoi(get("video", "gamepad_type", "0")));
@@ -516,6 +520,10 @@ void ConfigManager::setVideoSettings(const VideoSettings& settings)
     set("video", "keyboard_input_mode", settings.keyboard_input_mode ? "true" : "false");
     set("video", "keyboard_numbers_row", settings.keyboard_numbers_row ? "true" : "false");
     set("video", "keyboard_show_arrows", settings.keyboard_show_arrows ? "true" : "false");
+    set("video", "keyboard_fullscreen", settings.keyboard_fullscreen ? "true" : "false");
+    set("video", "keyboard_text_preview", settings.keyboard_text_preview ? "true" : "false");
+    set("video", "keyboard_mouse_passthrough", settings.keyboard_mouse_passthrough ? "true" : "false");
+    set("video", "capture_ps_button", settings.capture_ps_button ? "true" : "false");
     set("video", "render_mode", std::to_string(settings.render_mode));
     set("video", "pixel_format_mode", std::to_string(settings.pixel_format_mode));
     set("video", "gamepad_type", std::to_string(static_cast<int>(settings.gamepad_type)));

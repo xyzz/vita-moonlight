@@ -190,6 +190,7 @@
                 },
                 "notify_prefix": "Controller type changed to: "
             },
+            "capture_ps_button": "Use PS button as Guide",
             "swap_shoulder_buttons": {
                 "title": "Swap R1/L1 <-> R2/L2",
                 "notify_enabled": "Swap shoulder buttons enabled",
@@ -257,6 +258,9 @@
             "mode_saved": "Keyboard mode saved",
             "numbers_row_title": "Show number row",
             "arrows_title": "Show arrow keys",
+            "fullscreen_title": "Full-screen keyboard",
+            "text_preview_title": "Show local typing preview",
+            "mouse_passthrough_title": "Use video area as touchpad",
             "theme_preview_title": "Current Theme",
             "theme_editor_title": "Theme Editor",
             "theme_info": "Custom keyboard themes will be available in a future update. You will be able to create and share your own keyboard designs!",
@@ -285,6 +289,7 @@
             "editor_name_hint": "Optional name for this shortcut",
             "action_pause": "Pause",
             "action_keyboard": "Keyboard",
+            "action_front_touch": "Toggle front touch zones",
             "disabled_combo": "Disabled",
             "clear_combo_title": "Clear combination",
             "clear_combo_detail": "Set Button 1/2/3 to None",

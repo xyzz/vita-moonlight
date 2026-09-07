@@ -1,10 +1,8 @@
-// legacy_keyboard.cpp
-// Keyboard implementation using sceImeOpen + sceImeUpdate from main loop updates.
-
 #include "controller/keyboard/legacy_keyboard.hpp"
 
 #if defined(__PSV__) || defined(__psp2__) || defined(__PSP2__)
 #include <psp2/kernel/clib.h>
+#include <psp2/kernel/threadmgr.h>
 #include <psp2/libime.h>
 #include <psp2/sysmodule.h>
 #endif
@@ -12,6 +10,7 @@
 #include <string.h>
 
 #include <cstdint>
+#include <deque>
 
 #include "ConfigManager.hpp"
 #include "Limelight.h"
@@ -24,15 +23,19 @@
 static KeyboardLayout g_legacy_keyboard_layout = KB_LAYOUT_EN_US;
 static bool g_legacy_force_utf8                = false;
 
-static constexpr int IME_VIRTUAL_TEXT_LEN = 4;
+static constexpr SceUInt32 IME_VIRTUAL_TEXT_LENGTH  = 3;
+static constexpr SceUInt32 IME_MAX_TEXT_LENGTH      = 4;
+static constexpr SceUInt32 IME_OUTPUT_BUFFER_LENGTH = SCE_IME_MAX_PREEDIT_LENGTH + IME_MAX_TEXT_LENGTH + 1;
 static uint8_t g_ime_work[SCE_IME_WORK_BUFFER_SIZE] __attribute__((aligned(16)));
-static SceWChar16 g_ime_initial[IME_VIRTUAL_TEXT_LEN] __attribute__((aligned(4))) = { 1, 1, 1, 0 };
-static SceWChar16 g_ime_output[IME_VIRTUAL_TEXT_LEN] __attribute__((aligned(4)))  = { 0 };
+static SceWChar16 g_ime_initial[IME_VIRTUAL_TEXT_LENGTH + 1] __attribute__((aligned(4))) = { 1, 1, 1, 0 };
+static SceWChar16 g_ime_empty_initial[1] __attribute__((aligned(4)))                     = { 0 };
+static SceWChar16 g_ime_output[IME_OUTPUT_BUFFER_LENGTH] __attribute__((aligned(4)))     = { 0 };
 static SceImeCaret g_ime_caret;
 static std::atomic<bool> g_ime_close_requested { false };
 static std::atomic<bool> g_ime_just_opened { false };
-static std::atomic<std::uint32_t> g_pending_char { 0 };
 static std::atomic<std::uint32_t> g_pending_events { 0 };
+static std::mutex g_pending_chars_mutex;
+static std::deque<std::uint32_t> g_pending_chars;
 
 enum PendingImeEvent : std::uint32_t
 {
@@ -120,22 +123,30 @@ static void send_backspace_keypress()
     send_vk_event(0x08, KEY_ACTION_UP);
 }
 
-static void reset_ime_virtual_text()
+static bool reset_ime_virtual_text()
 {
-    for (int i = 0; i < IME_VIRTUAL_TEXT_LEN; ++i)
+    sceClibMemset(g_ime_output, 0, sizeof(g_ime_output));
+    for (SceUInt32 i = 0; i < IME_VIRTUAL_TEXT_LENGTH; ++i)
     {
         g_ime_output[i] = 1;
     }
-    g_ime_output[IME_VIRTUAL_TEXT_LEN - 1] = 0;
     sceClibMemset(&g_ime_caret, 0, sizeof(g_ime_caret));
     g_ime_caret.index = 1;
-    sceImeSetText(g_ime_initial, IME_VIRTUAL_TEXT_LEN);
-    sceImeSetCaret(&g_ime_caret);
+
+    const int textRes  = sceImeSetText(g_ime_initial, IME_VIRTUAL_TEXT_LENGTH);
+    const int caretRes = sceImeSetCaret(&g_ime_caret);
+    if (textRes < 0 || caretRes < 0)
+    {
+        vita_log::error("[LegacyKB] IME reset failed: text=0x%08X caret=0x%08X", textRes, caretRes);
+        return false;
+    }
+
+    return true;
 }
 
 static wchar_t extract_committed_char()
 {
-    for (int i = 0; i < IME_VIRTUAL_TEXT_LEN; ++i)
+    for (SceUInt32 i = 0; i < IME_OUTPUT_BUFFER_LENGTH; ++i)
     {
         SceWChar16 ch = g_ime_output[i];
         if (ch != 0 && ch != 1)
@@ -198,7 +209,8 @@ static void legacykb_ime_event_handler(void* /*arg*/, const SceImeEventData* e)
 
             if (ch != 0)
             {
-                g_pending_char.store(static_cast<std::uint32_t>(ch), std::memory_order_release);
+                std::lock_guard<std::mutex> lock(g_pending_chars_mutex);
+                g_pending_chars.push_back(static_cast<std::uint32_t>(ch));
             }
             g_pending_events.fetch_or(PendingEventResetVirtualText, std::memory_order_acq_rel);
             break;
@@ -218,7 +230,7 @@ static void legacykb_ime_event_handler(void* /*arg*/, const SceImeEventData* e)
         }
         case SCE_IME_EVENT_PRESS_ENTER:
             g_pending_events.fetch_or(PendingEventEnter | PendingEventResetVirtualText, std::memory_order_acq_rel);
-            // fall through
+            break;
         case SCE_IME_EVENT_PRESS_CLOSE:
             g_ime_close_requested.store(true, std::memory_order_release);
             break;
@@ -238,7 +250,7 @@ LegacyKeyboard::~LegacyKeyboard()
 
 void LegacyKeyboard::open()
 {
-    if (isOpenFlag.load(std::memory_order_acquire))
+    if (isOpenFlag.load(std::memory_order_acquire) || imeThread.joinable())
     {
         vita_log::info("[LegacyKB] Already open, ignoring");
         return;
@@ -253,16 +265,67 @@ void LegacyKeyboard::open()
         g_legacy_force_utf8      = vs.keyboard_input_mode;
     }
 
+    stopRequested.store(false, std::memory_order_release);
+    {
+        std::lock_guard<std::mutex> lock(startMutex);
+        startFinished  = false;
+        startSucceeded = false;
+    }
+
+    imeThread = std::thread(&LegacyKeyboard::runIme, this);
+
+    std::unique_lock<std::mutex> lock(startMutex);
+    startCondition.wait(lock, [this]()
+        { return startFinished; });
+    const bool opened = startSucceeded;
+    lock.unlock();
+
+    if (!opened && imeThread.joinable())
+    {
+        imeThread.join();
+    }
+#else
+    vita_log::info("[LegacyKB] IME not available on this platform");
+#endif
+}
+
+void LegacyKeyboard::close()
+{
+#if defined(__PSV__) || defined(__psp2__) || defined(__PSP2__)
+    stopRequested.store(true, std::memory_order_release);
+    if (imeThread.joinable())
+    {
+        imeThread.join();
+    }
+#endif
+
+    g_ime_close_requested.store(false, std::memory_order_release);
+    g_ime_just_opened.store(false, std::memory_order_release);
+    isOpenFlag.store(false, std::memory_order_release);
+}
+
+bool LegacyKeyboard::isOpen() const
+{
+    return isOpenFlag.load(std::memory_order_acquire);
+}
+
+void LegacyKeyboard::update()
+{
+}
+
+void LegacyKeyboard::runIme()
+{
+#if defined(__PSV__) || defined(__psp2__) || defined(__PSP2__)
     g_ime_close_requested.store(false, std::memory_order_release);
     g_ime_just_opened.store(true, std::memory_order_release);
-    g_pending_char.store(0, std::memory_order_release);
     g_pending_events.store(PendingEventNone, std::memory_order_release);
-
-    int loadRes = sceSysmoduleLoadModule(SCE_SYSMODULE_IME);
-    if (loadRes < 0)
     {
-        vita_log::error("[LegacyKB] sceSysmoduleLoadModule(IME) failed: 0x%08X", loadRes);
+        std::lock_guard<std::mutex> lock(g_pending_chars_mutex);
+        g_pending_chars.clear();
     }
+
+    const int loadRes = sceSysmoduleLoadModule(SCE_SYSMODULE_IME);
+    vita_log::info("[LegacyKB] IME module load: 0x%08X", loadRes);
 
     SceImeParam param;
     sceImeParamInit(&param);
@@ -286,105 +349,123 @@ void LegacyKeyboard::open()
     param.option          = SCE_IME_OPTION_NO_ASSISTANCE;
     param.work            = g_ime_work;
     param.handler         = legacykb_ime_event_handler;
-    param.initialText     = g_ime_initial;
-    param.maxTextLength   = IME_VIRTUAL_TEXT_LEN;
+    param.initialText     = g_ime_empty_initial;
+    param.maxTextLength   = IME_MAX_TEXT_LENGTH;
     param.inputTextBuffer = g_ime_output;
     param.enterLabel      = SCE_IME_ENTER_LABEL_DEFAULT;
     param.arg             = nullptr;
 
+    vita_log::info(
+        "[LegacyKB] Opening IME sdk=0x%08X language=0x%llX forced=%d max=%u",
+        param.sdkVersion,
+        static_cast<unsigned long long>(param.supportedLanguages),
+        static_cast<int>(param.languagesForced),
+        param.maxTextLength);
+
     int openRes = sceImeOpen(&param);
+    if (openRes == static_cast<int>(SCE_IME_ERROR_INVALID_PARAM))
+    {
+        vita_log::info("[LegacyKB] Retrying IME with system language");
+        param.supportedLanguages = 0;
+        param.languagesForced    = SCE_FALSE;
+        openRes                  = sceImeOpen(&param);
+    }
     if (openRes < 0)
     {
+        {
+            std::lock_guard<std::mutex> lock(startMutex);
+            startSucceeded = false;
+            startFinished  = true;
+        }
+        startCondition.notify_one();
         vita_log::error("[LegacyKB] sceImeOpen failed: 0x%08X", openRes);
-        isOpenFlag.store(false, std::memory_order_release);
         return;
     }
 
-    reset_ime_virtual_text();
+    if (!reset_ime_virtual_text())
+    {
+        const int closeRes = sceImeClose();
+        {
+            std::lock_guard<std::mutex> lock(startMutex);
+            startSucceeded = false;
+            startFinished  = true;
+        }
+        startCondition.notify_one();
+        vita_log::error("[LegacyKB] IME initialization failed (close=0x%08X)", closeRes);
+        return;
+    }
     isOpenFlag.store(true, std::memory_order_release);
-    vita_log::info("[LegacyKB] IME opened (sceImeOpen)");
-#else
-    vita_log::info("[LegacyKB] IME not available on this platform");
-#endif
-}
-
-void LegacyKeyboard::close()
-{
-#if defined(__PSV__) || defined(__psp2__) || defined(__PSP2__)
-    if (isOpenFlag.load(std::memory_order_acquire))
     {
-        sceImeClose();
+        std::lock_guard<std::mutex> lock(startMutex);
+        startSucceeded = true;
+        startFinished  = true;
     }
-#endif
+    startCondition.notify_one();
+    vita_log::info("[LegacyKB] IME opened");
 
-    g_ime_close_requested.store(false, std::memory_order_release);
-    g_ime_just_opened.store(false, std::memory_order_release);
+    int updateRes = 0;
+    while (!stopRequested.load(std::memory_order_acquire))
+    {
+        updateRes = sceImeUpdate();
+
+        if (updateRes < 0)
+        {
+            break;
+        }
+
+        const std::uint32_t pendingEvents = g_pending_events.exchange(PendingEventNone, std::memory_order_acq_rel);
+        std::deque<std::uint32_t> pendingChars;
+        {
+            std::lock_guard<std::mutex> lock(g_pending_chars_mutex);
+            pendingChars.swap(g_pending_chars);
+        }
+
+        if ((pendingEvents & PendingEventBackspace) != 0u)
+        {
+            send_backspace_keypress();
+        }
+        if ((pendingEvents & PendingEventEnter) != 0u)
+        {
+            send_vk_event(0x0D, KEY_ACTION_DOWN);
+            send_vk_event(0x0D, KEY_ACTION_UP);
+        }
+        if ((pendingEvents & PendingEventLeft) != 0u)
+        {
+            send_vk_event(0x25, KEY_ACTION_DOWN);
+            send_vk_event(0x25, KEY_ACTION_UP);
+        }
+        if ((pendingEvents & PendingEventRight) != 0u)
+        {
+            send_vk_event(0x27, KEY_ACTION_DOWN);
+            send_vk_event(0x27, KEY_ACTION_UP);
+        }
+        for (std::uint32_t pendingChar : pendingChars)
+        {
+            send_char_as_keypress(static_cast<wchar_t>(pendingChar));
+        }
+        if ((pendingEvents & PendingEventResetVirtualText) != 0u)
+        {
+            if (!reset_ime_virtual_text())
+            {
+                updateRes = SCE_IME_ERROR_INVALID_TEXT;
+                break;
+            }
+        }
+
+        if (g_ime_close_requested.load(std::memory_order_acquire))
+        {
+            break;
+        }
+
+        sceKernelDelayThread(1000);
+    }
+
+    const int closeRes = sceImeClose();
+    if (closeRes < 0 && closeRes != static_cast<int>(SCE_IME_ERROR_NOT_OPENED))
+    {
+        vita_log::error("[LegacyKB] sceImeClose failed: 0x%08X", closeRes);
+    }
     isOpenFlag.store(false, std::memory_order_release);
-}
-
-bool LegacyKeyboard::isOpen() const
-{
-    return isOpenFlag.load(std::memory_order_acquire);
-}
-
-void LegacyKeyboard::update()
-{
-#if defined(__PSV__) || defined(__psp2__) || defined(__PSP2__)
-    if (!isOpenFlag.load(std::memory_order_acquire))
-    {
-        return;
-    }
-
-    int updateRes = sceImeUpdate();
-
-    const std::uint32_t pendingEvents = g_pending_events.exchange(PendingEventNone, std::memory_order_acq_rel);
-    const std::uint32_t pendingChar   = g_pending_char.exchange(0, std::memory_order_acq_rel);
-
-    if ((pendingEvents & PendingEventBackspace) != 0u)
-    {
-        send_backspace_keypress();
-    }
-
-    if ((pendingEvents & PendingEventEnter) != 0u)
-    {
-        send_vk_event(0x0D, KEY_ACTION_DOWN);
-        send_vk_event(0x0D, KEY_ACTION_UP);
-    }
-
-    if ((pendingEvents & PendingEventLeft) != 0u)
-    {
-        send_vk_event(0x25, KEY_ACTION_DOWN);
-        send_vk_event(0x25, KEY_ACTION_UP);
-    }
-
-    if ((pendingEvents & PendingEventRight) != 0u)
-    {
-        send_vk_event(0x27, KEY_ACTION_DOWN);
-        send_vk_event(0x27, KEY_ACTION_UP);
-    }
-
-    if (pendingChar != 0u)
-    {
-        send_char_as_keypress(static_cast<wchar_t>(pendingChar));
-    }
-
-    if ((pendingEvents & PendingEventResetVirtualText) != 0u)
-    {
-        reset_ime_virtual_text();
-    }
-
-    if (g_ime_close_requested.exchange(false, std::memory_order_acq_rel))
-    {
-        sceImeClose();
-        isOpenFlag.store(false, std::memory_order_release);
-        vita_log::info("[LegacyKB] IME closed by event request");
-        return;
-    }
-
-    if (updateRes < 0)
-    {
-        isOpenFlag.store(false, std::memory_order_release);
-        vita_log::info("[LegacyKB] IME update ended: 0x%08X", updateRes);
-    }
+    vita_log::info("[LegacyKB] IME closed (status=0x%08X)", updateRes);
 #endif
 }

@@ -37,6 +37,7 @@ class VitaSession
 
     bool isActive() const { return m_is_active; }
     bool isTerminated() const { return m_is_terminated; }
+    const std::string& address() const { return m_address; }
 
     const VitaSessionStats& stats() const { return m_stats; }
 

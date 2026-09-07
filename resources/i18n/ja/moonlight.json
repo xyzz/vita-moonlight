@@ -190,6 +190,7 @@
             },
             "notify_prefix": "コントローラタイプ:"
         },
+        "capture_ps_button": "PSボタンをGuideとして使用",
         "swap_shoulder_buttons": {
             "title": "スワップ R1/L1 <-> R2/L2",
             "notify_enabled": "スワップショルダーボタンを有効にする",
@@ -257,6 +258,9 @@
         "mode_saved": "キーボードモード保存",
         "numbers_row_title": "数字行を表示",
         "arrows_title": "矢印キーを表示",
+        "fullscreen_title": "フルスクリーンキーボード",
+        "text_preview_title": "入力プレビューを表示",
+        "mouse_passthrough_title": "映像領域をタッチパッドとして使用",
         "theme_preview_title": "現在のテーマ",
         "theme_editor_title": "テーマエディタ",
         "theme_info": "カスタムテーマは今後のアップデートで対応予定です。独自のデザインを作成して共有できるようになります。",
@@ -285,6 +289,7 @@
         "editor_name_hint": "このショートカットのオプション名",
         "action_pause": "一時停止",
         "action_keyboard": "キーボード",
+        "action_front_touch": "前面タッチゾーンを切り替える",
         "disabled_combo": "無効",
         "clear_combo_title": "組み合わせをクリア",
         "clear_combo_detail": "ボタン1、2、3を「なし」に設定します",

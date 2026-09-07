@@ -8,6 +8,11 @@
 #include <string>
 #include <vector>
 
+namespace brls
+{
+class View;
+}
+
 namespace moonlight
 {
 
@@ -28,6 +33,8 @@ class settings
     static const std::vector<LanguageOption>& supportedLanguages();
     static std::string normalizeLanguage(const std::string& lang);
     static std::size_t languageIndex(const std::string& lang);
+    static void applyBackground(brls::View* view, float opacity);
+    static void pushView(brls::View* view, const std::string& title);
 };
 
 } // namespace moonlight

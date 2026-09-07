@@ -190,6 +190,7 @@
             },
             "notify_prefix": "Tipo de control cambiado a: "
         },
+        "capture_ps_button": "Usar el botón PS como Guide",
         "swap_shoulder_buttons": {
             "title": "Intercambiar R1/L1 <-> R2/L2",
             "notify_enabled": "Intercambio de botones de hombro activado",
@@ -257,6 +258,9 @@
         "mode_saved": "Modo de teclado guardado",
         "numbers_row_title": "Mostrar fila numérica",
         "arrows_title": "Mostrar teclas de flecha",
+        "fullscreen_title": "Teclado a pantalla completa",
+        "text_preview_title": "Mostrar vista previa de escritura",
+        "mouse_passthrough_title": "Usar la zona de video como trackpad",
         "theme_preview_title": "Tema actual",
         "theme_editor_title": "Editor de temas",
         "theme_info": "Los temas personalizados estarán disponibles en una actualización futura. Podrás crear y compartir tus propios diseños.",
@@ -285,6 +289,7 @@
         "editor_name_hint": "Nombre opcional para este atajo",
         "action_pause": "Pausa",
         "action_keyboard": "Teclado",
+        "action_front_touch": "Alternar zonas táctiles frontales",
         "disabled_combo": "Desactivado",
         "clear_combo_title": "Borrar combinación",
         "clear_combo_detail": "Establece los botones 1, 2 y 3 en Ninguno",

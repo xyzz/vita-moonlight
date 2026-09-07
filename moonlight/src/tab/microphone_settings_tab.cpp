@@ -172,6 +172,7 @@ MicrophoneSettingsTab::MicrophoneSettingsTab()
 
 MicrophoneSettingsTab::~MicrophoneSettingsTab()
 {
+    aliveToken->store(false, std::memory_order_release);
     auto& tester = MicrophoneTester::getInstance();
     if (tester.isRunning())
     {
@@ -215,7 +216,7 @@ brls::View* MicrophoneSettingsTab::create()
 
 void MicrophoneSettingsTab::loadHostsAsync()
 {
-    std::shared_ptr<bool> token = this->aliveToken;
+    std::shared_ptr<std::atomic<bool>> token = this->aliveToken;
 
     std::thread([this, token]()
         {
@@ -226,7 +227,7 @@ void MicrophoneSettingsTab::loadHostsAsync()
         });
 
         brls::sync([this, token, hosts]() {
-            if (!(*token)) return;
+            if (!token->load(std::memory_order_acquire)) return;
 
             std::vector<std::string> hostNames;
 

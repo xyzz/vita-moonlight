@@ -11,12 +11,9 @@ class TouchInputManager
     TouchInputManager();
     ~TouchInputManager();
 
-    void handleTouch(int touchscreenMode);
-
+    void handleTouch(int touchscreenMode, int activeHeight = 544);
     void dropTouch(int touchscreenMode);
-
     bool isModeSupportedByGamepad(int touchscreenMode, int gamepadType);
-
     bool setTouchMode(int newMode, int gamepadType);
 
     void setTrackpadSettings(int pointerSpeed, int deadZone, bool tapToClick,
@@ -36,6 +33,7 @@ class TouchInputManager
     SceTouchData touchData;
     SceTouchData lastTouchData;
     int currentMode;
+    int activeHeight = 544;
 
     int trackpadPointerSpeed         = 100; // 0-200
     int trackpadDeadZone             = 50; // 0-200px

@@ -93,6 +93,7 @@ ControllerInputManager::ControllerInputManager()
 
     currentGamepadType  = initialSettings.gamepad_type;
     swapShoulderButtons = initialSettings.swap_shoulder_buttons;
+    capturePSButton     = initialSettings.capture_ps_button;
 
     isPstvModel = (sceKernelGetModel() == SCE_KERNEL_MODEL_VITATV);
     initMapping();
@@ -104,6 +105,23 @@ ControllerInputManager::ControllerInputManager()
 
 ControllerInputManager::~ControllerInputManager()
 {
+    set_pause_callback({});
+    set_keyboard_callback({});
+    set_front_touch_callback({});
+    if (psButtonLocked)
+    {
+        unlockPSButton();
+    }
+    if (activeKeyboard)
+    {
+        IKeyboard* keyboard = activeKeyboard;
+        activeKeyboard      = nullptr;
+        keyboard->close();
+        if (!keyboard->selfDestructs())
+        {
+            delete keyboard;
+        }
+    }
     if (touchManager)
     {
         if (g_touchInput == touchManager)
@@ -193,7 +211,8 @@ void ControllerInputManager::handleInput()
 
     GamepadState gamepadState = buildGamepadState(ctrlData);
 
-    if (streamingActive)
+    // Outside a stream, the system handles the PS button normally.
+    if (streamingActive && capturePSButton)
     {
         constexpr uint64_t PSBTN_DOUBLETAP_DELAY_US = 500000; // 500ms
         const bool psButtonPressed                  = (ctrlData.buttons & SCE_CTRL_PSBUTTON) != 0;
@@ -310,8 +329,10 @@ void ControllerInputManager::handleInput()
     {
         constexpr uint64_t kTouchReleaseDelayUs = 150000;
         const bool keyboardOpen                 = (activeKeyboard != nullptr && activeKeyboard->isOpen());
+        const bool keyboardStreamTouch          = keyboardOpen && activeKeyboard->allowsStreamTouch() && activeKeyboard->streamTouchHeight() > 0;
+        const bool keyboardModeChanged          = keyboardOpen != lastKeyboardOpen || keyboardStreamTouch != lastKeyboardStreamTouch;
 
-        if (keyboardOpen)
+        if (keyboardOpen && !keyboardStreamTouch)
         {
             if (!touchSuppressed)
             {
@@ -322,7 +343,7 @@ void ControllerInputManager::handleInput()
         }
         else
         {
-            if (lastKeyboardOpen)
+            if (keyboardModeChanged)
             {
                 touchManager->dropTouch(touchscreenMode);
                 touchSuppressed      = true;
@@ -334,8 +355,9 @@ void ControllerInputManager::handleInput()
             }
             else if (!inFrontTouchZone)
             {
-                touchSuppressed = false;
-                touchManager->handleTouch(touchscreenMode);
+                touchSuppressed        = false;
+                const int activeHeight = keyboardStreamTouch ? activeKeyboard->streamTouchHeight() : 544;
+                touchManager->handleTouch(touchscreenMode, activeHeight);
             }
             else
             {
@@ -345,7 +367,8 @@ void ControllerInputManager::handleInput()
             }
         }
 
-        lastKeyboardOpen = keyboardOpen;
+        lastKeyboardOpen        = keyboardOpen;
+        lastKeyboardStreamTouch = keyboardStreamTouch;
     }
 
     // Keyboard per-frame update (legacy now runs IME update in dedicated thread)
@@ -363,9 +386,8 @@ void ControllerInputManager::handleInput()
         if (activeKeyboardSeenOpen && !activeKeyboard->isOpen())
         {
             vita_log::info("[ControllerInput] Active keyboard closed itself, cleaning up");
-            IKeyboard* kb          = activeKeyboard;
-            activeKeyboard         = nullptr;
-            activeKeyboardSeenOpen = false;
+            IKeyboard* kb = activeKeyboard;
+            setActiveKeyboard(nullptr);
             if (!kb->selfDestructs())
             {
                 delete kb;
@@ -450,11 +472,24 @@ void ControllerInputManager::setKeyboardShortcutCallback(const std::function<voi
     set_keyboard_callback(cb);
 }
 
+void ControllerInputManager::setFrontTouchShortcutCallback(const std::function<void()>& cb)
+{
+    set_front_touch_callback(cb);
+}
+
 void ControllerInputManager::setActiveKeyboard(IKeyboard* kb)
 {
     vita_log::info("[ControllerInput] setActiveKeyboard: %p", kb);
     activeKeyboard         = kb;
     activeKeyboardSeenOpen = (kb != nullptr && kb->isOpen());
+    if (kb)
+    {
+        unlockPSButton();
+    }
+    else if (streamingActive && inputEnabled && capturePSButton)
+    {
+        lockPSButton();
+    }
 }
 
 // Public setter to enable/disable input processing.
@@ -465,13 +500,12 @@ void ControllerInputManager::setInputEnabled(bool enabled)
     this->inputEnabled = enabled;
     if (!enabled)
     {
-        // Send zero status IMMEDIATELY asynchronously to not block the UI thread.
-        // dropInput() can invoke LiSendMultiControllerEvent which sometimes
-        // can block if the connection is in a bad state; call him on
-        // A separate thread prevents the UI from hitches when opening overlays.
-        std::thread([this]()
-            { this->dropInput(); })
-            .detach();
+        dropInput();
+        unlockPSButton();
+    }
+    else if (streamingActive && capturePSButton && activeKeyboard == nullptr)
+    {
+        lockPSButton();
     }
     vita_log::info("[ControllerInput] setInputEnabled -> %d", enabled ? 1 : 0);
 }
@@ -771,6 +805,19 @@ void ControllerInputManager::setFrontTouchEnabled(bool enabled)
     }
 }
 
+bool ControllerInputManager::toggleFrontTouchEnabled()
+{
+    if (!frontTouchManager)
+    {
+        return false;
+    }
+
+    const bool enabled = !frontTouchManager->isEnabled();
+    frontTouchManager->setEnabled(enabled);
+    vita_log::info("[ControllerInput] Front touch zones -> %d", enabled ? 1 : 0);
+    return enabled;
+}
+
 bool ControllerInputManager::setTouchscreenModeWithValidation(int newMode)
 {
     if (!touchManager)
@@ -830,7 +877,7 @@ bool ControllerInputManager::setTouchscreenModeRuntime(int newMode)
 void ControllerInputManager::lockPSButton()
 {
 #if defined(__PSV__)
-    if (!psButtonLocked)
+    if (capturePSButton && !psButtonLocked)
     {
         sceShellUtilLock((SceShellUtilLockType)(SCE_SHELL_UTIL_LOCK_TYPE_PS_BTN | SCE_SHELL_UTIL_LOCK_TYPE_PS_BTN_2));
         psButtonLocked = true;
@@ -852,12 +899,30 @@ void ControllerInputManager::unlockPSButton()
 void ControllerInputManager::setStreamingActive(bool active)
 {
     streamingActive = active;
-    if (!active)
+    if (active && capturePSButton && inputEnabled && activeKeyboard == nullptr)
+    {
+        lockPSButton();
+    }
+    else
     {
         psButtonSpecialActive = false;
         if (psButtonLocked)
         {
             unlockPSButton();
         }
+    }
+}
+
+void ControllerInputManager::setPSButtonCapture(bool enabled)
+{
+    capturePSButton = enabled;
+    if (enabled && streamingActive && inputEnabled && activeKeyboard == nullptr)
+    {
+        lockPSButton();
+    }
+    else
+    {
+        psButtonSpecialActive = false;
+        unlockPSButton();
     }
 }

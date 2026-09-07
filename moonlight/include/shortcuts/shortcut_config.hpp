@@ -11,8 +11,9 @@ namespace shortcuts
 
 enum class ShortcutAction : std::uint32_t
 {
-    Pause    = 0,
-    Keyboard = 1,
+    Pause      = 0,
+    Keyboard   = 1,
+    FrontTouch = 2,
 };
 
 inline constexpr std::size_t MAX_SHORTCUT_BUTTONS = 3;

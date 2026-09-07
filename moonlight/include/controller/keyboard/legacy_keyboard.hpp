@@ -1,13 +1,12 @@
 #pragma once
 
 #include <atomic>
+#include <condition_variable>
+#include <mutex>
+#include <thread>
 
 #include "controller/keyboard/IKeyboard.hpp"
 
-// Legacy keyboard using sceIme for PS Vita.
-//
-// Uses sceImeOpen + sceImeUpdate from the main input loop.
-// Characters are sent directly via LiSendKeyboardEvent.
 class LegacyKeyboard : public IKeyboard
 {
   public:
@@ -23,4 +22,12 @@ class LegacyKeyboard : public IKeyboard
 
   private:
     std::atomic<bool> isOpenFlag { false };
+    std::atomic<bool> stopRequested { false };
+    std::thread imeThread;
+    std::mutex startMutex;
+    std::condition_variable startCondition;
+    bool startFinished  = false;
+    bool startSucceeded = false;
+
+    void runIme();
 };

@@ -17,15 +17,9 @@ class IKeyboard
   public:
     virtual ~IKeyboard() = default;
 
-    virtual void open() = 0;
-
-    virtual void close() = 0;
-
+    virtual void open()         = 0;
+    virtual void close()        = 0;
     virtual bool isOpen() const = 0;
-
-    // Called every frame from the main thread (ControllerInputManager::handleInput).
-    // Legacy keyboard uses this to call sceImeUpdate().
-    // Modern keyboard does nothing here (it draws via Borealis).
     virtual void update() { }
 
     virtual KeyboardState getKeyboardState() const
@@ -35,8 +29,11 @@ class IKeyboard
     }
 
     virtual bool sendsDirectly() const { return false; }
-
     virtual bool usesNonNormalizedVk() const { return false; }
+
+    virtual bool allowsStreamTouch() const { return false; }
+
+    virtual int streamTouchHeight() const { return 0; }
 
     virtual bool selfDestructs() const { return false; }
 };

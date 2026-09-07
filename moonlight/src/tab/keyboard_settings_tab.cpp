@@ -24,6 +24,10 @@ KeyboardSettingsTab::KeyboardSettingsTab()
         {
             keyboardLayoutSelector->setVisibility(modernMode ? brls::Visibility::VISIBLE : brls::Visibility::GONE);
         }
+        if (keyboardInputModeToggle)
+        {
+            keyboardInputModeToggle->setVisibility(modernMode ? brls::Visibility::VISIBLE : brls::Visibility::GONE);
+        }
         if (keyboardModernHeader)
         {
             keyboardModernHeader->setVisibility(modernMode ? brls::Visibility::VISIBLE : brls::Visibility::GONE);
@@ -35,6 +39,18 @@ KeyboardSettingsTab::KeyboardSettingsTab()
         if (keyboardArrowsToggle)
         {
             keyboardArrowsToggle->setVisibility(modernMode ? brls::Visibility::VISIBLE : brls::Visibility::GONE);
+        }
+        if (keyboardFullscreenToggle)
+        {
+            keyboardFullscreenToggle->setVisibility(modernMode ? brls::Visibility::VISIBLE : brls::Visibility::GONE);
+        }
+        if (keyboardPreviewToggle)
+        {
+            keyboardPreviewToggle->setVisibility(modernMode ? brls::Visibility::VISIBLE : brls::Visibility::GONE);
+        }
+        if (keyboardMouseToggle)
+        {
+            keyboardMouseToggle->setVisibility(modernMode ? brls::Visibility::VISIBLE : brls::Visibility::GONE);
         }
         if (keyboardThemeHeader)
         {
@@ -132,6 +148,45 @@ KeyboardSettingsTab::KeyboardSettingsTab()
             cfg.load();
             VideoSettings settings        = cfg.getVideoSettings();
             settings.keyboard_show_arrows = value;
+            cfg.setVideoSettings(settings);
+            cfg.save();
+        });
+
+    keyboardFullscreenToggle->init(
+        brls::getStr("moonlight/keyboard/fullscreen_title"),
+        videoSettings.keyboard_fullscreen,
+        [](bool value)
+        {
+            ConfigManager cfg;
+            cfg.load();
+            VideoSettings settings       = cfg.getVideoSettings();
+            settings.keyboard_fullscreen = value;
+            cfg.setVideoSettings(settings);
+            cfg.save();
+        });
+
+    keyboardPreviewToggle->init(
+        brls::getStr("moonlight/keyboard/text_preview_title"),
+        videoSettings.keyboard_text_preview,
+        [](bool value)
+        {
+            ConfigManager cfg;
+            cfg.load();
+            VideoSettings settings         = cfg.getVideoSettings();
+            settings.keyboard_text_preview = value;
+            cfg.setVideoSettings(settings);
+            cfg.save();
+        });
+
+    keyboardMouseToggle->init(
+        brls::getStr("moonlight/keyboard/mouse_passthrough_title"),
+        videoSettings.keyboard_mouse_passthrough,
+        [](bool value)
+        {
+            ConfigManager cfg;
+            cfg.load();
+            VideoSettings settings              = cfg.getVideoSettings();
+            settings.keyboard_mouse_passthrough = value;
             cfg.setVideoSettings(settings);
             cfg.save();
         });

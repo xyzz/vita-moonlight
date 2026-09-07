@@ -13,6 +13,11 @@ void set_keyboard_callback(const std::function<void()>& cb)
     shortcuts::setKeyboardShortcutCallback(cb);
 }
 
+void set_front_touch_callback(const std::function<void()>& cb)
+{
+    shortcuts::setFrontTouchShortcutCallback(cb);
+}
+
 void reload_shortcuts_config()
 {
     shortcuts::ShortcutManager::instance().reloadConfig();

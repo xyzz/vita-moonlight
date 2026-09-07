@@ -10,11 +10,13 @@
 #include "GameStreamClient.hpp"
 #include "activity/main_activity.hpp"
 #include "controller/ControllerInput.hpp"
+#include "controller/keyboard/keyboard.hpp"
 #include "controller/keyboard/keyboard_launcher.hpp"
 #include "debug.hpp"
 #include "session/session_app_select.hpp"
 #include "session/session_main.hpp"
 #include "session/vita_session.hpp"
+#include "settings.hpp"
 #include "tab/hosts_tab.hpp"
 #include "tab/settings_tab.hpp"
 #include "video/VitaVideoRenderer.hpp"
@@ -98,6 +100,17 @@ void returnToMainMenuAsync(int retries = 8)
             return;
         }
 
+        // The modern keyboard owns an activity above SessionMainView. It must be
+        // removed before the session activity can be reached.
+        auto* keyboardOverlay = dynamic_cast<KeyboardOverlay*>(topContent);
+        if (keyboardOverlay) {
+            vita_log::info("[VitaPauseOverlay] Popping keyboard activity");
+            brls::Application::popActivity(brls::TransitionAnimation::NONE, []() {
+                returnToMainMenuAsync(4);
+            });
+            return;
+        }
+
         // 2) If SessionMainView is on top now, pop it.
         auto* sessionMain = dynamic_cast<SessionMainView*>(topContent);
         if (!sessionMain) {
@@ -165,16 +178,7 @@ VitaPauseOverlay::VitaPauseOverlay(std::function<void()> onClose, const HostInfo
             case 1: // Settings
                 {
                     brls::View* settingsView = SettingsTab::create();
-                    auto* frame = new brls::AppletFrame(settingsView);
-                    ConfigManager config;
-                    config.load();
-                    NVGcolor background = brls::Application::getTheme().getColor("brls/background");
-                    background.a = config.getVideoSettings().settings_background_opacity;
-                    settingsView->setBackgroundColor(nvgRGBA(0, 0, 0, 0));
-                    frame->setBackgroundColor(background);
-                    frame->setTitle(brls::getStr("moonlight/tabs/settings"));
-                    auto* activity = new brls::Activity(frame);
-                    brls::Application::pushActivity(activity, brls::TransitionAnimation::FADE);
+                    moonlight::settings::pushView(settingsView, brls::getStr("moonlight/tabs/settings"));
                 }
                 break;
             case 2: // Keyboard

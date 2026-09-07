@@ -190,6 +190,7 @@
             },
             "notify_prefix": "O tipo de controlador foi alterado para:"
         },
+        "capture_ps_button": "Usar o botão PS como Guide",
         "swap_shoulder_buttons": {
             "title": "Troca R1/L1 <-> R2/L2",
             "notify_enabled": "Trocar os botões do ombro activados",
@@ -257,6 +258,9 @@
         "mode_saved": "Modo de teclado salvo",
         "numbers_row_title": "Mostrar a linha de números",
         "arrows_title": "Mostrar as setas",
+        "fullscreen_title": "Teclado em tela cheia",
+        "text_preview_title": "Mostrar prévia da digitação",
+        "mouse_passthrough_title": "Usar a área do vídeo como touchpad",
         "theme_preview_title": "Tema atual",
         "theme_editor_title": "Editor de Temas",
         "theme_info": "Os temas personalizados do teclado estarão disponíveis em uma atualização futura. Você será capaz de criar e compartilhar seus próprios projetos de teclado!",
@@ -285,6 +289,7 @@
         "editor_name_hint": "Nome opcional para este atalho",
         "action_pause": "Pausa",
         "action_keyboard": "Teclado",
+        "action_front_touch": "Alternar zonas de toque frontal",
         "disabled_combo": "Desativado",
         "clear_combo_title": "Limpar a combinação",
         "clear_combo_detail": "Define os botões 1, 2 e 3 como Nenhum",

@@ -10,6 +10,7 @@ namespace
 
     ShortcutCallback g_pauseShortcutCallback;
     ShortcutCallback g_keyboardShortcutCallback;
+    ShortcutCallback g_frontTouchShortcutCallback;
 
 } // namespace
 
@@ -21,6 +22,11 @@ void setPauseShortcutCallback(const ShortcutCallback& cb)
 void setKeyboardShortcutCallback(const ShortcutCallback& cb)
 {
     g_keyboardShortcutCallback = cb;
+}
+
+void setFrontTouchShortcutCallback(const ShortcutCallback& cb)
+{
+    g_frontTouchShortcutCallback = cb;
 }
 
 bool executeShortcutAction(ShortcutAction action)
@@ -38,6 +44,13 @@ bool executeShortcutAction(ShortcutAction action)
             if (g_keyboardShortcutCallback)
             {
                 g_keyboardShortcutCallback();
+                return true;
+            }
+            break;
+        case ShortcutAction::FrontTouch:
+            if (g_frontTouchShortcutCallback)
+            {
+                g_frontTouchShortcutCallback();
                 return true;
             }
             break;

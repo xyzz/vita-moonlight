@@ -1,7 +1,9 @@
 #pragma once
 
+#include <atomic>
 #include <borealis.hpp>
 #include <chrono>
+#include <memory>
 #include <string>
 
 class MicrophoneSettingsTab : public brls::Box
@@ -32,9 +34,9 @@ class MicrophoneSettingsTab : public brls::Box
     bool monitoringConnection = false;
 
     std::chrono::steady_clock::time_point lastConnectionCheck;
-    static constexpr int CONNECTION_CHECK_INTERVAL_MS = 500; // Check every 500ms
+    static constexpr int CONNECTION_CHECK_INTERVAL_MS = 500;
 
-    std::shared_ptr<bool> aliveToken = std::make_shared<bool>(true);
+    std::shared_ptr<std::atomic<bool>> aliveToken = std::make_shared<std::atomic<bool>>(true);
     void loadHostsAsync();
 
     void frame(brls::FrameContext* ctx) override

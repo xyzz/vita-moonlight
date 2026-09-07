@@ -261,15 +261,22 @@ extern "C"
             oy = image_scaling.offset_y;
         }
 
+        VitaVideoRenderer::instance().adjustPresentation(ox, oy, dw, dh);
+
         const uint32_t storageWidth  = gxm_texture_get_storage_width(tex);
         const uint32_t storageHeight = gxm_texture_get_storage_height(tex);
         const float uMax             = storageWidth > 0 ? (float)gxm_texture_get_width(tex) / storageWidth : 1.0f;
         const float vMax             = storageHeight > 0 ? (float)gxm_texture_get_height(tex) / storageHeight : 1.0f;
+        float texTop                 = 0.0f;
+        float texBottom              = vMax;
+        VitaVideoRenderer::instance().cropKeyboardPresentation(oy, dh, texTop, texBottom);
+        if (dh <= 0.0f)
+            return -1;
 
-        s_vertices[0] = { ox, oy, 0.5f, 0.0f, 0.0f };
-        s_vertices[1] = { ox + dw, oy, 0.5f, uMax, 0.0f };
-        s_vertices[2] = { ox, oy + dh, 0.5f, 0.0f, vMax };
-        s_vertices[3] = { ox + dw, oy + dh, 0.5f, uMax, vMax };
+        s_vertices[0] = { ox, oy, 0.5f, 0.0f, texTop };
+        s_vertices[1] = { ox + dw, oy, 0.5f, uMax, texTop };
+        s_vertices[2] = { ox, oy + dh, 0.5f, 0.0f, texBottom };
+        s_vertices[3] = { ox + dw, oy + dh, 0.5f, uMax, texBottom };
 
         NVGXMwindow* win = gxmGetWindow();
         if (!win || !win->context)

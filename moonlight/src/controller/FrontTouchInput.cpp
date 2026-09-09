@@ -4,12 +4,9 @@
 #include <psp2/touch.h>
 #include <string.h>
 
-#include <algorithm>
-
-#include "Limelight.h"
-#include "controller/input_types.hpp"
-#include "controller/shortcuts.hpp"
-#include "controller/special_inputs.hpp"
+#include "controller/touch_zone_action.hpp"
+#include "utils/math_utils.hpp"
+#include "utils/vita_platform.hpp"
 
 namespace
 {
@@ -18,10 +15,6 @@ constexpr float PANEL_HEIGHT = 544.0f;
 constexpr float MAX_TOUCH_X  = 1919.0f;
 constexpr float MAX_TOUCH_Y  = 1087.0f;
 
-inline float clamp01(float value)
-{
-    return std::max(0.0f, std::min(1.0f, value));
-}
 }
 
 FrontTouchInputManager::FrontTouchInputManager()
@@ -86,7 +79,7 @@ bool FrontTouchInputManager::process(GamepadState& state, bool isPstvModel)
     }
 
     static uint64_t lastFrontTouchPollUs = 0;
-    uint64_t nowUs                       = sceKernelGetSystemTimeWide();
+    uint64_t nowUs                       = vita::monotonicMicroseconds();
     // Poll front touch at 125Hz to reduce CPU cost without noticeable latency.
     if (lastFrontTouchPollUs != 0 && (nowUs - lastFrontTouchPollUs) < 8000)
     {
@@ -104,8 +97,8 @@ bool FrontTouchInputManager::process(GamepadState& state, bool isPstvModel)
     for (int i = 0; i < frontData.reportNum; ++i)
     {
         const SceTouchReport& report = frontData.report[i];
-        const float x                = clamp01(static_cast<float>(report.x) / MAX_TOUCH_X) * PANEL_WIDTH;
-        const float y                = clamp01(static_cast<float>(report.y) / MAX_TOUCH_Y) * PANEL_HEIGHT;
+        const float x                = moonlight::clampNormalized(static_cast<float>(report.x) / MAX_TOUCH_X) * PANEL_WIDTH;
+        const float y                = moonlight::clampNormalized(static_cast<float>(report.y) / MAX_TOUCH_Y) * PANEL_HEIGHT;
 
         for (std::size_t z = 0; z < zones.size(); ++z)
         {
@@ -120,7 +113,8 @@ bool FrontTouchInputManager::process(GamepadState& state, bool isPstvModel)
     for (std::size_t i = 0; i < zoneActive.size(); ++i)
     {
         const std::uint32_t actionCode = getActionForIndex(i);
-        handleZoneAction(i, zoneActive[i], actionCode, state);
+        controller::applyTouchZoneAction(zoneActive[i], lastZoneActive[i], actionCode, state);
+        lastZoneActive[i] = zoneActive[i];
     }
 
     return anyInZone;
@@ -133,7 +127,7 @@ void FrontTouchInputManager::dropState()
     {
         if (lastZoneActive[i])
         {
-            handleZoneAction(i, false, getActionForIndex(i), dummy);
+            controller::applyTouchZoneAction(false, true, getActionForIndex(i), dummy);
         }
     }
     lastZoneActive.fill(false);
@@ -154,94 +148,4 @@ std::uint32_t FrontTouchInputManager::getActionForIndex(std::size_t index) const
         default:
             return 0;
     }
-}
-
-void FrontTouchInputManager::handleZoneAction(std::size_t index, bool pressed, std::uint32_t code, GamepadState& state)
-{
-    if (code == 0)
-    {
-        lastZoneActive[index] = pressed;
-        return;
-    }
-
-    const std::uint32_t type  = code & controller::INPUT_TYPE_MASK;
-    const std::uint32_t value = code & controller::INPUT_VALUE_MASK;
-
-    switch (type)
-    {
-        case controller::INPUT_TYPE_SPECIAL:
-        {
-            if (pressed && !lastZoneActive[index])
-            {
-                trigger_virtual_shortcut(value);
-            }
-            break;
-        }
-        case controller::INPUT_TYPE_GAMEPAD:
-        {
-            if (pressed)
-            {
-                state.buttonFlags |= value;
-            }
-            else if (lastZoneActive[index])
-            {
-                state.buttonFlags &= ~value;
-            }
-            break;
-        }
-        case controller::INPUT_TYPE_ANALOG:
-        {
-            if (pressed)
-            {
-                if (value == controller::ANALOG_LEFT_TRIGGER)
-                {
-                    state.leftTrigger = 0xFF;
-                }
-                else if (value == controller::ANALOG_RIGHT_TRIGGER)
-                {
-                    state.rightTrigger = 0xFF;
-                }
-            }
-            else if (lastZoneActive[index])
-            {
-                if (value == controller::ANALOG_LEFT_TRIGGER)
-                {
-                    state.leftTrigger = 0;
-                }
-                else if (value == controller::ANALOG_RIGHT_TRIGGER)
-                {
-                    state.rightTrigger = 0;
-                }
-            }
-            break;
-        }
-        case controller::INPUT_TYPE_MOUSE:
-        {
-            if (pressed && !lastZoneActive[index])
-            {
-                LiSendMouseButtonEvent(BUTTON_ACTION_PRESS, value);
-            }
-            else if (!pressed && lastZoneActive[index])
-            {
-                LiSendMouseButtonEvent(BUTTON_ACTION_RELEASE, value);
-            }
-            break;
-        }
-        case controller::INPUT_TYPE_KEYBOARD:
-        {
-            if (pressed && !lastZoneActive[index])
-            {
-                LiSendKeyboardEvent(value, KEY_ACTION_DOWN, 0);
-            }
-            else if (!pressed && lastZoneActive[index])
-            {
-                LiSendKeyboardEvent(value, KEY_ACTION_UP, 0);
-            }
-            break;
-        }
-        default:
-            break;
-    }
-
-    lastZoneActive[index] = pressed;
 }

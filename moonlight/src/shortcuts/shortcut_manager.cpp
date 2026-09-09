@@ -2,11 +2,10 @@
 
 #include <psp2/kernel/processmgr.h>
 
-#include <algorithm>
-#include <cctype>
 #include <string>
 
 #include "shortcuts/shortcut_actions.hpp"
+#include "shortcuts/shortcut_text.hpp"
 
 namespace shortcuts
 {
@@ -27,23 +26,6 @@ namespace
     {
         ShortcutCombo normalized = combo;
         normalizeCombo(normalized);
-        return normalized;
-    }
-
-    std::string trimWhitespace(std::string value)
-    {
-        auto notSpace = [](unsigned char c)
-        { return !std::isspace(c); };
-        value.erase(value.begin(), std::find_if(value.begin(), value.end(), notSpace));
-        value.erase(std::find_if(value.rbegin(), value.rend(), notSpace).base(), value.end());
-        return value;
-    }
-
-    std::string normalizeNameKey(const std::string& value)
-    {
-        std::string normalized = trimWhitespace(value);
-        std::transform(normalized.begin(), normalized.end(), normalized.begin(), [](unsigned char c)
-            { return static_cast<char>(std::tolower(c)); });
         return normalized;
     }
 

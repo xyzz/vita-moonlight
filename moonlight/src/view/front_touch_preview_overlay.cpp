@@ -4,6 +4,8 @@
 
 #include <algorithm>
 
+#include "utils/math_utils.hpp"
+
 namespace
 {
 constexpr float PANEL_WIDTH  = 960.0f;
@@ -11,10 +13,6 @@ constexpr float PANEL_HEIGHT = 544.0f;
 constexpr float MAX_TOUCH_X  = 1919.0f;
 constexpr float MAX_TOUCH_Y  = 1087.0f;
 
-inline float clamp01(float value)
-{
-    return std::max(0.0f, std::min(1.0f, value));
-}
 }
 
 FrontTouchPreviewCanvas::FrontTouchPreviewCanvas(int offset, int size)
@@ -97,8 +95,8 @@ void FrontTouchPreviewCanvas::draw(NVGcontext* vg, float x, float y, float width
     bool zoneActive[4] = { false, false, false, false };
     for (int i = 0; i < frontData.reportNum; ++i)
     {
-        float tx = clamp01(static_cast<float>(frontData.report[i].x) / MAX_TOUCH_X) * PANEL_WIDTH;
-        float ty = clamp01(static_cast<float>(frontData.report[i].y) / MAX_TOUCH_Y) * PANEL_HEIGHT;
+        float tx = moonlight::clampNormalized(static_cast<float>(frontData.report[i].x) / MAX_TOUCH_X) * PANEL_WIDTH;
+        float ty = moonlight::clampNormalized(static_cast<float>(frontData.report[i].y) / MAX_TOUCH_Y) * PANEL_HEIGHT;
 
         // NW
         if (tx >= offset && tx <= offset + size && ty >= offset && ty <= offset + size)

@@ -38,6 +38,5 @@ class RearTouchInputManager
     float midY       = 0.5f;
 
     void recalcBounds();
-    void handleZoneAction(std::size_t index, bool pressed, std::uint32_t code, GamepadState& state);
     std::uint32_t getActionForIndex(std::size_t index) const;
 };

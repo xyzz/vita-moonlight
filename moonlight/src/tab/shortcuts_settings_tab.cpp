@@ -1,14 +1,13 @@
 #include "tab/shortcuts_settings_tab.hpp"
 
-#include <algorithm>
-#include <cctype>
 #include <memory>
 #include <string>
 #include <vector>
 
+#include "Settings.hpp"
 #include "controller/shortcuts.hpp"
-#include "settings.hpp"
 #include "shortcuts/shortcut_manager.hpp"
+#include "shortcuts/shortcut_text.hpp"
 
 namespace
 {
@@ -93,23 +92,6 @@ std::string comboDisplayOrDisabled(const shortcuts::ShortcutCombo& combo)
     return shortcuts::comboToDisplay(combo);
 }
 
-std::string trimWhitespace(std::string value)
-{
-    auto notSpace = [](unsigned char c)
-    { return !std::isspace(c); };
-    value.erase(value.begin(), std::find_if(value.begin(), value.end(), notSpace));
-    value.erase(std::find_if(value.rbegin(), value.rend(), notSpace).base(), value.end());
-    return value;
-}
-
-std::string normalizeNameKey(const std::string& value)
-{
-    std::string key = trimWhitespace(value);
-    std::transform(key.begin(), key.end(), key.begin(), [](unsigned char c)
-        { return static_cast<char>(std::tolower(c)); });
-    return key;
-}
-
 std::string fallbackCustomTitleFromIndex(std::size_t index)
 {
     return brls::getStr("moonlight/shortcuts/custom_shortcut_title") + " " + std::to_string(index - 1);
@@ -126,7 +108,7 @@ std::string shortcutTitleForEntry(std::size_t index, const shortcuts::ShortcutEn
         return brls::getStr("moonlight/shortcuts/keyboard_combo_title");
     }
 
-    const std::string customName = trimWhitespace(entry.name);
+    const std::string customName = shortcuts::trimWhitespace(entry.name);
     if (!customName.empty())
     {
         return customName;
@@ -143,7 +125,7 @@ bool containsCustomName(const std::vector<shortcuts::ShortcutEntry>& entries, co
         {
             continue;
         }
-        if (normalizeNameKey(entries[i].name) == nameKey)
+        if (shortcuts::normalizeNameKey(entries[i].name) == nameKey)
         {
             return true;
         }
@@ -156,7 +138,7 @@ std::string nextDefaultCustomName(const std::vector<shortcuts::ShortcutEntry>& e
     for (std::size_t idx = 1; idx < 10000; ++idx)
     {
         const std::string candidate = "Shortcut " + std::to_string(idx);
-        if (!containsCustomName(entries, normalizeNameKey(candidate), ignoreIndex))
+        if (!containsCustomName(entries, shortcuts::normalizeNameKey(candidate), ignoreIndex))
         {
             return candidate;
         }
@@ -279,7 +261,7 @@ void ShortcutsSettingsTab::openShortcutEditor(std::size_t index, bool creatingNe
         auto* nameInput = new brls::InputCell();
         nameInput->init(
             brls::getStr("moonlight/shortcuts/editor_name_title"),
-            trimWhitespace(editorState->name),
+            shortcuts::trimWhitespace(editorState->name),
             [editorState](std::string text)
             {
                 editorState->name = text;

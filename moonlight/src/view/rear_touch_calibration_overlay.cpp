@@ -10,7 +10,9 @@
 #include <string>
 #include <utility>
 
+#include "controller/special_inputs.hpp"
 #include "debug.hpp"
+#include "utils/math_utils.hpp"
 
 namespace
 {
@@ -36,10 +38,6 @@ std::string getEdgeLabel(int index)
     }
 }
 
-inline float clamp01(float value)
-{
-    return std::max(0.0f, std::min(1.0f, value));
-}
 }
 
 RearTouchCalibrationCanvas::RearTouchCalibrationCanvas(const RearTouchSettings& initialSettings)
@@ -256,8 +254,8 @@ void RearTouchCalibrationCanvas::drawPanel(NVGcontext* vg, float panelX, float p
 
     for (int i = 0; i < sample.reportNum; ++i)
     {
-        const float normX = clamp01(static_cast<float>(sample.report[i].x) / MAX_TOUCH_X);
-        const float normY = clamp01(static_cast<float>(sample.report[i].y) / MAX_TOUCH_Y);
+        const float normX = moonlight::clampNormalized(static_cast<float>(sample.report[i].x) / MAX_TOUCH_X);
+        const float normY = moonlight::clampNormalized(static_cast<float>(sample.report[i].y) / MAX_TOUCH_Y);
         float touchX      = panelX + normX * width;
         float touchY      = panelY + normY * height;
         nvgBeginPath(vg);
@@ -362,8 +360,6 @@ RearTouchCalibrationOverlay::RearTouchCalibrationOverlay(const RearTouchSettings
     root->getAppletFrameItem()->title = overlayTitle;
     this->setTitle(overlayTitle);
     this->getAppletFrameItem()->title = overlayTitle;
-    // Use vita_debug_log so the log can be toggled on Vita via g_debug_log_enabled
-    vita_log::info("[RearTouchCalibrationOverlay] constructor set title='%s'", overlayTitle.c_str());
     root->setGrow(1.0f);
     canvas                              = new RearTouchCalibrationCanvas(initialSettings);
     canvas->getAppletFrameItem()->title = brls::getStr("moonlight/rear_touch/calibration/title");

@@ -12,6 +12,7 @@
 
 #include "ConfigManager.hpp"
 #include "debug.hpp"
+#include "shortcuts/shortcut_text.hpp"
 
 namespace shortcuts
 {
@@ -55,21 +56,9 @@ namespace
 
     std::string trimAndUpper(std::string value)
     {
-        auto notSpace = [](unsigned char c)
-        { return !std::isspace(c); };
-        value.erase(value.begin(), std::find_if(value.begin(), value.end(), notSpace));
-        value.erase(std::find_if(value.rbegin(), value.rend(), notSpace).base(), value.end());
+        value = trimWhitespace(std::move(value));
         std::transform(value.begin(), value.end(), value.begin(), [](unsigned char c)
             { return static_cast<char>(std::toupper(c)); });
-        return value;
-    }
-
-    std::string trimWhitespace(std::string value)
-    {
-        auto notSpace = [](unsigned char c)
-        { return !std::isspace(c); };
-        value.erase(value.begin(), std::find_if(value.begin(), value.end(), notSpace));
-        value.erase(std::find_if(value.rbegin(), value.rend(), notSpace).base(), value.end());
         return value;
     }
 

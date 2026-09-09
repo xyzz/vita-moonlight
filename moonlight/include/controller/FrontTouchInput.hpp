@@ -31,7 +31,6 @@ class FrontTouchInputManager
     std::array<bool, 4> lastZoneActive { false, false, false, false };
 
     void recalcZones();
-    void handleZoneAction(std::size_t index, bool pressed, std::uint32_t code, GamepadState& state);
     std::uint32_t getActionForIndex(std::size_t index) const;
 
     struct Zone

@@ -43,6 +43,16 @@ bool open_configured_keyboard()
 
     if (kbSettings.keyboard_mode == 0)
     {
+        if (kbSettings.keyboard_legacy_dialog)
+        {
+            if (!open_legacy_dialog_keyboard())
+            {
+                vita_log::error("[KeyboardLauncher] Legacy IME dialog failed to open");
+                return false;
+            }
+            return true;
+        }
+
         auto* legacyKb = new LegacyKeyboard();
         legacyKb->open();
         if (!legacyKb->isOpen())

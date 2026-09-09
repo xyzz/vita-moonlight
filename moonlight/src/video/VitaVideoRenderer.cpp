@@ -50,50 +50,28 @@ void VitaVideoRenderer::setFullscreenStretch(bool stretch)
 
 void VitaVideoRenderer::setKeyboardViewport(int visibleHeight, bool showBottom)
 {
-    keyboardViewportHeight.store(std::max(0, visibleHeight), std::memory_order_release);
+    keyboardViewportHeight.store(std::min(SCREEN_HEIGHT, std::max(0, visibleHeight)), std::memory_order_release);
     keyboardShowBottom.store(showBottom, std::memory_order_release);
-    keyboardFocusY.store(-1, std::memory_order_release);
-}
-
-void VitaVideoRenderer::setKeyboardFocus(float normalizedY)
-{
-    const int focus = static_cast<int>(std::clamp(normalizedY, 0.0f, 1.0f) * 10000.0f);
-    keyboardFocusY.store(focus, std::memory_order_release);
 }
 
 void VitaVideoRenderer::clearKeyboardViewport()
 {
     keyboardViewportHeight.store(0, std::memory_order_release);
     keyboardShowBottom.store(false, std::memory_order_release);
-    keyboardFocusY.store(-1, std::memory_order_release);
 }
 
-void VitaVideoRenderer::adjustPresentation(float& x, float& y, float width, float height) const
+void VitaVideoRenderer::adjustPresentation(float& y) const
 {
-    (void)x;
     const int visibleHeight = keyboardViewportHeight.load(std::memory_order_acquire);
     if (visibleHeight <= 0)
     {
         return;
     }
-    if (height <= static_cast<float>(visibleHeight))
-    {
-        y = (static_cast<float>(visibleHeight) - height) * 0.5f;
-        return;
-    }
 
-    const int focus = keyboardFocusY.load(std::memory_order_acquire);
-    if (focus >= 0)
+    if (keyboardShowBottom.load(std::memory_order_acquire))
     {
-        const float topShift    = -y;
-        const float bottomShift = static_cast<float>(visibleHeight) - (y + height);
-        const float targetY     = static_cast<float>(focus) / 10000.0f;
-        const float centerShift = static_cast<float>(visibleHeight) * 0.5f - (y + targetY * height);
-        y += std::clamp(centerShift, bottomShift, topShift);
-        return;
+        y -= static_cast<float>(SCREEN_HEIGHT - visibleHeight);
     }
-
-    y = keyboardShowBottom.load(std::memory_order_acquire) ? static_cast<float>(visibleHeight) - height : 0.0f;
 }
 
 void VitaVideoRenderer::cropKeyboardPresentation(float& y, float& height, float& texTop, float& texBottom) const
@@ -289,7 +267,7 @@ void VitaVideoRenderer::drawNVG(NVGcontext* vg, float viewportW, float viewportH
 
     float drawX = static_cast<float>(ox);
     float drawY = static_cast<float>(oy);
-    adjustPresentation(drawX, drawY, static_cast<float>(dw), static_cast<float>(dh));
+    adjustPresentation(drawY);
 
     const int keyboardHeight = keyboardViewportHeight.load(std::memory_order_acquire);
     if (keyboardHeight > 0)

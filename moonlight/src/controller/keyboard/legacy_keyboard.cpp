@@ -1,22 +1,35 @@
 #include "controller/keyboard/legacy_keyboard.hpp"
 
 #if defined(__PSV__) || defined(__psp2__) || defined(__PSP2__)
+#include <psp2/ime_dialog.h>
 #include <psp2/kernel/clib.h>
 #include <psp2/kernel/threadmgr.h>
 #include <psp2/libime.h>
 #include <psp2/sysmodule.h>
 #endif
 
+#include <borealis/extern/nanovg/nanovg.h>
 #include <string.h>
 
+#include <borealis.hpp>
 #include <cstdint>
 #include <deque>
 
 #include "ConfigManager.hpp"
 #include "Limelight.h"
+#include "controller/keyboard/keyboard_focus.hpp"
 #include "controller/keyboard/keyboard_utf8.hpp"
 #include "controller/keyboard/keyboardloader.hpp"
 #include "debug.hpp"
+#include "session/vita_session.hpp"
+#include "video/VitaVideoRenderer.hpp"
+
+namespace
+{
+constexpr int LEGACY_IME_VIEWPORT_HEIGHT = 294;
+constexpr float FOCUS_BUTTON_SIZE        = 44.0f;
+constexpr float FOCUS_BUTTON_MARGIN      = 8.0f;
+}
 
 #if defined(__PSV__) || defined(__psp2__) || defined(__PSP2__)
 
@@ -34,6 +47,8 @@ static SceImeCaret g_ime_caret;
 static std::atomic<bool> g_ime_close_requested { false };
 static std::atomic<bool> g_ime_just_opened { false };
 static std::atomic<std::uint32_t> g_pending_events { 0 };
+static std::atomic<int> g_ime_viewport_height { LEGACY_IME_VIEWPORT_HEIGHT };
+static std::atomic<bool> g_ime_dialog_active { false };
 static std::mutex g_pending_chars_mutex;
 static std::deque<std::uint32_t> g_pending_chars;
 
@@ -123,6 +138,44 @@ static void send_backspace_keypress()
     send_vk_event(0x08, KEY_ACTION_UP);
 }
 
+static void send_dialog_text(const std::string& text)
+{
+    std::size_t offset = 0;
+    while (offset < text.size())
+    {
+        const unsigned char lead = static_cast<unsigned char>(text[offset]);
+        std::size_t length       = 1;
+        if ((lead & 0xE0) == 0xC0)
+        {
+            length = 2;
+        }
+        else if ((lead & 0xF0) == 0xE0)
+        {
+            length = 3;
+        }
+        else if ((lead & 0xF8) == 0xF0)
+        {
+            length = 4;
+        }
+
+        if (offset + length > text.size())
+        {
+            break;
+        }
+
+        std::uint32_t codepoint = 0;
+        if (decode_single_utf8(text.substr(offset, length), codepoint))
+        {
+            send_char_as_keypress(static_cast<wchar_t>(codepoint));
+            offset += length;
+        }
+        else
+        {
+            ++offset;
+        }
+    }
+}
+
 static bool reset_ime_virtual_text()
 {
     sceClibMemset(g_ime_output, 0, sizeof(g_ime_output));
@@ -184,6 +237,18 @@ static void legacykb_ime_event_handler(void* /*arg*/, const SceImeEventData* e)
 
     switch (e->id)
     {
+        case SCE_IME_EVENT_CHANGE_SIZE:
+        {
+            const int visibleHeight = static_cast<int>(e->param.rect.y);
+            if (visibleHeight > 0 && visibleHeight < 544)
+            {
+                g_ime_viewport_height.store(visibleHeight, std::memory_order_release);
+            }
+            vita_log::info("[LegacyKB][IME] rect=%ux%u at %u,%u viewport=%d",
+                e->param.rect.width, e->param.rect.height, e->param.rect.x, e->param.rect.y,
+                g_ime_viewport_height.load(std::memory_order_acquire));
+            break;
+        }
         case SCE_IME_EVENT_UPDATE_TEXT:
         {
             const int caretIndex = e->param.text.caretIndex;
@@ -264,7 +329,6 @@ void LegacyKeyboard::open()
         g_legacy_keyboard_layout = static_cast<KeyboardLayout>(vs.keyboard_layout);
         g_legacy_force_utf8      = vs.keyboard_input_mode;
     }
-
     stopRequested.store(false, std::memory_order_release);
     {
         std::lock_guard<std::mutex> lock(startMutex);
@@ -284,6 +348,21 @@ void LegacyKeyboard::open()
     {
         imeThread.join();
     }
+    else if (opened)
+    {
+        showBottomVideo    = false;
+        focusButtonPressed = false;
+        manualVideoFocus   = false;
+        viewportHeight     = g_ime_viewport_height.load(std::memory_order_acquire);
+        updateVideoViewport();
+        request_keyboard_typing_focus([this](float normalizedY)
+            {
+            if (!isOpenFlag.load(std::memory_order_acquire) || manualVideoFocus) {
+                return;
+            }
+            showBottomVideo = normalizedY * 544.0f > static_cast<float>(viewportHeight);
+            updateVideoViewport(); });
+    }
 #else
     vita_log::info("[LegacyKB] IME not available on this platform");
 #endif
@@ -291,6 +370,8 @@ void LegacyKeyboard::open()
 
 void LegacyKeyboard::close()
 {
+    cancel_keyboard_typing_focus();
+    VitaVideoRenderer::instance().clearKeyboardViewport();
 #if defined(__PSV__) || defined(__psp2__) || defined(__PSP2__)
     stopRequested.store(true, std::memory_order_release);
     if (imeThread.joinable())
@@ -309,8 +390,124 @@ bool LegacyKeyboard::isOpen() const
     return isOpenFlag.load(std::memory_order_acquire);
 }
 
+bool LegacyKeyboard::allowsStreamTouch() const
+{
+    return isOpenFlag.load(std::memory_order_acquire) && viewportHeight > 0;
+}
+
+int LegacyKeyboard::streamTouchHeight() const
+{
+    return allowsStreamTouch() ? viewportHeight : 0;
+}
+
+bool LegacyKeyboard::blocksStreamTouch() const
+{
+    return focusButtonPressed;
+}
+
 void LegacyKeyboard::update()
 {
+#if defined(__PSV__) || defined(__psp2__) || defined(__PSP2__)
+    if (!isOpenFlag.load(std::memory_order_acquire))
+    {
+        return;
+    }
+
+    const int reportedHeight = g_ime_viewport_height.load(std::memory_order_acquire);
+    if (reportedHeight != viewportHeight)
+    {
+        viewportHeight = reportedHeight;
+        updateVideoViewport();
+        if (!manualVideoFocus)
+        {
+            request_keyboard_typing_focus([this](float normalizedY)
+                {
+                if (!isOpenFlag.load(std::memory_order_acquire) || manualVideoFocus) {
+                    return;
+                }
+                showBottomVideo = normalizedY * 544.0f > static_cast<float>(viewportHeight);
+                updateVideoViewport(); });
+        }
+    }
+
+#endif
+}
+
+void LegacyKeyboard::drawOverlay(NVGcontext* vg)
+{
+    if (!vg || !isOpenFlag.load(std::memory_order_acquire))
+    {
+        return;
+    }
+
+    float buttonX = 0.0f;
+    float buttonY = 0.0f;
+    focusButtonPosition(buttonX, buttonY);
+
+    nvgSave(vg);
+    nvgBeginPath(vg);
+    nvgRoundedRect(vg, buttonX, buttonY, FOCUS_BUTTON_SIZE, FOCUS_BUTTON_SIZE, 6.0f);
+    nvgFillColor(vg, nvgRGBA(45, 105, 190, 235));
+    nvgFill(vg);
+    nvgStrokeColor(vg, nvgRGBA(230, 240, 255, 255));
+    nvgStrokeWidth(vg, 1.5f);
+    nvgStroke(vg);
+
+    nvgFontFace(vg, "regular");
+    nvgFontSize(vg, 24.0f);
+    nvgTextAlign(vg, NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE);
+    nvgFillColor(vg, nvgRGBA(255, 255, 255, 255));
+    nvgText(vg, buttonX + FOCUS_BUTTON_SIZE * 0.5f, buttonY + FOCUS_BUTTON_SIZE * 0.5f,
+        showBottomVideo ? "^" : "v", nullptr);
+    nvgRestore(vg);
+}
+
+bool LegacyKeyboard::beginFocusButtonTouch(float x, float y)
+{
+    if (!isOpenFlag.load(std::memory_order_acquire))
+    {
+        return false;
+    }
+
+    float buttonX = 0.0f;
+    float buttonY = 0.0f;
+    focusButtonPosition(buttonX, buttonY);
+    if (x < buttonX || x > buttonX + FOCUS_BUTTON_SIZE || y < buttonY || y > buttonY + FOCUS_BUTTON_SIZE)
+    {
+        return false;
+    }
+
+    focusButtonPressed = true;
+    toggleVideoFocus();
+    return true;
+}
+
+void LegacyKeyboard::endFocusButtonTouch()
+{
+    focusButtonPressed = false;
+}
+
+void LegacyKeyboard::toggleVideoFocus()
+{
+    manualVideoFocus = true;
+    showBottomVideo  = !showBottomVideo;
+    cancel_keyboard_typing_focus();
+    updateVideoViewport();
+    vita_log::info("[LegacyKB] Manual video view=%s viewport=%d",
+        showBottomVideo ? "bottom" : "top", viewportHeight);
+}
+
+void LegacyKeyboard::updateVideoViewport()
+{
+    VitaVideoRenderer::instance().setKeyboardViewport(viewportHeight, showBottomVideo);
+}
+
+void LegacyKeyboard::focusButtonPosition(float& x, float& y) const
+{
+    const float scale       = brls::Application::windowScale > 0.0f ? brls::Application::windowScale : 1.0f;
+    const float viewportTop = static_cast<float>(viewportHeight) / scale;
+    x                       = brls::Application::contentWidth - FOCUS_BUTTON_SIZE - FOCUS_BUTTON_MARGIN;
+    y                       = viewportTop - FOCUS_BUTTON_SIZE - FOCUS_BUTTON_MARGIN;
 }
 
 void LegacyKeyboard::runIme()
@@ -318,6 +515,7 @@ void LegacyKeyboard::runIme()
 #if defined(__PSV__) || defined(__psp2__) || defined(__PSP2__)
     g_ime_close_requested.store(false, std::memory_order_release);
     g_ime_just_opened.store(true, std::memory_order_release);
+    g_ime_viewport_height.store(LEGACY_IME_VIEWPORT_HEIGHT, std::memory_order_release);
     g_pending_events.store(PendingEventNone, std::memory_order_release);
     {
         std::lock_guard<std::mutex> lock(g_pending_chars_mutex);
@@ -467,5 +665,55 @@ void LegacyKeyboard::runIme()
     }
     isOpenFlag.store(false, std::memory_order_release);
     vita_log::info("[LegacyKB] IME closed (status=0x%08X)", updateRes);
+#endif
+}
+
+bool open_legacy_dialog_keyboard()
+{
+#if defined(__PSV__) || defined(__psp2__) || defined(__PSP2__)
+    ConfigManager config;
+    config.load();
+    const VideoSettings settings = config.getVideoSettings();
+    g_legacy_keyboard_layout     = static_cast<KeyboardLayout>(settings.keyboard_layout);
+    g_legacy_force_utf8          = settings.keyboard_input_mode;
+
+    auto* ime = brls::Application::getImeManager();
+    if (!ime)
+    {
+        return false;
+    }
+
+    const bool opened = ime->openForText(
+        [](std::string text)
+        {
+            VitaSession* session = VitaSession::active();
+            if (session && session->isActive())
+            {
+                send_dialog_text(text);
+            }
+        },
+        brls::getStr("moonlight/keyboard/legacy_dialog_prompt"), "", 512);
+    g_ime_dialog_active.store(opened, std::memory_order_release);
+    return opened;
+#else
+    return false;
+#endif
+}
+
+bool is_legacy_dialog_keyboard_active()
+{
+#if defined(__PSV__) || defined(__psp2__) || defined(__PSP2__)
+    if (!g_ime_dialog_active.load(std::memory_order_acquire))
+    {
+        return false;
+    }
+    if (sceImeDialogGetStatus() == SCE_COMMON_DIALOG_STATUS_NONE)
+    {
+        g_ime_dialog_active.store(false, std::memory_order_release);
+        return false;
+    }
+    return true;
+#else
+    return false;
 #endif
 }

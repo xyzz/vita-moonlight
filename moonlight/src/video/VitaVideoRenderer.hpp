@@ -20,9 +20,8 @@ class VitaVideoRenderer final
     void setFullscreenStretch(bool stretch);
     bool isFullscreenStretch() const { return fullscreenStretch; }
     void setKeyboardViewport(int visibleHeight, bool showBottom);
-    void setKeyboardFocus(float normalizedY);
     void clearKeyboardViewport();
-    void adjustPresentation(float& x, float& y, float width, float height) const;
+    void adjustPresentation(float& y) const;
     void cropKeyboardPresentation(float& y, float& height, float& texTop, float& texBottom) const;
     // Release NVG image that references the current GXM texture.
     // Public so UI code can clear any NVG references before stopping video.
@@ -48,7 +47,6 @@ class VitaVideoRenderer final
     int imageCacheSize = 0;
     std::atomic<int> keyboardViewportHeight { 0 };
     std::atomic<bool> keyboardShowBottom { false };
-    std::atomic<int> keyboardFocusY { -1 };
 
     // Diagnostics
     uint32_t nvgImageCreateCount = 0;

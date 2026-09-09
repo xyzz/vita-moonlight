@@ -35,5 +35,7 @@ class IKeyboard
 
     virtual int streamTouchHeight() const { return 0; }
 
+    virtual bool blocksStreamTouch() const { return false; }
+
     virtual bool selfDestructs() const { return false; }
 };

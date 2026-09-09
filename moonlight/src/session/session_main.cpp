@@ -11,6 +11,8 @@
 #include "borealis.hpp"
 #include "controller/ControllerInput.hpp"
 #include "controller/keyboard/keyboard_launcher.hpp"
+#include "controller/keyboard/keyboard_touch.hpp"
+#include "controller/keyboard/legacy_keyboard.hpp"
 #include "debug.hpp"
 #include "session/overlay/vita_pause_overlay.hpp"
 #include "session/vita_session.hpp"
@@ -40,6 +42,18 @@ SessionMainView::SessionMainView(const HostInfo& host, const RemoteAppInfo& app)
 
     // Inicializar input manager
     g_controllerInput = new ControllerInputManager();
+    this->addGestureRecognizer(new KeyboardTouchRecognizer([](brls::GestureState state, const brls::Point& position)
+        {
+        auto* keyboard = g_controllerInput
+            ? dynamic_cast<LegacyKeyboard*>(g_controllerInput->getActiveKeyboard())
+            : nullptr;
+        if (state == brls::GestureState::START) {
+            return keyboard && keyboard->beginFocusButtonTouch(position.x, position.y);
+        }
+        if (keyboard && (state == brls::GestureState::END || state == brls::GestureState::INTERRUPTED)) {
+            keyboard->endFocusButtonTouch();
+        }
+        return true; }));
 
     // Enable PS button capture for streaming (sends Guide/Special button to host)
     if (g_controllerInput)
@@ -149,15 +163,21 @@ SessionMainView::SessionMainView(const HostInfo& host, const RemoteAppInfo& app)
         vita_frame_pacer_start((int)targetFps);
     }
 
-    if (vita_dp_init() == 0)
-    {
-        prePresentSub        = brls::Application::getPrePresentEvent()->subscribe([]()
-            {
-            if (vita_dp_is_active()) {
-                vita_dp_present_frame();
-            } });
-        prePresentSubscribed = true;
+    const bool directPresenterReady = vita_dp_init() == 0;
+    prePresentSub                   = brls::Application::getPrePresentEvent()->subscribe([]()
+        {
+        if (vita_dp_is_active()) {
+            vita_dp_present_frame();
+        } else if (is_legacy_dialog_keyboard_active()) {
+            VitaVideoRenderer::instance().drawNVG(
+                brls::Application::getNVGContext(),
+                static_cast<float>(brls::Application::windowWidth),
+                static_cast<float>(brls::Application::windowHeight));
+        } });
+    prePresentSubscribed            = true;
 
+    if (directPresenterReady)
+    {
         // NanoVG flushes after the direct quad, so the session background must stay clear.
         this->setBackgroundColor(nvgRGBA(0, 0, 0, 0));
     }
@@ -205,6 +225,15 @@ void SessionMainView::draw(NVGcontext* vg, float x, float y, float width, float 
     }
 
     Box::draw(vg, x, y, width, height, style, ctx);
+
+    if (g_controllerInput)
+    {
+        auto* legacyKeyboard = dynamic_cast<LegacyKeyboard*>(g_controllerInput->getActiveKeyboard());
+        if (legacyKeyboard)
+        {
+            legacyKeyboard->drawOverlay(vg);
+        }
+    }
 }
 
 void showSessionMain(const HostInfo& host, const RemoteAppInfo& app)

@@ -2,12 +2,13 @@
 
 #include <sys/stat.h>
 
+#include <cmath>
 #include <fstream>
-#include <functional>
 #include <iostream>
 #include <sstream>
-#include <thread>
 
+#include "controller/keyboard/keyboard_focus.hpp"
+#include "controller/keyboard/keyboard_touch.hpp"
 #include "controller/keyboard/keyboard_utf8.hpp"
 #include "controller/keyboard/keyboardloader.hpp"
 #include "debug.hpp"
@@ -22,8 +23,6 @@
 
 #include "ConfigManager.hpp"
 #include "controller/ControllerInput.hpp"
-#include "moonmic/MoonmicBridge.hpp"
-#include "session/vita_session.hpp"
 #include "video/VitaVideoRenderer.hpp"
 
 namespace
@@ -39,58 +38,6 @@ enum ModifierMask : unsigned int
     MOD_SHIFT = 1u << 1,
     MOD_ALT   = 1u << 2,
     MOD_WIN   = 1u << 3
-};
-
-class KeyTouchRecognizer : public brls::GestureRecognizer
-{
-  public:
-    using Callback = std::function<void(brls::GestureState, const brls::Point&)>;
-
-    explicit KeyTouchRecognizer(Callback cb)
-        : callback(std::move(cb))
-    {
-    }
-
-    brls::GestureState recognitionLoop(brls::TouchState touch, brls::MouseState mouse, brls::View* view, brls::Sound* soundToPlay) override
-    {
-        (void)view;
-        (void)soundToPlay;
-        brls::TouchPhase phase = touch.phase;
-        brls::Point position   = touch.position;
-        if (phase == brls::TouchPhase::NONE)
-        {
-            position = mouse.position;
-            phase    = mouse.leftButton;
-        }
-
-        if (!enabled || phase == brls::TouchPhase::NONE)
-        {
-            state = brls::GestureState::FAILED;
-            return state;
-        }
-
-        switch (phase)
-        {
-            case brls::TouchPhase::START:
-                state = brls::GestureState::START;
-                break;
-            case brls::TouchPhase::STAY:
-                state = brls::GestureState::STAY;
-                break;
-            case brls::TouchPhase::END:
-                state = brls::GestureState::END;
-                break;
-            case brls::TouchPhase::NONE:
-                state = brls::GestureState::FAILED;
-                break;
-        }
-
-        callback(state, position);
-        return state;
-    }
-
-  private:
-    Callback callback;
 };
 
 } // namespace
@@ -132,7 +79,7 @@ KeyboardOverlay::KeyboardOverlay(const std::string& cssPath)
     initDefaultLayout();
 
     // Register recognizer for touch press/hold
-    auto* touchRecognizer = new KeyTouchRecognizer([this](brls::GestureState state, const brls::Point& position)
+    auto* touchRecognizer = new KeyboardTouchRecognizer([this](brls::GestureState state, const brls::Point& position)
         {
         const float tapX = position.x;
         const float tapY = position.y;
@@ -142,7 +89,7 @@ KeyboardOverlay::KeyboardOverlay(const std::string& cssPath)
              tapY >= panelY && tapY <= panelY + panelH);
 
         if (state == brls::GestureState::START) {
-            if (!inPanel) return;
+            if (!inPanel) return false;
             int row = -1;
             int col = -1;
             if (hitTestKey(tapX, tapY, row, col)) {
@@ -160,7 +107,7 @@ KeyboardOverlay::KeyboardOverlay(const std::string& cssPath)
                     pressedModifier      = action;
                     modifierPressStartUs = static_cast<std::uint64_t>(brls::getCPUTimeUsec());
                     modifierHoldTriggered = false;
-                    return;
+                    return true;
                 }
 
                 const bool modifiedShortcut = (modifiers & (MOD_CTRL | MOD_ALT | MOD_WIN)) != 0;
@@ -171,7 +118,7 @@ KeyboardOverlay::KeyboardOverlay(const std::string& cssPath)
                 }
             }
         } else if (state == brls::GestureState::STAY) {
-            if (!pressedActive) return;
+            if (!pressedActive) return true;
             int row = -1;
             int col = -1;
             if (!hitTestKey(tapX, tapY, row, col) || row != pressedRow || col != pressedCol) {
@@ -190,7 +137,8 @@ KeyboardOverlay::KeyboardOverlay(const std::string& cssPath)
             pressedActive = false;
             pressedRow = -1;
             pressedCol = -1;
-        } });
+        }
+        return true; });
     this->addGestureRecognizer(touchRecognizer);
 
     // Register with input manager
@@ -204,6 +152,7 @@ KeyboardOverlay::KeyboardOverlay(const std::string& cssPath)
 
 KeyboardOverlay::~KeyboardOverlay()
 {
+    cancel_keyboard_typing_focus();
     releaseAllKeys();
     VitaVideoRenderer::instance().clearKeyboardViewport();
     // Unregister
@@ -225,6 +174,7 @@ void KeyboardOverlay::open()
 
 void KeyboardOverlay::close()
 {
+    cancel_keyboard_typing_focus();
     closePending = true;
 }
 
@@ -240,7 +190,7 @@ bool KeyboardOverlay::allowsStreamTouch() const
 
 int KeyboardOverlay::streamTouchHeight() const
 {
-    return allowsStreamTouch() ? static_cast<int>(panelY) : 0;
+    return allowsStreamTouch() ? videoViewportHeight() : 0;
 }
 
 KeyboardState KeyboardOverlay::getKeyboardState() const
@@ -433,8 +383,8 @@ void KeyboardOverlay::willAppear(bool resetState)
     // Adjust panel so that it fills the entire width and is at the bottom
     try
     {
-        float screenW = (float)this->getWidth();
-        float screenH = (float)this->getHeight();
+        const float contentWidth  = static_cast<float>(this->getWidth());
+        const float contentHeight = static_cast<float>(this->getHeight());
         // If the CSS specifies panel-height, use it
         auto pit = properties.find("panel-height");
         if (pit != properties.end())
@@ -449,22 +399,37 @@ void KeyboardOverlay::willAppear(bool resetState)
         }
         if (fullscreen)
         {
-            panelH = screenH;
+            panelH = contentHeight;
         }
         else
         {
-            float maxPanelH = screenH * 0.5f;
+            const float maxPanelH = contentHeight * 0.5f;
             if (panelH > maxPanelH)
             {
                 panelH = maxPanelH;
             }
         }
-        panelW = screenW;
+        panelW = contentWidth;
         panelX = 0.0f;
-        panelY = fullscreen ? 0.0f : std::max(0.0f, screenH - panelH);
+        panelY = fullscreen ? 0.0f : std::max(0.0f, contentHeight - panelH);
 
         recalculateKeyMetrics();
         updateVideoViewport();
+        if (!fullscreen && !manualVideoFocus)
+        {
+            const int viewportHeight = videoViewportHeight();
+            vita_log::info("[KeyboardOverlay] Video viewport=%d keyboard=%d", viewportHeight,
+                static_cast<int>(brls::Application::windowHeight) - viewportHeight);
+            request_keyboard_typing_focus([this](float normalizedY)
+                {
+                const int viewportHeight = videoViewportHeight();
+                if (!visible || fullscreen || viewportHeight <= 0) {
+                    return;
+                }
+                showBottomVideo = normalizedY * static_cast<float>(brls::Application::windowHeight) >
+                    static_cast<float>(viewportHeight);
+                updateVideoViewport(); });
+        }
     }
     catch (...)
     {
@@ -1020,57 +985,31 @@ void KeyboardOverlay::toggleVideoFocus()
     {
         return;
     }
-    showBottomVideo = !showBottomVideo;
+    manualVideoFocus = true;
+    showBottomVideo  = !showBottomVideo;
+    cancel_keyboard_typing_focus();
     updateVideoViewport();
-
-    ConfigManager config;
-    config.load();
-    const VideoSettings settings = config.getVideoSettings();
-    std::string host             = settings.microphone_host_ip;
-    if (host.empty())
-    {
-        VitaSession* session = VitaSession::active();
-        if (session)
-        {
-            host = session->address();
-        }
-    }
-    if (host.empty())
-    {
-        return;
-    }
-
-    const int port = settings.microphone_port > 0 ? settings.microphone_port : MOONMIC_DEFAULT_PORT;
-    if (!moonmic::MoonmicBridge::getInstance().isAvailable(host, port))
-    {
-        return;
-    }
-
-    std::thread([host, port]()
-        {
-        const auto result = moonmic::MoonmicBridge::getInstance().queryTypingFocus(host, port);
-        if (!result.success)
-        {
-            vita_log::info("[KeyboardOverlay] Moonmic typing focus unavailable; using manual view");
-            return;
-        }
-
-        VitaVideoRenderer::instance().setKeyboardFocus(result.normalized_y);
-        vita_log::info("[KeyboardOverlay] Video focused at y=%.3f (%s)", result.normalized_y,
-            result.caret ? "caret" : "pointer"); })
-        .detach();
+    vita_log::info("[KeyboardOverlay] Manual video view=%s viewport=%d",
+        showBottomVideo ? "bottom" : "top", videoViewportHeight());
 }
 
 void KeyboardOverlay::updateVideoViewport()
 {
-    if (visible && !fullscreen && panelY > 0.0f)
+    const int viewportHeight = videoViewportHeight();
+    if (visible && !fullscreen && viewportHeight > 0)
     {
-        VitaVideoRenderer::instance().setKeyboardViewport(static_cast<int>(panelY), showBottomVideo);
+        VitaVideoRenderer::instance().setKeyboardViewport(viewportHeight, showBottomVideo);
     }
     else
     {
         VitaVideoRenderer::instance().clearKeyboardViewport();
     }
+}
+
+int KeyboardOverlay::videoViewportHeight() const
+{
+    const int height = static_cast<int>(std::lround(panelY * brls::Application::windowScale));
+    return std::max(0, std::min(static_cast<int>(brls::Application::windowHeight), height));
 }
 
 bool KeyboardOverlay::mapActionToVk(const std::string& action, int& outVk) const

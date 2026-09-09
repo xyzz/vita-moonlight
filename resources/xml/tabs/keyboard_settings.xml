@@ -46,6 +46,11 @@
                 title="Force UTF-8 Text Input"
                 marginBottom="20"/>
 
+            <brls:BooleanCell
+                id="keyboard_legacy_dialog_toggle"
+                title="@i18n/moonlight/keyboard/legacy_dialog_title"
+                marginBottom="20"/>
+
             <!-- Modern Keyboard Options -->
             <brls:Header
                 id="keyboard_modern_header"

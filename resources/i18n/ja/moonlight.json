@@ -256,6 +256,8 @@
         "mode_legacy": "レガシー(システム IME)",
         "mode_modern": "モダン(カスタムオーバーレイ)",
         "mode_saved": "キーボードモード保存",
+        "legacy_dialog_title": "システム入力欄を表示",
+        "legacy_dialog_prompt": "テキストを入力",
         "numbers_row_title": "数字行を表示",
         "arrows_title": "矢印キーを表示",
         "fullscreen_title": "フルスクリーンキーボード",

@@ -276,6 +276,11 @@ void ControllerInputManager::handleInput()
         rearTouchManager->process(gamepadState, isPstvModel);
     }
 
+    if (activeKeyboard)
+    {
+        activeKeyboard->update();
+    }
+
     bool inFrontTouchZone = false;
     bool keyboardOpen     = (activeKeyboard && activeKeyboard->isOpen());
     if (frontTouchManager && !keyboardOpen)
@@ -330,9 +335,10 @@ void ControllerInputManager::handleInput()
         constexpr uint64_t kTouchReleaseDelayUs = 150000;
         const bool keyboardOpen                 = (activeKeyboard != nullptr && activeKeyboard->isOpen());
         const bool keyboardStreamTouch          = keyboardOpen && activeKeyboard->allowsStreamTouch() && activeKeyboard->streamTouchHeight() > 0;
+        const bool keyboardBlocksStreamTouch    = keyboardStreamTouch && activeKeyboard->blocksStreamTouch();
         const bool keyboardModeChanged          = keyboardOpen != lastKeyboardOpen || keyboardStreamTouch != lastKeyboardStreamTouch;
 
-        if (keyboardOpen && !keyboardStreamTouch)
+        if (keyboardOpen && (!keyboardStreamTouch || keyboardBlocksStreamTouch))
         {
             if (!touchSuppressed)
             {
@@ -371,11 +377,8 @@ void ControllerInputManager::handleInput()
         lastKeyboardStreamTouch = keyboardStreamTouch;
     }
 
-    // Keyboard per-frame update (legacy now runs IME update in dedicated thread)
     if (activeKeyboard)
     {
-        activeKeyboard->update();
-
         if (activeKeyboard->isOpen())
         {
             activeKeyboardSeenOpen = true;

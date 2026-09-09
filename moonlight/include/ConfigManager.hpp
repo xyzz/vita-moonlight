@@ -73,6 +73,7 @@ struct VideoSettings
     bool keyboard_input_mode           = false; // false=VK (default), true=force UTF-8 text input
     bool keyboard_numbers_row          = true; // Modern: show numeric row
     bool keyboard_show_arrows          = true; // Modern: show arrow keys
+    bool keyboard_legacy_dialog        = false;
     bool keyboard_fullscreen           = false;
     bool keyboard_text_preview         = true;
     bool keyboard_mouse_passthrough    = false;

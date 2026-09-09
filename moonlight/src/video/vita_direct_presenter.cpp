@@ -261,7 +261,7 @@ extern "C"
             oy = image_scaling.offset_y;
         }
 
-        VitaVideoRenderer::instance().adjustPresentation(ox, oy, dw, dh);
+        VitaVideoRenderer::instance().adjustPresentation(oy);
 
         const uint32_t storageWidth  = gxm_texture_get_storage_width(tex);
         const uint32_t storageHeight = gxm_texture_get_storage_height(tex);

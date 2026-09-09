@@ -405,6 +405,7 @@ VideoSettings ConfigManager::getVideoSettings() const
     settings.keyboard_input_mode          = get("video", "keyboard_input_mode", "false") == "true";
     settings.keyboard_numbers_row         = get("video", "keyboard_numbers_row", "true") == "true";
     settings.keyboard_show_arrows         = get("video", "keyboard_show_arrows", "true") == "true";
+    settings.keyboard_legacy_dialog       = get("video", "keyboard_legacy_dialog", "false") == "true";
     settings.keyboard_fullscreen          = get("video", "keyboard_fullscreen", "false") == "true";
     settings.keyboard_text_preview        = get("video", "keyboard_text_preview", "true") == "true";
     settings.keyboard_mouse_passthrough   = get("video", "keyboard_mouse_passthrough", "false") == "true";
@@ -520,6 +521,7 @@ void ConfigManager::setVideoSettings(const VideoSettings& settings)
     set("video", "keyboard_input_mode", settings.keyboard_input_mode ? "true" : "false");
     set("video", "keyboard_numbers_row", settings.keyboard_numbers_row ? "true" : "false");
     set("video", "keyboard_show_arrows", settings.keyboard_show_arrows ? "true" : "false");
+    set("video", "keyboard_legacy_dialog", settings.keyboard_legacy_dialog ? "true" : "false");
     set("video", "keyboard_fullscreen", settings.keyboard_fullscreen ? "true" : "false");
     set("video", "keyboard_text_preview", settings.keyboard_text_preview ? "true" : "false");
     set("video", "keyboard_mouse_passthrough", settings.keyboard_mouse_passthrough ? "true" : "false");

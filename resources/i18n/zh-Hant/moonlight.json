@@ -256,6 +256,8 @@
         "mode_legacy": "傳統（系統 IME）",
         "mode_modern": "現代（自訂覆蓋層）",
         "mode_saved": "鍵盤模式已保存",
+        "legacy_dialog_title": "顯示系統文字輸入框",
+        "legacy_dialog_prompt": "輸入文字",
         "numbers_row_title": "顯示數字行",
         "arrows_title": "顯示箭頭鍵",
         "fullscreen_title": "全螢幕鍵盤",

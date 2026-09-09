@@ -256,6 +256,8 @@
     "mode_legacy": "Classique (IME système)",
     "mode_modern": "Moderne (interface personnalisée)",
     "mode_saved": "Mode clavier enregistré",
+    "legacy_dialog_title": "Afficher la zone de texte système",
+    "legacy_dialog_prompt": "Saisissez le texte",
     "numbers_row_title": "Afficher la rangée de chiffres",
     "arrows_title": "Afficher les touches fléchées",
     "fullscreen_title": "Clavier en plein écran",

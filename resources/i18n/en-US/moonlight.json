@@ -256,6 +256,8 @@
             "mode_legacy": "Legacy (System IME)",
             "mode_modern": "Modern (Custom Overlay)",
             "mode_saved": "Keyboard mode saved",
+            "legacy_dialog_title": "Show system text box",
+            "legacy_dialog_prompt": "Enter text",
             "numbers_row_title": "Show number row",
             "arrows_title": "Show arrow keys",
             "fullscreen_title": "Full-screen keyboard",

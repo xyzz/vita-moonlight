@@ -81,6 +81,7 @@ class KeyboardOverlay : public BaseOverlay, public IKeyboard
     void updateTextPreview(const std::string& action);
     void toggleVideoFocus();
     void updateVideoViewport();
+    int videoViewportHeight() const;
     bool mapActionToVk(const std::string& action, int& outVk) const;
     void pulseKey(int vk);
     void releaseExpiredKeys();
@@ -109,6 +110,7 @@ class KeyboardOverlay : public BaseOverlay, public IKeyboard
     bool showTextPreview   = true;
     bool mousePassthrough  = false;
     bool showBottomVideo   = false;
+    bool manualVideoFocus  = false;
     unsigned int modifiers = 0;
     std::string textPreview;
     float previewHeight = 52.0f;

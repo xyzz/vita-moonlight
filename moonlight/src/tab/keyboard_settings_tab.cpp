@@ -28,6 +28,10 @@ KeyboardSettingsTab::KeyboardSettingsTab()
         {
             keyboardInputModeToggle->setVisibility(modernMode ? brls::Visibility::VISIBLE : brls::Visibility::GONE);
         }
+        if (keyboardLegacyDialogToggle)
+        {
+            keyboardLegacyDialogToggle->setVisibility(modernMode ? brls::Visibility::GONE : brls::Visibility::VISIBLE);
+        }
         if (keyboardModernHeader)
         {
             keyboardModernHeader->setVisibility(modernMode ? brls::Visibility::VISIBLE : brls::Visibility::GONE);
@@ -148,6 +152,19 @@ KeyboardSettingsTab::KeyboardSettingsTab()
             cfg.load();
             VideoSettings settings        = cfg.getVideoSettings();
             settings.keyboard_show_arrows = value;
+            cfg.setVideoSettings(settings);
+            cfg.save();
+        });
+
+    keyboardLegacyDialogToggle->init(
+        brls::getStr("moonlight/keyboard/legacy_dialog_title"),
+        videoSettings.keyboard_legacy_dialog,
+        [](bool value)
+        {
+            ConfigManager cfg;
+            cfg.load();
+            VideoSettings settings          = cfg.getVideoSettings();
+            settings.keyboard_legacy_dialog = value;
             cfg.setVideoSettings(settings);
             cfg.save();
         });

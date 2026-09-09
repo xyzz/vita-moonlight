@@ -256,6 +256,8 @@
         "mode_legacy": "Legado (IME del sistema)",
         "mode_modern": "Moderno (Superposición personalizada)",
         "mode_saved": "Modo de teclado guardado",
+        "legacy_dialog_title": "Mostrar cuadro de texto del sistema",
+        "legacy_dialog_prompt": "Escribe el texto",
         "numbers_row_title": "Mostrar fila numérica",
         "arrows_title": "Mostrar teclas de flecha",
         "fullscreen_title": "Teclado a pantalla completa",

@@ -253,11 +253,8 @@ void MicrophoneManager::errorCallback(const char* error, void* userData)
 void MicrophoneManager::setGain(float gain)
 {
     ConfigManager config;
-    config.load();
-    VideoSettings settings   = config.getVideoSettings();
-    settings.microphone_gain = gain;
-    config.setVideoSettings(settings);
-    config.save();
+    config.updateVideoSettings([gain](VideoSettings& settings)
+        { settings.microphone_gain = gain; });
 
     if (running_ && client_)
     {

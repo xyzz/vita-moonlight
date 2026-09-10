@@ -234,7 +234,7 @@ extern "C"
     {
         if (!s_dp_active)
             return -1;
-        if (g_stats.frames_decoded == 0)
+        if (video_stats::load(g_stats.frames_decoded) == 0)
             return -1;
 
         int displayIdx = __atomic_load_n(&frame_display_idx, __ATOMIC_ACQUIRE);
@@ -304,7 +304,7 @@ extern "C"
         sceGxmSetVertexStream(win->context, 0, s_vertices);
         sceGxmDraw(win->context, SCE_GXM_PRIMITIVE_TRIANGLE_STRIP, SCE_GXM_INDEX_FORMAT_U16, s_indices, 4);
 
-        g_stats.frames_presented++;
+        video_stats::increment(g_stats.frames_presented);
         // FFmpeg releases deferred CDRAM buffers from the presentation side.
         VitaVideoRenderer::instance().onFramePresented(sceGxmTextureGetData(&gxmTexSnapshot));
 

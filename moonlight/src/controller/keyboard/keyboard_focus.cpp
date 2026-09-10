@@ -27,7 +27,7 @@ void request_keyboard_typing_focus(KeyboardTypingFocusCallback callback)
     std::string host             = settings.microphone_host_ip;
     if (host.empty())
     {
-        VitaSession* session = VitaSession::active();
+        auto session = VitaSession::active();
         if (session)
         {
             host = session->address();

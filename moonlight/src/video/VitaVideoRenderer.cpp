@@ -12,18 +12,14 @@
 #include <mutex>
 
 #include "legacy/modules/vita_globals.hpp"
+#include "session/connection_telemetry.hpp"
+#include "video/runtime_settings.hpp"
 
 namespace
 {
 uint32_t s_presentWindowFrames = 0;
 uint64_t s_cachedStatsStart    = 0;
 uint32_t s_prevDecodedCount    = 0;
-
-bool is_gpu_yuv_experimental_enabled()
-{
-    extern bool g_gpu_yuv_experimental_enabled;
-    return g_gpu_yuv_experimental_enabled;
-}
 
 bool is_yuv_gxm_format(uint32_t fmt)
 {
@@ -129,7 +125,7 @@ void VitaVideoRenderer::drawNVG(NVGcontext* vg, float viewportW, float viewportH
         draw(viewportW, viewportH);
         return;
     }
-    if (g_stats.frames_decoded == 0)
+    if (video_stats::load(g_stats.frames_decoded) == 0)
         return;
 
     int displayIdx = __atomic_load_n(&frame_display_idx, __ATOMIC_ACQUIRE);
@@ -287,7 +283,7 @@ void VitaVideoRenderer::drawNVG(NVGcontext* vg, float viewportW, float viewportH
         nvgRestore(vg);
     }
 
-    g_stats.frames_presented++;
+    video_stats::increment(g_stats.frames_presented);
     onFramePresented(currentData);
 }
 
@@ -339,7 +335,7 @@ void VitaVideoRenderer::onFramePresented(const void* textureData)
     // Only process ffmpeg deferred releases when in ffmpeg mode.
     // In legacy mode, the deferred list is always empty but we'd still
     // pay for a mutex lock+unlock on every single frame for nothing.
-    if (g_video_settings_snapshot.render_mode == 1)
+    if (video_runtime::renderMode() == 1)
     {
         ffmpeg_video_watchdog_tick();
         ffmpeg_mark_direct_buffer_presented(textureData);
@@ -358,7 +354,7 @@ void VitaVideoRenderer::onFramePresented(const void* textureData)
         s_presentWindowFrames = 0;
         last_fps_window_ms    = stats_start_ms;
         // Reset decoding window counter in sync with the present window for easier comparison
-        s_prevDecodedCount = g_stats.frames_decoded;
+        s_prevDecodedCount = video_stats::load(g_stats.frames_decoded);
     }
 
     if (last_fps_window_ms == 0)
@@ -368,52 +364,48 @@ void VitaVideoRenderer::onFramePresented(const void* textureData)
 
     s_presentWindowFrames++;
 
-    if (stats_start_ms <= now)
-    {
-        g_stats.session_ms = now - stats_start_ms;
-    }
-
     uint64_t elapsed = now - last_fps_window_ms;
     if (elapsed >= 1000)
     {
         if (elapsed == 0)
             elapsed = 1;
-        g_stats.current_fps = (uint32_t)((uint64_t)s_presentWindowFrames * 1000ULL / elapsed);
-        curr_fps[0]         = g_stats.current_fps;
+        video_stats::store(g_stats.current_fps,
+            (uint32_t)((uint64_t)s_presentWindowFrames * 1000ULL / elapsed));
         // Compute decode FPS using the global decoded frames counter and the same time window
-        uint32_t nowDecCount = g_stats.frames_decoded;
+        uint32_t nowDecCount = video_stats::load(g_stats.frames_decoded);
         uint32_t decInWindow = nowDecCount - s_prevDecodedCount;
-        g_stats.decoded_fps  = (uint32_t)((uint64_t)decInWindow * 1000ULL / elapsed);
-        s_prevDecodedCount   = nowDecCount;
+        video_stats::store(g_stats.decoded_fps,
+            (uint32_t)((uint64_t)decInWindow * 1000ULL / elapsed));
+        s_prevDecodedCount = nowDecCount;
 
-        if (g_decode_count > 0)
+        const uint32_t decodeCount = video_stats::exchange(g_decode_count, 0);
+        if (decodeCount > 0)
         {
-            uint32_t avg       = g_decode_sum_ms / g_decode_count;
-            uint32_t estRtt    = 0;
-            uint32_t estRttVar = 0;
-            if (!g_session_stopping && LiGetEstimatedRttInfo(&estRtt, &estRttVar))
+            const uint32_t decodeSum = video_stats::exchange(g_decode_sum_ms, 0);
+            const uint32_t decodeMin = video_stats::exchange(g_decode_min_ms, 999999);
+            const uint32_t decodeMax = video_stats::exchange(g_decode_max_ms, 0);
+            uint32_t avg             = decodeSum / decodeCount;
+            uint32_t estRtt          = 0;
+            uint32_t estRttVar       = 0;
+            if (connection::getEstimatedRtt(estRtt, estRttVar))
             {
                 // Log warning if RTT variance is high or FPS is low
-                if (estRttVar > 5 || g_decode_count < 55)
+                if (estRttVar > 5 || decodeCount < 55)
                 {
                     VITA_DEBUG_LOG("[PERF][DECODE] WARNING: Latency (min/avg/max): %u/%u/%u ms (frames in window: %u) - RTT: %u ms (var: %u)",
-                        g_decode_min_ms, avg, g_decode_max_ms, g_decode_count, estRtt, estRttVar);
+                        decodeMin, avg, decodeMax, decodeCount, estRtt, estRttVar);
                 }
                 else
                 {
                     VITA_DEBUG_LOG("[PERF][DECODE] Latency (min/avg/max): %u/%u/%u ms (frames in window: %u) - RTT: %u ms (var: %u)",
-                        g_decode_min_ms, avg, g_decode_max_ms, g_decode_count, estRtt, estRttVar);
+                        decodeMin, avg, decodeMax, decodeCount, estRtt, estRttVar);
                 }
             }
             else
             {
                 VITA_DEBUG_LOG("[PERF][DECODE] Latency (min/avg/max): %u/%u/%u ms (frames in window: %u)",
-                    g_decode_min_ms, avg, g_decode_max_ms, g_decode_count);
+                    decodeMin, avg, decodeMax, decodeCount);
             }
-            g_decode_min_ms = 999999;
-            g_decode_max_ms = 0;
-            g_decode_sum_ms = 0;
-            g_decode_count  = 0;
         }
 
         if (s_e2e_count > 0)

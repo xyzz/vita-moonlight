@@ -5,27 +5,27 @@
 */
 #pragma once
 #include <cstdint>
+#include <functional>
+#include <map>
+#include <mutex>
 #include <string>
-#include <unordered_map>
 
-#include "../../third_party/moonmic/moonmic.h" // For MOONMIC_DEFAULT_* constants
+#include "../../third_party/moonmic/moonmic.h"
 #include "controller/input_types.hpp"
 #include "controller/special_inputs.hpp"
 #include "controller/touchscreen_modes.hpp"
 
-// Streaming configuration structure (similar to legacy)
 struct StreamConfiguration
 {
-    int width                 = 1280; // Moonmic host monitor target
-    int height                = 720;
-    int streamWidth           = 960;
-    int streamHeight          = 544; // Encoded stream resolution
-    int fps                   = 60;
-    int bitrate               = -1; // Automatic bitrate
-    int packetSize            = 1024;
-    int streamingRemotely     = 0;
-    int audioConfiguration    = 2; // AUDIO_CONFIGURATION_STEREO
-    int supportedVideoFormats = 1; // VIDEO_FORMAT_H264
+    int width              = 1280; // Moonmic host monitor target
+    int height             = 720;
+    int streamWidth        = 960;
+    int streamHeight       = 544; // Encoded stream resolution
+    int fps                = 60;
+    int bitrate            = -1; // Automatic bitrate
+    int packetSize         = 1024;
+    int streamingRemotely  = 0;
+    int audioConfiguration = 2; // AUDIO_CONFIGURATION_STEREO
 };
 
 struct RearTouchSettings
@@ -43,45 +43,40 @@ struct RearTouchSettings
 
 enum GamepadType : int
 {
-    GAMEPAD_TYPE_XBOX = 0, // Emular Xbox 360 (A/B/X/Y, LB/RB)
-    GAMEPAD_TYPE_PS4  = 1, // Emular PS4 (Cross/Circle/Square/Triangle, L1/R1)
+    GAMEPAD_TYPE_XBOX = 0,
+    GAMEPAD_TYPE_PS4  = 1,
 };
 
 struct VideoSettings
 {
-    bool sops                          = true; // Stream Optimization
-    bool localaudio                    = false;
-    bool fullscreen                    = true;
-    bool enable_frame_pacer            = true;
-    bool keep_awake_while_streaming    = true;
-    float settings_background_opacity  = 1.0f;
-    bool center_region_only            = false;
-    bool show_fps                      = false;
-    bool save_debug_log                = false;
-    bool enable_ref_frame_invalidation = false;
-    bool enable_vita_vblank_wait       = false;
-    bool enable_motion_controls        = false;
-    bool enable_double_tap_sprint      = false;
-    bool enable_network_optimizations  = true; // Network optimizations (IDR smart, pacing, etc.)
-    int touchscreen_mode               = TOUCHSCREEN_MODE_TRACKPAD;
-    int double_tap_sprint_step_time    = 200;
-    float motion_controls_scalar_x     = 1.2f;
-    float motion_controls_scalar_y     = 0.8f;
-    int mouse_acceleration             = 150;
-    int keyboard_layout                = 0; // 0=EN_US, 1=ES_ES, 2=ES_LATAM, 3=FR, 4=DE, 5=IT, 6=PT_BR, 7=UK
-    int keyboard_mode                  = 0; // 0=Legacy (SCE IME), 1=Modern (Borealis overlay)
-    bool keyboard_input_mode           = false; // false=VK (default), true=force UTF-8 text input
-    bool keyboard_numbers_row          = true; // Modern: show numeric row
-    bool keyboard_show_arrows          = true; // Modern: show arrow keys
-    bool keyboard_legacy_dialog        = false;
-    bool keyboard_fullscreen           = false;
-    bool keyboard_text_preview         = true;
-    bool keyboard_mouse_passthrough    = false;
-    bool capture_ps_button             = true;
+    bool sops                         = true;
+    bool localaudio                   = false;
+    bool fullscreen                   = true;
+    bool enable_frame_pacer           = true;
+    bool keep_awake_while_streaming   = true;
+    float settings_background_opacity = 1.0f;
+    bool center_region_only           = false;
+    bool show_fps                     = false;
+    bool save_debug_log               = false;
+    bool enable_motion_controls       = false;
+    bool enable_double_tap_sprint     = false;
+    bool enable_network_optimizations = true;
+    int touchscreen_mode              = TOUCHSCREEN_MODE_TRACKPAD;
+    float motion_controls_scalar_x    = 1.2f;
+    float motion_controls_scalar_y    = 0.8f;
+    int keyboard_layout               = 0; // EN_US, ES_ES, ES_LATAM
+    int keyboard_mode                 = 0; // SCE IME or Borealis overlay
+    bool keyboard_input_mode          = false; // VK codes or UTF-8 text
+    bool keyboard_numbers_row         = true;
+    bool keyboard_show_arrows         = true;
+    bool keyboard_legacy_dialog       = false;
+    bool keyboard_fullscreen          = false;
+    bool keyboard_text_preview        = true;
+    bool keyboard_mouse_passthrough   = false;
+    bool capture_ps_button            = true;
 
     int trackpad_pointer_speed           = 100; // 0-200
     int trackpad_dead_zone               = 50; // 0-200px
-    bool trackpad_tap_to_click           = true;
     bool trackpad_two_finger_right_click = true;
     bool trackpad_two_finger_scroll      = true;
     bool trackpad_invert_scroll          = false;
@@ -96,9 +91,9 @@ struct VideoSettings
     bool swap_shoulder_buttons = false;
 
     // Swap interval (V-Sync): 0 = Sin V-Sync, 1 = 60 FPS, 2 = 30 FPS, etc.
-    int swap_interval = 0;
+    int swap_interval = 1;
 
-    bool enable_front_touchzones         = true;
+    bool enable_front_touchzones         = false;
     int front_touch_offset               = 0; // px from screen edge
     int front_touch_size                 = 150; // px square zone size
     std::uint32_t front_action_northwest = controller::INPUT_TYPE_SPECIAL | controller::INPUT_SPECIAL_KEY_PAUSE;
@@ -128,25 +123,23 @@ class ConfigManager
     void set(const std::string& section, const std::string& key, const std::string& value);
     static std::string getConfigPath();
 
-    // --- Key/device directory management ---
     std::string getKeysDir() const;
     void setKeysDir(const std::string& dir);
 
-    // Secure helpers to create/secure key-related directories
-    // Ensure that the route exists (mkdir -p behavior). Returns true if
-    // the route exists after the call or false on error.
     bool ensureDirExists(const std::string& path) const;
     bool ensureKeysDirExists() const;
     bool ensureKeyDirExists(const std::string& safeId) const;
 
-    // --- Streaming configuration (legacy mode) ---
     StreamConfiguration getStreamConfig() const;
     void setStreamConfig(const StreamConfiguration& config);
     VideoSettings getVideoSettings() const;
     void setVideoSettings(const VideoSettings& settings);
+    bool updateStreamConfig(const std::function<void(StreamConfiguration&)>& update);
+    bool updateVideoSettings(const std::function<void(VideoSettings&)>& update);
 
   private:
-    std::unordered_map<std::string, std::unordered_map<std::string, std::string>> data;
+    static std::recursive_mutex fileMutex;
+    std::map<std::string, std::map<std::string, std::string>> data;
     mutable std::string cachedKeysDir;
     mutable bool keysDirLoaded = false;
 };

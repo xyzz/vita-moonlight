@@ -1,32 +1,78 @@
 [general]
-language = es
+language = en-US
 
 [stream]
 width = 1280
 height = 720
+stream_width = 960
+stream_height = 544
 fps = 60
 bitrate = -1
 packetsize = 1024
 streaming_remotely = 0
 audio_config = 2
-video_formats = 1
 
 [video]
 sops = true
 localaudio = false
 fullscreen = true
 enable_frame_pacer = true
+keep_awake_while_streaming = true
+settings_background_opacity = 1.0
 center_region_only = false
 show_fps = false
 save_debug_log = false
-enable_ref_frame_invalidation = false
-enable_vita_vblank_wait = false
 enable_motion_controls = false
 enable_double_tap_sprint = false
+enable_network_optimizations = true
 touchscreen_mode = 1
 touchscreen_mode_schema = 2
-double_tap_sprint_step_time = 200
 motion_controls_scalar_x = 1.2
 motion_controls_scalar_y = 0.8
-mouse_acceleration = 150
 keyboard_layout = 0
+keyboard_mode = 0
+keyboard_input_mode = false
+keyboard_numbers_row = true
+keyboard_show_arrows = true
+keyboard_legacy_dialog = false
+keyboard_fullscreen = false
+keyboard_text_preview = true
+keyboard_mouse_passthrough = false
+capture_ps_button = true
+render_mode = 0
+pixel_format_mode = 1
+gamepad_type = 0
+swap_shoulder_buttons = false
+swap_interval = 1
+enable_microphone = false
+microphone_gain = 10.0
+enable_microphone_compression = false
+
+[trackpad]
+pointer_speed = 100
+dead_zone = 50
+two_finger_right_click = true
+two_finger_scroll = true
+invert_scroll = false
+multi_touch = true
+edge_zone = 15
+
+[rear_touch]
+enabled = true
+top = 0
+right = 0
+bottom = 0
+left = 0
+schema_version = 2
+
+[front_touch]
+enabled = false
+offset = 0
+size = 150
+
+[microphone]
+host_ip =
+port = 48100
+sample_rate = 16000
+channels = 1
+bitrate = 64000

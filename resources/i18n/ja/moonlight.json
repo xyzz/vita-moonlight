@@ -156,7 +156,6 @@
         "center_region_title": "中央領域のみ",
         "show_fps_title": "FPSを表示する",
         "save_debug_log_title": "デバッグログを保存",
-        "ref_frame_title": "参照フレームの無効化",
         "swap_interval": {
             "title": "V-Sync(スワップインターバル)",
             "options": {
@@ -180,7 +179,9 @@
                 "4": "マルチタッチタブレット"
             },
             "saved": "タッチスクリーンモード保存",
-            "changed": "タッチスクリーンモードが変更されました:"
+            "changed": "タッチスクリーンモードが変更されました:",
+            "ds4_requires_playstation": "DS4タッチパッドにはPlayStationコントローラータイプが必要です",
+            "change_failed": "タッチスクリーンモードを変更できませんでした"
         },
         "gamepad_type": {
             "title": "コントローラーのタイプ",

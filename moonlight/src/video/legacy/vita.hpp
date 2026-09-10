@@ -31,16 +31,7 @@ enum VideoStatus
     VITA_VIDEO_INIT_AVC_LIB,
     VITA_VIDEO_INIT_DECODER_MEMBLOCK,
     VITA_VIDEO_INIT_AVC_DEC,
-    VITA_VIDEO_INIT_FRAME_PACER_THREAD,
 };
-
-// Structure for visual indicators
-typedef struct
-{
-    bool activated;
-    uint8_t alpha;
-    bool plus;
-} indicator_status;
 
 // Structure for image scaling
 typedef struct
@@ -60,9 +51,6 @@ typedef struct
 // Callbacks for the video system
 extern "C" void vitavideo_start();
 extern "C" void vitavideo_stop();
-extern "C" void vitavideo_show_poor_net_indicator();
-extern "C" void vitavideo_hide_poor_net_indicator();
-extern "C" int vitavideo_initialized();
 
 // Basic video pipeline stats (similar to simplified MoonlightSession stats)
 typedef struct
@@ -87,19 +75,11 @@ typedef struct
 extern "C" void vitavideo_get_stats(VitaVideoStats* outStats);
 extern "C" void vitavideo_reset_stats();
 
-// Presentation mode now always immediate; removed external functions
-
 // Configuration functions
 extern "C" int vitavideo_setup(int videoFormat, int width, int height, int redrawRate, void* context, int drFlags);
 extern "C" void vita_cleanup();
 extern "C" void vita_full_teardown();
 extern "C" int vitavideo_submit_decode_unit(PDECODE_UNIT decodeUnit);
-
-// Legacy modes removed
-
-// Rendering functions (legacy removed; use VitaVideoRenderer instead of vitavideo_draw_streaming*_*)
-extern "C" void vitavideo_draw_fps();
-extern "C" void vitavideo_draw_indicators();
 
 // Access to the current front texture.
 extern "C" struct GxmTexture* vitavideo_get_current_texture();

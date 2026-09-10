@@ -8,7 +8,7 @@ class HostMenuTab : public brls::Box
 {
   public:
     HostMenuTab(const HostInfo& hostToEdit);
-    virtual ~HostMenuTab();
+    ~HostMenuTab() override = default;
     static brls::View* create(const HostInfo& hostToEdit);
 
   private:

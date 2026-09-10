@@ -1,4 +1,7 @@
 #pragma once
+#include <atomic>
+#include <memory>
+#include <mutex>
 #include <string>
 
 #include "GameStreamClient.hpp"
@@ -8,14 +11,12 @@
 
 struct VitaSessionStats
 {
-    uint64_t videoFrames           = 0;
     uint64_t firstFrameTimestampMs = 0;
     uint32_t windowFrames          = 0;
     uint64_t windowStartMs         = 0;
     uint32_t fps                   = 0;
 };
 
-// Mini snapshot for overlay (added without exposing VitaVideoStats directly)
 struct VitaOverlaySnapshot
 {
     uint32_t fps_presented    = 0;
@@ -25,45 +26,29 @@ struct VitaOverlaySnapshot
     uint32_t frames_presented = 0;
 };
 
-class VitaSession
+class VitaSession : public std::enable_shared_from_this<VitaSession>
 {
   public:
-    VitaSession(const std::string& address, int appId, bool isSunshine);
+    VitaSession(const std::string& address, int appId);
     ~VitaSession();
 
-    // Start session (returns immediate bool; deep logs in callbacks)
     bool start();
     void stop(bool terminateApp);
 
-    bool isActive() const { return m_is_active; }
-    bool isTerminated() const { return m_is_terminated; }
+    bool isActive() const { return m_is_active.load(); }
+    bool isTerminated() const { return m_is_terminated.load(); }
     const std::string& address() const { return m_address; }
 
-    const VitaSessionStats& stats() const { return m_stats; }
-
-    // manual reconnection
     bool attemptReconnect();
     bool reconnectAfterResume();
 
-    // Access to active session
-    static VitaSession* active();
-    // Destroy (stop + free) the active session if it exists
-    static void destroyActive(bool terminateApp);
-
-    // Notification from the decoder when a frame is ready (post swap)
+    static std::shared_ptr<VitaSession> active();
     static void onFrameDecoded();
-
-    // Draw current frame
     void draw(float viewportW, float viewportH);
-
-    // Get snapshot for overlay (uses vitavideo_get_stats internally)
     VitaOverlaySnapshot overlaySnapshot() const;
-
-    // Notify server of gamepad type saved in config
     static void notifyGamepadType();
 
   private:
-    // Moonlight-Switch style static callbacks
     static void connection_stage_starting(int stage);
     static void connection_stage_complete(int stage);
     static void connection_stage_failed(int stage, int error_code);
@@ -71,12 +56,6 @@ class VitaSession
     static void connection_terminated(int error_code);
     static void connection_log_message(const char* format, ...);
     static void connection_status_update(int status);
-
-    static int video_decoder_setup(int, int, int, int, void*, int);
-    static void video_decoder_start();
-    static void video_decoder_stop();
-    static void video_decoder_cleanup();
-    static int video_decoder_submit_decode_unit(PDECODE_UNIT);
 
     static int audio_renderer_init(int, const POPUS_MULTISTREAM_CONFIGURATION, void*, int);
     static void audio_renderer_start();
@@ -90,24 +69,23 @@ class VitaSession
   private:
     std::string m_address;
     int m_app_id;
-    bool m_is_sunshine;
-
     STREAM_CONFIGURATION m_config {};
     CONNECTION_LISTENER_CALLBACKS m_conn_callbacks {};
     DECODER_RENDERER_CALLBACKS m_video_callbacks {};
     AUDIO_RENDERER_CALLBACKS m_audio_callbacks {};
 
-    bool m_is_active              = false;
-    bool m_is_terminated          = false;
-    bool m_poor                   = false;
-    bool m_allow_resume_reconnect = false;
+    std::atomic<bool> m_is_active { false };
+    std::atomic<bool> m_is_terminated { false };
+    std::atomic<bool> m_allow_resume_reconnect { false };
 
-    int m_reconnect_attempts    = 0;
+    std::atomic<int> m_reconnect_attempts { 0 };
     const int m_reconnect_limit = 1;
 
+    mutable std::mutex m_lifecycle_mutex;
+    bool m_start_attempted  = false;
+    bool m_cleanup_complete = false;
+    mutable std::mutex m_stats_mutex;
     VitaSessionStats m_stats {};
-    uint64_t m_startMonotonicMs = 0;
-    static uint64_t monotonicMs();
-
-    static VitaSession* s_active;
+    static std::mutex s_active_mutex;
+    static std::weak_ptr<VitaSession> s_active;
 };

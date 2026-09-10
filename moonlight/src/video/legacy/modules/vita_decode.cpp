@@ -26,9 +26,7 @@ extern "C"
 {
 #include "Platform.h"
 }
-#include "network/NetworkOptimizations.hpp"
 #include "video/pixel_format/pixel_format.hpp"
-#include "video/render_mode_cache.hpp"
 #include "vita_sceAvcInternal.hpp"
 
 // Global pixel format processor (modular RGBA/YUV handling)
@@ -152,7 +150,7 @@ static bool legacy_frame_is_stale(PDECODE_UNIT decodeUnit)
         VITA_DEBUG_LOG("[Video][LAT] dropping stale frame age=%lluus frame=%d",
             (unsigned long long)(nowUs - expectedUs), decodeUnit->frameNumber);
     }
-    g_stats.frames_dropped_pacer++;
+    video_stats::increment(g_stats.frames_dropped_pacer);
     return true;
 }
 
@@ -419,13 +417,11 @@ extern "C" int vitavideo_submit_decode_unit(PDECODE_UNIT decodeUnit)
     if (ret >= 0)
     {
         uint32_t dec_ms = (uint32_t)(end_dec - start_dec) / 1000;
-        g_stats.decode_time_ms += dec_ms;
-        if (dec_ms < g_decode_min_ms)
-            g_decode_min_ms = dec_ms;
-        if (dec_ms > g_decode_max_ms)
-            g_decode_max_ms = dec_ms;
-        g_decode_sum_ms += dec_ms;
-        g_decode_count++;
+        video_stats::add(g_stats.decode_time_ms, dec_ms);
+        video_stats::updateMinimum(g_decode_min_ms, dec_ms);
+        video_stats::updateMaximum(g_decode_max_ms, dec_ms);
+        video_stats::add(g_decode_sum_ms, dec_ms);
+        video_stats::increment(g_decode_count);
     }
 
     // Map common errors for quick diagnosis
@@ -452,9 +448,6 @@ extern "C" int vitavideo_submit_decode_unit(PDECODE_UNIT decodeUnit)
         return DR_NEED_IDR;
     }
 
-    static unsigned syntheticFrameIndex = 0;
-    vita_netopt_on_frame_seen(syntheticFrameIndex);
-
     if (ret < 0 || vd_submit_counter < 4 || (vd_submit_counter % 240) == 0)
     {
         VITA_DEBUG_LOG("[Video] dec ret=0x%x out=%d pitch=%u fb=%s physPtr=%p", ret, array_picture.numOfOutput, picture.frame.framePitch, decoder_use_phys_fallback ? "on" : "off", decoder_output_phys_ptr);
@@ -469,7 +462,6 @@ extern "C" int vitavideo_submit_decode_unit(PDECODE_UNIT decodeUnit)
     {
         // If there is no output but we are in physical fallback and we have a block, make a tentative copy (best-effort)
         // No output yet
-        syntheticFrameIndex++;
         vd_submit_counter++;
         return DR_OK;
     }
@@ -509,17 +501,15 @@ extern "C" int vitavideo_submit_decode_unit(PDECODE_UNIT decodeUnit)
     // Wake the render loop now instead of letting it sleep out its frame budget.
     vita_video_frame_published();
 
-    if (g_stats.frames_decoded == 0)
+    if (video_stats::load(g_stats.frames_decoded) == 0)
         VITA_DEBUG_LOG("[Video][DBG] primer frame decodificado");
 
     VitaSession::onFrameDecoded();
 
-    if (active_video_thread)
+    if (active_video_thread.load(std::memory_order_acquire))
     {
-        g_stats.frames_decoded++;
-        vita_netopt_on_frame_completed(syntheticFrameIndex);
+        video_stats::increment(g_stats.frames_decoded);
     }
-    syntheticFrameIndex++;
     vd_submit_counter++;
     // Case: consecutive outputs=1 in frames where host sends accumulated slices.
     // The API can return repeated outputs=1 if there are ready frames in the internal queue; we accept.

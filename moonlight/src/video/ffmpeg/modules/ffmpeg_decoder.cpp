@@ -8,6 +8,7 @@
 
 #include "../ffmpeg.hpp"
 #include "legacy/modules/vita_globals.hpp"
+#include "video/runtime_settings.hpp"
 
 #ifdef __cplusplus
 extern "C"
@@ -104,9 +105,10 @@ int ffmpeg_decoder_init(FFmpegDecoderContext* ctx)
 #ifdef BOREALIS_USE_GXM
     if (codec->id == AV_CODEC_ID_H264)
     {
-        int requestedPixelMode = g_video_settings_snapshot.pixel_format_mode;
+        int requestedPixelMode = video_runtime::pixelFormatMode();
         ctx->is_vita_hw        = (strcmp(codec->name, "h264_vita") == 0);
 
+        // h264_vita exposes NV12 surfaces directly; its RGBA path is slower and unstable.
         enum AVPixelFormat requestedPixFmt = ctx->is_vita_hw ? AV_PIX_FMT_VITA_NV12 : AV_PIX_FMT_YUV420P;
         ctx->avctx->pix_fmt                = requestedPixFmt;
 
@@ -218,7 +220,7 @@ int ffmpeg_decoder_init(FFmpegDecoderContext* ctx)
         ctx->use_direct_render = false;
     }
 #else
-    ctx->avctx->pix_fmt    = (g_video_settings_snapshot.pixel_format_mode == 0) ? AV_PIX_FMT_RGBA : AV_PIX_FMT_YUV420P;
+    ctx->avctx->pix_fmt    = (video_runtime::pixelFormatMode() == 0) ? AV_PIX_FMT_RGBA : AV_PIX_FMT_YUV420P;
     ctx->use_direct_render = false;
 #endif
 

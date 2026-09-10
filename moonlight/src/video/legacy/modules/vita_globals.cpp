@@ -3,6 +3,7 @@
 #include <mutex>
 
 #include "gamestream/sps.h"
+#include "video/runtime_settings.hpp"
 
 VideoStatus video_status          = VITA_VIDEO_NOT_INIT;
 uint32_t video_status_canary_pre  = 0xDEADBEEF;
@@ -27,7 +28,7 @@ int SCREEN_HEIGHT = 544;
 
 image_scaling_settings image_scaling = { 0 };
 
-bool active_video_thread = false;
+std::atomic<bool> active_video_thread { false };
 
 // Legacy mode and heuristics
 // Legacy modes removed
@@ -68,17 +69,8 @@ bool decoder_linear_rgba_physically_backed = false;
 VitaVideoStats g_stats      = { 0 };
 uint64_t stats_start_ms     = 0;
 uint64_t last_fps_window_ms = 0;
-uint32_t curr_fps[2]        = { 0, 0 };
-SceUID pacer_thread         = -1;
-bool active_pacer_thread    = false;
-
-// Indicadores
-indicator_status poor_net_indicator = { 0 };
 
 gs::SpsContext* g_sps_ctx = nullptr; // SPS context active (SPS fix)
-
-// Video status info
-VideoStatusInfo g_video_status_info = { VITA_VIDEO_NOT_INIT };
 
 // Video settings snapshot
 // Defined elsewhere
@@ -106,7 +98,7 @@ void vitavideo_update_scaling_settings(int width, int height)
     else if (SCREEN_WIDTH * height > SCREEN_HEIGHT * width)
     {
         // Taller host (e.g. 4:3) -> scaled_height > SCREEN_HEIGHT
-        if (g_video_settings_snapshot.center_region_only)
+        if (video_runtime::centerRegionOnly())
         {
             image_scaling.texture_height = VITA_DECODER_RESOLUTION((int)vita_round(scaled_height));
             image_scaling.region_y1      = (float)VITA_DECODER_RESOLUTION((int)vita_round((scaled_height - SCREEN_HEIGHT) / 2));
@@ -122,7 +114,7 @@ void vitavideo_update_scaling_settings(int width, int height)
     else
     {
         // "Wider" host (e.g. 16:9)
-        if (g_video_settings_snapshot.center_region_only)
+        if (video_runtime::centerRegionOnly())
         {
             image_scaling.texture_width = VITA_DECODER_RESOLUTION((int)vita_round(scaled_width));
             image_scaling.region_x1     = (float)VITA_DECODER_RESOLUTION((int)vita_round((scaled_width - SCREEN_WIDTH) / 2));
@@ -181,5 +173,3 @@ uint32_t g_decode_min_ms = 999999;
 uint32_t g_decode_max_ms = 0;
 uint32_t g_decode_sum_ms = 0;
 uint32_t g_decode_count  = 0;
-
-volatile bool g_session_stopping = false;

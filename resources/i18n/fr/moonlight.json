@@ -156,7 +156,6 @@
     "center_region_title": "Région du centre seulement",
     "show_fps_title": "Afficher FPS",
     "save_debug_log_title": "Enregistrer le journal de débogage",
-    "ref_frame_title": "Invalidation du cadre de référence",
     "swap_interval": {
       "title": "V-Sync (intervalle de rotation)",
       "options": {
@@ -180,7 +179,9 @@
         "4": "Comprimé multitouch"
       },
       "saved": "Mode écran tactile enregistré",
-      "changed": "Le mode écran tactile est devenu :"
+      "changed": "Le mode écran tactile est devenu :",
+      "ds4_requires_playstation": "Le pavé tactile DS4 nécessite le type de manette PlayStation",
+      "change_failed": "Impossible de changer le mode de l'écran tactile"
     },
     "gamepad_type": {
       "title": "Type de contrôleur",

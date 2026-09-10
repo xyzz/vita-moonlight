@@ -12,17 +12,43 @@
 #include <sys/types.h>
 
 #include <algorithm>
+#include <cstdio>
 #include <fstream>
 #include <iostream>
 #include <sstream>
 #include <string>
 
 #include "debug.hpp"
+#include "session/stream_config.hpp"
 
 namespace
 {
 
 constexpr int TOUCHSCREEN_MODE_SCHEMA = 2;
+
+int parseInt(const std::string& value, int fallback)
+{
+    try
+    {
+        return std::stoi(value);
+    }
+    catch (...)
+    {
+        return fallback;
+    }
+}
+
+float parseFloat(const std::string& value, float fallback)
+{
+    try
+    {
+        return std::stof(value);
+    }
+    catch (...)
+    {
+        return fallback;
+    }
+}
 
 int migrateLegacyTouchscreenMode(int mode)
 {
@@ -145,6 +171,8 @@ bool ConfigManager::ensureKeyDirExists(const std::string& safeId) const
 {
     if (safeId.empty())
         return ensureKeysDirExists();
+    if (safeId == "." || safeId == ".." || safeId.find('/') != std::string::npos || safeId.find('\\') != std::string::npos)
+        return false;
     std::string base = getKeysDir();
     std::string path = base + "/" + safeId;
     return ensureDirExists(path);
@@ -158,6 +186,8 @@ static int iniHandler(void* user, const char* section, const char* name, const c
 }
 
 ConfigManager::ConfigManager() { }
+
+std::recursive_mutex ConfigManager::fileMutex;
 
 // Gets the keys/devices directory, configurable by file or by code
 std::string ConfigManager::getKeysDir() const
@@ -193,7 +223,10 @@ void ConfigManager::setKeysDir(const std::string& dir)
 
 bool ConfigManager::load()
 {
+    std::lock_guard<std::recursive_mutex> lock(fileMutex);
     data.clear();
+    cachedKeysDir.clear();
+    keysDirLoaded    = false;
     std::string path = getConfigPath();
 #if defined(__PSV__) || defined(__psp2__) || defined(__PSP2__)
     vita_log::info("[ConfigManager] Cargando configuración desde: %s", path.c_str());
@@ -206,14 +239,15 @@ bool ConfigManager::load()
         std::cout << "[ConfigManager] Error al cargar el archivo o no existe." << std::endl;
         return false;
     }
-    // Verbose logging removed for performance
     return true;
 }
 
 bool ConfigManager::save() const
 {
-    std::string path = getConfigPath();
-    std::ofstream file(path);
+    std::lock_guard<std::recursive_mutex> lock(fileMutex);
+    std::string path     = getConfigPath();
+    std::string tempPath = path + ".tmp";
+    std::ofstream file(tempPath, std::ios::trunc);
     if (!file.is_open())
     {
         std::cout << "[ConfigManager] No se pudo abrir el archivo para guardar." << std::endl;
@@ -228,7 +262,23 @@ bool ConfigManager::save() const
         }
         file << "\n";
     }
-    // Verbose logging removed for performance
+    file.flush();
+    if (!file.good())
+    {
+        file.close();
+        std::remove(tempPath.c_str());
+        return false;
+    }
+    file.close();
+#ifdef _WIN32
+    if (!MoveFileExA(tempPath.c_str(), path.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
+#else
+    if (std::rename(tempPath.c_str(), path.c_str()) != 0)
+#endif
+    {
+        std::remove(tempPath.c_str());
+        return false;
+    }
     return true;
 }
 
@@ -252,8 +302,8 @@ void ConfigManager::set(const std::string& section, const std::string& key, cons
 StreamConfiguration ConfigManager::getStreamConfig() const
 {
     StreamConfiguration config;
-    config.width  = std::stoi(get("stream", "width", "1280"));
-    config.height = std::stoi(get("stream", "height", "720"));
+    config.width  = parseInt(get("stream", "width", "1280"), 1280);
+    config.height = parseInt(get("stream", "height", "720"), 720);
     // Older builds rounded Moonmic host resolutions to decoder-aligned dimensions.
     if (config.width == 1152 && config.height == 656)
         config.height = 648;
@@ -264,42 +314,19 @@ StreamConfiguration ConfigManager::getStreamConfig() const
     else if (config.width == 1600 && config.height == 896)
         config.height = 900;
 
-    config.streamWidth  = std::stoi(get("stream", "stream_width", "960"));
-    config.streamHeight = std::stoi(get("stream", "stream_height", "544"));
+    config.streamWidth  = parseInt(get("stream", "stream_width", "960"), 960);
+    config.streamHeight = parseInt(get("stream", "stream_height", "544"), 544);
 
-    static const int supportedStreamResolutions[][2] = {
-        { 848, 480 },
-        { 960, 540 },
-        { 960, 544 },
-        { 1024, 576 },
-        { 1152, 648 },
-        { 1280, 540 },
-        { 1280, 720 },
-        { 1366, 768 },
-        // 1600x900 and 1920x1080 overload the Vita AVC decoder at streaming frame rates.
-        // {1600, 900},
-        // {1920, 1080}
-    };
-    bool supportedResolution = false;
-    for (const auto& resolution : supportedStreamResolutions)
-    {
-        if (config.streamWidth == resolution[0] && config.streamHeight == resolution[1])
-        {
-            supportedResolution = true;
-            break;
-        }
-    }
-    if (!supportedResolution)
+    if (!stream::isSupportedStreamResolution(config.streamWidth, config.streamHeight))
     {
         config.streamWidth  = 960;
         config.streamHeight = 544;
     }
-    config.fps                   = std::stoi(get("stream", "fps", "60"));
-    config.bitrate               = std::stoi(get("stream", "bitrate", "-1"));
-    config.packetSize            = std::stoi(get("stream", "packetsize", "1024"));
-    config.streamingRemotely     = std::stoi(get("stream", "streaming_remotely", "0"));
-    config.audioConfiguration    = std::stoi(get("stream", "audio_config", "2"));
-    config.supportedVideoFormats = std::stoi(get("stream", "video_formats", "1"));
+    config.fps                = parseInt(get("stream", "fps", "60"), 60);
+    config.bitrate            = parseInt(get("stream", "bitrate", "-1"), -1);
+    config.packetSize         = parseInt(get("stream", "packetsize", "1024"), 1024);
+    config.streamingRemotely  = parseInt(get("stream", "streaming_remotely", "0"), 0);
+    config.audioConfiguration = parseInt(get("stream", "audio_config", "2"), 2);
     return config;
 }
 
@@ -314,7 +341,16 @@ void ConfigManager::setStreamConfig(const StreamConfiguration& config)
     set("stream", "packetsize", std::to_string(config.packetSize));
     set("stream", "streaming_remotely", std::to_string(config.streamingRemotely));
     set("stream", "audio_config", std::to_string(config.audioConfiguration));
-    set("stream", "video_formats", std::to_string(config.supportedVideoFormats));
+}
+
+bool ConfigManager::updateStreamConfig(const std::function<void(StreamConfiguration&)>& update)
+{
+    std::lock_guard<std::recursive_mutex> lock(fileMutex);
+    load();
+    StreamConfiguration config = getStreamConfig();
+    update(config);
+    setStreamConfig(config);
+    return save();
 }
 
 VideoSettings ConfigManager::getVideoSettings() const
@@ -336,28 +372,19 @@ VideoSettings ConfigManager::getVideoSettings() const
             return def;
         }
     };
-    settings.sops                       = get("video", "sops", "true") == "true";
-    settings.localaudio                 = get("video", "localaudio", "false") == "true";
-    settings.fullscreen                 = get("video", "fullscreen", "true") == "true";
-    settings.enable_frame_pacer         = get("video", "enable_frame_pacer", "true") == "true";
-    settings.keep_awake_while_streaming = get("video", "keep_awake_while_streaming", "true") == "true";
-    try
-    {
-        settings.settings_background_opacity = std::stof(get("video", "settings_background_opacity", "1.0"));
-    }
-    catch (...)
-    {
-        settings.settings_background_opacity = 1.0f;
-    }
-    settings.settings_background_opacity   = std::max(0.0f, std::min(1.0f, settings.settings_background_opacity));
+    settings.sops                          = get("video", "sops", "true") == "true";
+    settings.localaudio                    = get("video", "localaudio", "false") == "true";
+    settings.fullscreen                    = get("video", "fullscreen", "true") == "true";
+    settings.enable_frame_pacer            = get("video", "enable_frame_pacer", "true") == "true";
+    settings.keep_awake_while_streaming    = get("video", "keep_awake_while_streaming", "true") == "true";
+    settings.settings_background_opacity   = parseFloat(get("video", "settings_background_opacity", "1.0"), 1.0f);
+    settings.settings_background_opacity   = std::clamp(settings.settings_background_opacity, 0.0f, 1.0f);
     settings.center_region_only            = get("video", "center_region_only", "false") == "true";
     settings.show_fps                      = get("video", "show_fps", "false") == "true";
     settings.save_debug_log                = get("video", "save_debug_log", "false") == "true";
     settings.enable_microphone             = get("video", "enable_microphone", "false") == "true";
-    settings.microphone_gain               = std::stof(get("video", "microphone_gain", "10.0"));
+    settings.microphone_gain               = parseFloat(get("video", "microphone_gain", "10.0"), 10.0f);
     settings.enable_microphone_compression = get("video", "enable_microphone_compression", "false") == "true";
-    settings.enable_ref_frame_invalidation = get("video", "enable_ref_frame_invalidation", "false") == "true";
-    settings.enable_vita_vblank_wait       = get("video", "enable_vita_vblank_wait", "false") == "true";
     settings.enable_motion_controls        = get("video", "enable_motion_controls", "false") == "true";
     settings.enable_double_tap_sprint      = get("video", "enable_double_tap_sprint", "false") == "true";
     const bool legacyAbsoluteMouse         = get("video", "absolute_mouse", "false") == "true";
@@ -384,24 +411,15 @@ VideoSettings ConfigManager::getVideoSettings() const
     }
     else
     {
-        try
-        {
-            const int storedMode      = std::stoi(touchscreenStr);
-            settings.touchscreen_mode = usesCurrentTouchscreenIds ? storedMode : migrateLegacyTouchscreenMode(storedMode);
-        }
-        catch (...)
-        {
-            settings.touchscreen_mode = TOUCHSCREEN_MODE_TRACKPAD;
-        }
+        const int storedMode      = parseInt(touchscreenStr, TOUCHSCREEN_MODE_TRACKPAD);
+        settings.touchscreen_mode = usesCurrentTouchscreenIds ? storedMode : migrateLegacyTouchscreenMode(storedMode);
     }
-    settings.touchscreen_mode             = std::max(static_cast<int>(TOUCHSCREEN_MODE_OFF), std::min(static_cast<int>(TOUCHSCREEN_MODE_TABLET), settings.touchscreen_mode));
+    settings.touchscreen_mode             = std::clamp(settings.touchscreen_mode, static_cast<int>(TOUCHSCREEN_MODE_OFF), static_cast<int>(TOUCHSCREEN_MODE_TABLET));
     settings.enable_network_optimizations = get("video", "enable_network_optimizations", "true") == "true";
-    settings.double_tap_sprint_step_time  = std::stoi(get("video", "double_tap_sprint_step_time", "200"));
-    settings.motion_controls_scalar_x     = std::stof(get("video", "motion_controls_scalar_x", "1.2"));
-    settings.motion_controls_scalar_y     = std::stof(get("video", "motion_controls_scalar_y", "0.8"));
-    settings.mouse_acceleration           = std::stoi(get("video", "mouse_acceleration", "150"));
-    settings.keyboard_layout              = std::stoi(get("video", "keyboard_layout", "0"));
-    settings.keyboard_mode                = std::stoi(get("video", "keyboard_mode", "0"));
+    settings.motion_controls_scalar_x     = parseFloat(get("video", "motion_controls_scalar_x", "1.2"), 1.2f);
+    settings.motion_controls_scalar_y     = parseFloat(get("video", "motion_controls_scalar_y", "0.8"), 0.8f);
+    settings.keyboard_layout              = parseInt(get("video", "keyboard_layout", "0"), 0);
+    settings.keyboard_mode                = parseInt(get("video", "keyboard_mode", "0"), 0);
     settings.keyboard_input_mode          = get("video", "keyboard_input_mode", "false") == "true";
     settings.keyboard_numbers_row         = get("video", "keyboard_numbers_row", "true") == "true";
     settings.keyboard_show_arrows         = get("video", "keyboard_show_arrows", "true") == "true";
@@ -410,34 +428,26 @@ VideoSettings ConfigManager::getVideoSettings() const
     settings.keyboard_text_preview        = get("video", "keyboard_text_preview", "true") == "true";
     settings.keyboard_mouse_passthrough   = get("video", "keyboard_mouse_passthrough", "false") == "true";
     settings.capture_ps_button            = get("video", "capture_ps_button", "true") == "true";
-    settings.render_mode                  = std::stoi(get("video", "render_mode", "0"));
-    settings.pixel_format_mode            = std::stoi(get("video", "pixel_format_mode", "1"));
-    settings.gamepad_type                 = static_cast<GamepadType>(std::stoi(get("video", "gamepad_type", "0")));
+    settings.render_mode                  = parseInt(get("video", "render_mode", "0"), 0);
+    settings.pixel_format_mode            = parseInt(get("video", "pixel_format_mode", "1"), 1);
+    settings.gamepad_type                 = static_cast<GamepadType>(parseInt(get("video", "gamepad_type", "0"), 0));
     settings.swap_shoulder_buttons        = get("video", "swap_shoulder_buttons", "false") == "true";
-    settings.swap_interval                = std::stoi(get("video", "swap_interval", "1"));
+    settings.swap_interval                = parseInt(get("video", "swap_interval", "1"), 1);
     // Trackpad Settings
-    settings.trackpad_pointer_speed          = std::stoi(get("trackpad", "pointer_speed", "100"));
-    settings.trackpad_dead_zone              = std::stoi(get("trackpad", "dead_zone", "50"));
-    settings.trackpad_tap_to_click           = get("trackpad", "tap_to_click", "true") == "true";
+    settings.trackpad_pointer_speed          = parseInt(get("trackpad", "pointer_speed", "100"), 100);
+    settings.trackpad_dead_zone              = parseInt(get("trackpad", "dead_zone", "50"), 50);
     settings.trackpad_two_finger_right_click = get("trackpad", "two_finger_right_click", "true") == "true";
     settings.trackpad_two_finger_scroll      = get("trackpad", "two_finger_scroll", "true") == "true";
     settings.trackpad_invert_scroll          = get("trackpad", "invert_scroll", "false") == "true";
     settings.trackpad_multi_touch            = get("trackpad", "multi_touch", "true") == "true";
-    settings.trackpad_edge_zone              = std::stoi(get("trackpad", "edge_zone", "15"));
+    settings.trackpad_edge_zone              = parseInt(get("trackpad", "edge_zone", "15"), 15);
 
     auto readMargin = [this](const std::string& key, int fallback) -> int
     {
         std::string value = get("rear_touch", key, "");
         if (value.empty())
             return fallback;
-        try
-        {
-            return std::stoi(value);
-        }
-        catch (...)
-        {
-            return fallback;
-        }
+        return parseInt(value, fallback);
     };
 
     settings.rear_touch.enabled = get("rear_touch", "enabled", "true") == "true";
@@ -451,15 +461,7 @@ VideoSettings ConfigManager::getVideoSettings() const
     settings.rear_touch.bottom = std::max(0, settings.rear_touch.bottom);
     settings.rear_touch.left   = std::max(0, settings.rear_touch.left);
 
-    int rearTouchSchema = 1;
-    try
-    {
-        rearTouchSchema = std::stoi(get("rear_touch", "schema_version", "1"));
-    }
-    catch (...)
-    {
-        rearTouchSchema = 1;
-    }
+    int rearTouchSchema = parseInt(get("rear_touch", "schema_version", "1"), 1);
 
     constexpr int OLD_MARGIN_DEFAULT = 80;
     if (rearTouchSchema < 2)
@@ -471,7 +473,6 @@ VideoSettings ConfigManager::getVideoSettings() const
             settings.rear_touch.bottom = 0;
             settings.rear_touch.left   = 0;
         }
-        const_cast<ConfigManager*>(this)->set("rear_touch", "schema_version", "2");
     }
     settings.rear_touch.actionNorthWest = readUint("rear_touch", "action_nw", settings.rear_touch.actionNorthWest);
     settings.rear_touch.actionNorthEast = readUint("rear_touch", "action_ne", settings.rear_touch.actionNorthEast);
@@ -480,12 +481,38 @@ VideoSettings ConfigManager::getVideoSettings() const
 
     // Front Touch Settings
     settings.enable_front_touchzones = get("front_touch", "enabled", "false") == "true";
-    settings.front_touch_offset      = std::stoi(get("front_touch", "offset", "0"));
-    settings.front_touch_size        = std::stoi(get("front_touch", "size", "150"));
+    settings.front_touch_offset      = parseInt(get("front_touch", "offset", "0"), 0);
+    settings.front_touch_size        = parseInt(get("front_touch", "size", "150"), 150);
     settings.front_action_northwest  = readUint("front_touch", "action_nw", settings.front_action_northwest);
     settings.front_action_northeast  = readUint("front_touch", "action_ne", settings.front_action_northeast);
     settings.front_action_southwest  = readUint("front_touch", "action_sw", settings.front_action_southwest);
     settings.front_action_southeast  = readUint("front_touch", "action_se", settings.front_action_southeast);
+
+    settings.microphone_host_ip     = get("microphone", "host_ip", settings.microphone_host_ip);
+    settings.microphone_port        = parseInt(get("microphone", "port", std::to_string(settings.microphone_port)), settings.microphone_port);
+    settings.microphone_sample_rate = parseInt(get("microphone", "sample_rate", std::to_string(settings.microphone_sample_rate)), settings.microphone_sample_rate);
+    settings.microphone_channels    = parseInt(get("microphone", "channels", std::to_string(settings.microphone_channels)), settings.microphone_channels);
+    settings.microphone_bitrate     = parseInt(get("microphone", "bitrate", std::to_string(settings.microphone_bitrate)), settings.microphone_bitrate);
+
+    settings.microphone_gain          = std::clamp(settings.microphone_gain, 1.0f, 50.0f);
+    settings.microphone_port          = std::clamp(settings.microphone_port, 1, 65535);
+    settings.microphone_sample_rate   = std::clamp(settings.microphone_sample_rate, 8000, 48000);
+    settings.microphone_channels      = std::clamp(settings.microphone_channels, 1, 2);
+    settings.microphone_bitrate       = std::clamp(settings.microphone_bitrate, 6000, 512000);
+    settings.motion_controls_scalar_x = std::clamp(settings.motion_controls_scalar_x, 0.1f, 3.0f);
+    settings.motion_controls_scalar_y = std::clamp(settings.motion_controls_scalar_y, 0.1f, 3.0f);
+    settings.keyboard_layout          = std::clamp(settings.keyboard_layout, 0, 2);
+    settings.keyboard_mode            = std::clamp(settings.keyboard_mode, 0, 1);
+    settings.render_mode              = std::clamp(settings.render_mode, 0, 1);
+    settings.pixel_format_mode        = std::clamp(settings.pixel_format_mode, 0, 1);
+    settings.swap_interval            = std::clamp(settings.swap_interval, 0, 4);
+    settings.trackpad_pointer_speed   = std::clamp(settings.trackpad_pointer_speed, 0, 200);
+    settings.trackpad_dead_zone       = std::clamp(settings.trackpad_dead_zone, 0, 200);
+    settings.trackpad_edge_zone       = std::clamp(settings.trackpad_edge_zone, 0, 50);
+    settings.front_touch_offset       = std::clamp(settings.front_touch_offset, 0, 200);
+    settings.front_touch_size         = std::clamp(settings.front_touch_size, 50, 300);
+    if (settings.gamepad_type != GAMEPAD_TYPE_XBOX && settings.gamepad_type != GAMEPAD_TYPE_PS4)
+        settings.gamepad_type = GAMEPAD_TYPE_XBOX;
 
     return settings;
 }
@@ -504,18 +531,15 @@ void ConfigManager::setVideoSettings(const VideoSettings& settings)
     set("video", "enable_microphone", settings.enable_microphone ? "true" : "false");
     set("video", "microphone_gain", std::to_string(settings.microphone_gain));
     set("video", "enable_microphone_compression", settings.enable_microphone_compression ? "true" : "false");
-    set("video", "enable_ref_frame_invalidation", settings.enable_ref_frame_invalidation ? "true" : "false");
-    set("video", "enable_vita_vblank_wait", settings.enable_vita_vblank_wait ? "true" : "false");
+    data["video"].erase("enable_ref_frame_invalidation");
     set("video", "enable_motion_controls", settings.enable_motion_controls ? "true" : "false");
     set("video", "enable_double_tap_sprint", settings.enable_double_tap_sprint ? "true" : "false");
     set("video", "touchscreen_mode", std::to_string(settings.touchscreen_mode));
     set("video", "touchscreen_mode_schema", std::to_string(TOUCHSCREEN_MODE_SCHEMA));
     data["video"].erase("absolute_mouse");
     set("video", "enable_network_optimizations", settings.enable_network_optimizations ? "true" : "false");
-    set("video", "double_tap_sprint_step_time", std::to_string(settings.double_tap_sprint_step_time));
     set("video", "motion_controls_scalar_x", std::to_string(settings.motion_controls_scalar_x));
     set("video", "motion_controls_scalar_y", std::to_string(settings.motion_controls_scalar_y));
-    set("video", "mouse_acceleration", std::to_string(settings.mouse_acceleration));
     set("video", "keyboard_layout", std::to_string(settings.keyboard_layout));
     set("video", "keyboard_mode", std::to_string(settings.keyboard_mode));
     set("video", "keyboard_input_mode", settings.keyboard_input_mode ? "true" : "false");
@@ -534,7 +558,6 @@ void ConfigManager::setVideoSettings(const VideoSettings& settings)
     // Trackpad Settings
     set("trackpad", "pointer_speed", std::to_string(settings.trackpad_pointer_speed));
     set("trackpad", "dead_zone", std::to_string(settings.trackpad_dead_zone));
-    set("trackpad", "tap_to_click", settings.trackpad_tap_to_click ? "true" : "false");
     set("trackpad", "two_finger_right_click", settings.trackpad_two_finger_right_click ? "true" : "false");
     set("trackpad", "two_finger_scroll", settings.trackpad_two_finger_scroll ? "true" : "false");
     set("trackpad", "invert_scroll", settings.trackpad_invert_scroll ? "true" : "false");
@@ -560,4 +583,20 @@ void ConfigManager::setVideoSettings(const VideoSettings& settings)
     set("front_touch", "action_ne", std::to_string(settings.front_action_northeast));
     set("front_touch", "action_sw", std::to_string(settings.front_action_southwest));
     set("front_touch", "action_se", std::to_string(settings.front_action_southeast));
+
+    set("microphone", "host_ip", settings.microphone_host_ip);
+    set("microphone", "port", std::to_string(settings.microphone_port));
+    set("microphone", "sample_rate", std::to_string(settings.microphone_sample_rate));
+    set("microphone", "channels", std::to_string(settings.microphone_channels));
+    set("microphone", "bitrate", std::to_string(settings.microphone_bitrate));
+}
+
+bool ConfigManager::updateVideoSettings(const std::function<void(VideoSettings&)>& update)
+{
+    std::lock_guard<std::recursive_mutex> lock(fileMutex);
+    load();
+    VideoSettings settings = getVideoSettings();
+    update(settings);
+    setVideoSettings(settings);
+    return save();
 }

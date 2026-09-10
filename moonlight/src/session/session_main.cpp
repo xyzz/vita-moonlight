@@ -6,6 +6,7 @@
 #include <borealis/core/frame_context.hpp>
 #include <borealis/core/style.hpp>
 #include <memory>
+#include <utility>
 
 #include "ConfigManager.hpp"
 #include "borealis.hpp"
@@ -29,10 +30,11 @@ extern "C"
     void vita_frame_pacer_stop(int restoreFps);
 }
 
-SessionMainView::SessionMainView(const HostInfo& host, const RemoteAppInfo& app)
+SessionMainView::SessionMainView(const HostInfo& host, const RemoteAppInfo& app, std::shared_ptr<VitaSession> session)
     : brls::Box()
     , host(host)
     , app(app)
+    , session(std::move(session))
 {
     this->setFocusable(true);
     this->setHideHighlight(true);
@@ -135,14 +137,12 @@ SessionMainView::SessionMainView(const HostInfo& host, const RemoteAppInfo& app)
 
     if (!overlayStatsView)
     {
-        overlayStatsView = std::make_unique<VitaStreamOverlayView>();
+        overlayStatsView = new VitaStreamOverlayView();
     }
     if (overlayStatsView)
     {
-        this->addView(overlayStatsView.get());
+        this->addView(overlayStatsView);
     }
-
-    g_video_settings_snapshot = videoSettings;
 
     unsigned targetFps = (unsigned)streamCfg.fps;
     if (targetFps == 0)
@@ -180,20 +180,6 @@ SessionMainView::SessionMainView(const HostInfo& host, const RemoteAppInfo& app)
     {
         // NanoVG flushes after the direct quad, so the session background must stay clear.
         this->setBackgroundColor(nvgRGBA(0, 0, 0, 0));
-    }
-
-    // Direct GXM mode eliminated. render_mode normalizes: 0=legacy,1=ffmpeg (future)
-    bool settingsChanged = false;
-    if (videoSettings.render_mode > 1)
-    {
-        videoSettings.render_mode = 0;
-        vita_log::info("[SessionMainView] render_mode deprecated (>1) normalizado a 0 (legacy)");
-        settingsChanged = true;
-    }
-    if (settingsChanged)
-    {
-        cfgMgr.setVideoSettings(videoSettings);
-        cfgMgr.save();
     }
 
     brls::Application::giveFocus(this);
@@ -236,12 +222,6 @@ void SessionMainView::draw(NVGcontext* vg, float x, float y, float width, float 
     }
 }
 
-void showSessionMain(const HostInfo& host, const RemoteAppInfo& app)
-{
-    auto* view = new SessionMainView(host, app);
-    brls::Application::pushActivity(new brls::Activity(view));
-}
-
 SessionMainView::~SessionMainView()
 {
     sessionActive.store(false);
@@ -256,11 +236,13 @@ SessionMainView::~SessionMainView()
     vita_frame_pacer_stop(60);
     brls::Application::setLowLatencyMode(false);
     vita_dp_fini();
-    overlayStatsView.release();
+    if (session)
+        session->stop(false);
     if (g_controllerInput)
     {
         delete g_controllerInput;
         g_controllerInput = nullptr;
     }
     g_controllerInput = new ControllerInputManager();
+    session.reset();
 }

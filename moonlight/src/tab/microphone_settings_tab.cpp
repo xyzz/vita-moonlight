@@ -22,26 +22,22 @@ MicrophoneSettingsTab::MicrophoneSettingsTab()
         currentGain = 1.0f;
     if (currentGain > 50.0f)
         currentGain = 50.0f;
-    gainSlider->setProgress((currentGain - 1.0f) / 49.0f); // Normalize 1-50 to 0-1
+    gainSlider->setProgress((currentGain - 1.0f) / 49.0f);
 
     gainLabel->setText(getGainText(currentGain));
 
     gainSlider->getProgressEvent()->subscribe([this](float progress)
         {
-        float gain = 1.0f + (progress * 49.0f);  // 1-50 range
-        gain = std::round(gain);  // Round to nearest integer
+        float gain = 1.0f + (progress * 49.0f);
+        gain = std::round(gain);
         if (gain < 1.0f) gain = 1.0f;
         if (gain > 50.0f) gain = 50.0f;
 
         ConfigManager cfg;
-        cfg.load();
-        VideoSettings settings = cfg.getVideoSettings();
-        settings.microphone_gain = gain;
-        cfg.setVideoSettings(settings);
-        cfg.save();
+        cfg.updateVideoSettings([gain](VideoSettings& settings) { settings.microphone_gain = gain; });
 
         MicrophoneManager::getInstance().setGain(gain);
-        MicrophoneTester::getInstance().setGain(gain);  // Also apply to local test
+        MicrophoneTester::getInstance().setGain(gain);
 
         gainLabel->setText(getGainText(gain)); });
 
@@ -51,11 +47,8 @@ MicrophoneSettingsTab::MicrophoneSettingsTab()
         [](bool value)
         {
             ConfigManager cfg;
-            cfg.load();
-            VideoSettings settings                 = cfg.getVideoSettings();
-            settings.enable_microphone_compression = value;
-            cfg.setVideoSettings(settings);
-            cfg.save();
+            cfg.updateVideoSettings([value](VideoSettings& settings)
+                { settings.enable_microphone_compression = value; });
             brls::Application::notify(value ? brls::getStr("moonlight/microphone/notify_opus_enabled") : brls::getStr("moonlight/microphone/notify_opus_disabled"));
             return true;
         });

@@ -77,21 +77,21 @@ RearTouchSettingsTab::RearTouchSettingsTab()
         [this, updateRearTouchDetail, applyRearTouchActions](bool value)
         {
             ConfigManager config;
-            config.load();
-            VideoSettings settings      = config.getVideoSettings();
-            settings.rear_touch.enabled = value;
-            config.setVideoSettings(settings);
-            config.save();
+            RearTouchSettings updated;
+            config.updateVideoSettings([value, &updated](VideoSettings& settings)
+                {
+                settings.rear_touch.enabled = value;
+                updated                     = settings.rear_touch; });
             if (g_controllerInput)
             {
                 g_controllerInput->setRearTouchEnabled(value);
                 if (value)
                 {
-                    g_controllerInput->applyRearTouchSettings(settings.rear_touch);
+                    g_controllerInput->applyRearTouchSettings(updated);
                 }
             }
-            updateRearTouchDetail(settings.rear_touch);
-            applyRearTouchActions(settings.rear_touch);
+            updateRearTouchDetail(updated);
+            applyRearTouchActions(updated);
             brls::Application::notify(value ? brls::getStr("moonlight/rear_touch/notify_enabled")
                                             : brls::getStr("moonlight/rear_touch/notify_disabled"));
         });
@@ -112,17 +112,18 @@ RearTouchSettingsTab::RearTouchSettingsTab()
             [member, applyRearTouchActions](int selected)
             {
                 ConfigManager config;
-                config.load();
-                VideoSettings settings      = config.getVideoSettings();
-                settings.rear_touch.*member = controller::getCodeForSelectableIndex(static_cast<std::size_t>(selected));
-                config.setVideoSettings(settings);
-                config.save();
+                const auto code = controller::getCodeForSelectableIndex(static_cast<std::size_t>(selected));
+                RearTouchSettings updated;
+                config.updateVideoSettings([member, code, &updated](VideoSettings& settings)
+                    {
+                    settings.rear_touch.*member = code;
+                    updated                     = settings.rear_touch; });
                 if (g_controllerInput)
                 {
-                    g_controllerInput->applyRearTouchSettings(settings.rear_touch);
-                    g_controllerInput->setRearTouchEnabled(settings.rear_touch.enabled);
+                    g_controllerInput->applyRearTouchSettings(updated);
+                    g_controllerInput->setRearTouchEnabled(updated.enabled);
                 }
-                applyRearTouchActions(settings.rear_touch);
+                applyRearTouchActions(updated);
                 brls::Application::notify(brls::getStr("moonlight/rear_touch/notify_action_saved"));
             });
     };
@@ -145,11 +146,7 @@ RearTouchSettingsTab::RearTouchSettingsTab()
         auto* overlay = new RearTouchCalibrationOverlay(initial,
             [this, updateRearTouchDetail, applyRearTouchActions](const RearTouchSettings& updated) {
                 ConfigManager cfg;
-                cfg.load();
-                VideoSettings vs = cfg.getVideoSettings();
-                vs.rear_touch = updated;
-                cfg.setVideoSettings(vs);
-                cfg.save();
+                cfg.updateVideoSettings([&updated](VideoSettings& settings) { settings.rear_touch = updated; });
                 if (g_controllerInput) {
                     g_controllerInput->applyRearTouchSettings(updated);
                     g_controllerInput->setRearTouchEnabled(updated.enabled);

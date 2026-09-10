@@ -868,11 +868,8 @@ bool ControllerInputManager::setTouchscreenModeRuntime(int newMode)
     vita_log::info("[ControllerInput] Modo touch cambiado en tiempo de ejecución a %d", newMode);
 
     ConfigManager config;
-    config.load();
-    VideoSettings settings    = config.getVideoSettings();
-    settings.touchscreen_mode = newMode;
-    config.setVideoSettings(settings);
-    config.save();
+    config.updateVideoSettings([newMode](VideoSettings& settings)
+        { settings.touchscreen_mode = newMode; });
 
     return true;
 }

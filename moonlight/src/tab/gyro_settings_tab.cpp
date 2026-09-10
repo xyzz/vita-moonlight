@@ -6,6 +6,7 @@
 
 #include "ConfigManager.hpp"
 #include "controller/ControllerInput.hpp"
+#include "video/runtime_settings.hpp"
 #include "view/gyro_test_overlay.hpp"
 
 static constexpr float SLIDER_MIN = 0.1f;
@@ -42,11 +43,9 @@ GyroSettingsTab::GyroSettingsTab()
         [](bool value)
         {
             ConfigManager cfg;
-            cfg.load();
-            VideoSettings settings          = cfg.getVideoSettings();
-            settings.enable_motion_controls = value;
-            cfg.setVideoSettings(settings);
-            cfg.save();
+            cfg.updateVideoSettings([value](VideoSettings& settings)
+                { settings.enable_motion_controls = value; });
+            video_runtime::setMotionControlsEnabled(value);
             brls::Application::notify(value
                     ? brls::getStr("moonlight/gyro/notify_enabled")
                     : brls::getStr("moonlight/gyro/notify_disabled"));
@@ -60,11 +59,8 @@ GyroSettingsTab::GyroSettingsTab()
         {
         float v = sliderToValue(progress);
         ConfigManager cfg;
-        cfg.load();
-        VideoSettings settings = cfg.getVideoSettings();
-        settings.motion_controls_scalar_x = v;
-        cfg.setVideoSettings(settings);
-        cfg.save();
+        cfg.updateVideoSettings([v](VideoSettings& settings) { settings.motion_controls_scalar_x = v; });
+        video_runtime::setMotionScaleX(v);
         scalarXLabel->setText(scalarText("X", v)); });
 
     // Scalar Y slider
@@ -74,11 +70,8 @@ GyroSettingsTab::GyroSettingsTab()
         {
         float v = sliderToValue(progress);
         ConfigManager cfg;
-        cfg.load();
-        VideoSettings settings = cfg.getVideoSettings();
-        settings.motion_controls_scalar_y = v;
-        cfg.setVideoSettings(settings);
-        cfg.save();
+        cfg.updateVideoSettings([v](VideoSettings& settings) { settings.motion_controls_scalar_y = v; });
+        video_runtime::setMotionScaleY(v);
         scalarYLabel->setText(scalarText("Y", v)); });
 
     // Test / calibrate button

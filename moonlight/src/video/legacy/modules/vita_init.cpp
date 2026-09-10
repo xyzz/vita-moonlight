@@ -12,8 +12,8 @@
 #include <borealis/core/application.hpp>
 #include <memory>
 
-#include "network/NetworkOptimizations.hpp"
 #include "video/pixel_format/pixel_format.hpp"
+#include "video/runtime_settings.hpp"
 #include "vita_globals.hpp"
 #include "vita_sceAvcInternal.hpp"
 
@@ -43,7 +43,6 @@ static inline size_t align_up_size(size_t value, size_t alignment)
 #define SCE_VIDEODEC_TYPE_HW_AVCDEC ((SceVideodecType)0x1001)
 #endif
 
-int vita_pacer_thread_main(SceSize args, void* argp);
 extern "C" void vita_cleanup();
 uint64_t vita_monotonic_ms();
 
@@ -56,11 +55,11 @@ extern "C" int vitavideo_setup(int videoFormat, int width, int height, int redra
     int ret = 0;
     if (redrawRate > 0)
     {
-        g_stats.target_fps = (uint32_t)redrawRate;
+        video_stats::store(g_stats.target_fps, (uint32_t)redrawRate);
     }
     if (video_status == VITA_VIDEO_NOT_INIT)
     {
-
+        vitavideo_reset_stats();
         // Ensure we register a one-time application-exit hook that will
         // perform the full teardown of vita resources when Borealis exits.
         // This prevents calling full teardown (sceVideodecTermLibrary / vita2d_fini)
@@ -80,7 +79,7 @@ extern "C" int vitavideo_setup(int videoFormat, int width, int height, int redra
         decoder_src_height           = height;
         decoder_tried_direct_texture = false;
         decoder_use_phys_fallback    = false; // try first decode direct to texture; activate dynamic fallback if it fails
-        decoder_output_mode          = g_video_settings_snapshot.pixel_format_mode;
+        decoder_output_mode          = video_runtime::pixelFormatMode();
         decoder_yuv_raw              = nullptr;
         decoder_yuv_buffer           = nullptr;
         decoder_yuv_buffer_size      = 0;
@@ -100,10 +99,10 @@ extern "C" int vitavideo_setup(int videoFormat, int width, int height, int redra
             VITA_DEBUG_LOG("[Video][INIT] Modo de procesado: RGBA Hardware Direct (No Downscale)");
         }
 
-        video_fullscreen_stretch = g_video_settings_snapshot.fullscreen;
-        if (g_stats.target_fps == 0 && redrawRate > 0)
+        video_fullscreen_stretch = video_runtime::fullscreen();
+        if (video_stats::load(g_stats.target_fps) == 0 && redrawRate > 0)
         {
-            g_stats.target_fps = (uint32_t)redrawRate;
+            video_stats::store(g_stats.target_fps, (uint32_t)redrawRate);
         }
 #ifdef __cplusplus
         if (!g_sps_ctx)
@@ -350,21 +349,6 @@ extern "C" int vitavideo_setup(int videoFormat, int width, int height, int redra
         VITA_DEBUG_LOG("[Video] Framebuffer inicializado");
 
         video_status = VITA_VIDEO_INIT_AVC_DEC;
-    }
-    if (video_status == VITA_VIDEO_INIT_AVC_DEC)
-    {
-        ret = sceKernelCreateThread("frame_pacer", vita_pacer_thread_main, 0, 0x10000, 0, 0, NULL);
-        if (ret < 0)
-        {
-            VITA_DEBUG_LOG("[Video] Error creando thread frame_pacer: 0x%x", ret);
-            ret = 0x80010007;
-            goto cleanup;
-        }
-        pacer_thread        = ret;
-        active_pacer_thread = true;
-        sceKernelStartThread(pacer_thread, 0, NULL);
-
-        video_status = VITA_VIDEO_INIT_FRAME_PACER_THREAD;
     }
     VITA_DEBUG_LOG("[Video] vitavideo_setup completado exitosamente, retornando 0");
     if (video_status_canary_pre != 0xDEADBEEF || video_status_canary_post != 0xBAADF00D)

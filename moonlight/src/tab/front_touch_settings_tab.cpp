@@ -61,20 +61,20 @@ FrontTouchSettingsTab::FrontTouchSettingsTab()
         [this, applyFrontTouchActions](bool value)
         {
             ConfigManager config;
-            config.load();
-            VideoSettings settings           = config.getVideoSettings();
-            settings.enable_front_touchzones = value;
-            config.setVideoSettings(settings);
-            config.save();
+            VideoSettings updated;
+            config.updateVideoSettings([value, &updated](VideoSettings& settings)
+                {
+                settings.enable_front_touchzones = value;
+                updated                          = settings; });
             if (g_controllerInput)
             {
                 g_controllerInput->setFrontTouchEnabled(value);
                 if (value)
                 {
-                    g_controllerInput->applyFrontTouchSettings(settings);
+                    g_controllerInput->applyFrontTouchSettings(updated);
                 }
             }
-            applyFrontTouchActions(settings);
+            applyFrontTouchActions(updated);
             brls::Application::notify(value ? brls::getStr("moonlight/front_touch/notify_enabled")
                                             : brls::getStr("moonlight/front_touch/notify_disabled"));
         });
@@ -87,16 +87,16 @@ FrontTouchSettingsTab::FrontTouchSettingsTab()
             {
                 int offset = static_cast<int>(progress * 200.0f);
                 ConfigManager config;
-                config.load();
-                VideoSettings settings      = config.getVideoSettings();
-                settings.front_touch_offset = offset;
-                config.setVideoSettings(settings);
-                config.save();
+                VideoSettings updated;
+                config.updateVideoSettings([offset, &updated](VideoSettings& settings)
+                    {
+                    settings.front_touch_offset = offset;
+                    updated                     = settings; });
                 if (g_controllerInput)
                 {
-                    g_controllerInput->applyFrontTouchSettings(settings);
+                    g_controllerInput->applyFrontTouchSettings(updated);
                 }
-                updateSliderDetails(settings);
+                updateSliderDetails(updated);
             });
         updateSliderDetails(videoSettings);
     }
@@ -109,16 +109,16 @@ FrontTouchSettingsTab::FrontTouchSettingsTab()
             {
                 int size = 50 + static_cast<int>(progress * 250.0f);
                 ConfigManager config;
-                config.load();
-                VideoSettings settings    = config.getVideoSettings();
-                settings.front_touch_size = size;
-                config.setVideoSettings(settings);
-                config.save();
+                VideoSettings updated;
+                config.updateVideoSettings([size, &updated](VideoSettings& settings)
+                    {
+                    settings.front_touch_size = size;
+                    updated                   = settings; });
                 if (g_controllerInput)
                 {
-                    g_controllerInput->applyFrontTouchSettings(settings);
+                    g_controllerInput->applyFrontTouchSettings(updated);
                 }
-                updateSliderDetails(settings);
+                updateSliderDetails(updated);
             });
         updateSliderDetails(videoSettings);
     }
@@ -151,17 +151,18 @@ FrontTouchSettingsTab::FrontTouchSettingsTab()
             [member, applyFrontTouchActions](int selected)
             {
                 ConfigManager config;
-                config.load();
-                VideoSettings settings = config.getVideoSettings();
-                settings.*member       = controller::getCodeForSelectableIndex(static_cast<std::size_t>(selected));
-                config.setVideoSettings(settings);
-                config.save();
+                const auto code = controller::getCodeForSelectableIndex(static_cast<std::size_t>(selected));
+                VideoSettings updated;
+                config.updateVideoSettings([member, code, &updated](VideoSettings& settings)
+                    {
+                    settings.*member = code;
+                    updated          = settings; });
                 if (g_controllerInput)
                 {
-                    g_controllerInput->applyFrontTouchSettings(settings);
-                    g_controllerInput->setFrontTouchEnabled(settings.enable_front_touchzones);
+                    g_controllerInput->applyFrontTouchSettings(updated);
+                    g_controllerInput->setFrontTouchEnabled(updated.enable_front_touchzones);
                 }
-                applyFrontTouchActions(settings);
+                applyFrontTouchActions(updated);
                 brls::Application::notify(brls::getStr("moonlight/front_touch/notify_action_saved"));
             });
     };

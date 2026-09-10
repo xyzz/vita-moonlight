@@ -33,7 +33,6 @@ static_assert(sizeof(moonmic_focus_response_t) == 20);
 
 MoonmicBridge::MoonmicBridge()
 {
-    config_file_ = "moonmic"; // Will use ConfigManager's device.ini
     loadConfig();
 }
 
@@ -45,13 +44,13 @@ MoonmicBridge& MoonmicBridge::getInstance()
 
 void MoonmicBridge::setTargetResolution(uint16_t width, uint16_t height)
 {
-    // Validate resolution
     if (width < 640 || width > 3840 || height < 480 || height > 2160)
     {
         std::cerr << "[MoonmicBridge] Invalid resolution: " << width << "x" << height << std::endl;
         return;
     }
 
+    std::lock_guard<std::mutex> lock(target_mutex_);
     target_width_  = width;
     target_height_ = height;
 
@@ -60,6 +59,7 @@ void MoonmicBridge::setTargetResolution(uint16_t width, uint16_t height)
 
 std::pair<uint16_t, uint16_t> MoonmicBridge::getTargetResolution() const
 {
+    std::lock_guard<std::mutex> lock(target_mutex_);
     return { target_width_, target_height_ };
 }
 
@@ -68,49 +68,8 @@ void MoonmicBridge::loadConfig()
     ConfigManager config;
     config.load();
 
-    // Load resolution from standard Moonlight settings [stream] section
-    // This matches what the user selects in the Settings tab (720p, 1080p, etc.)
-    std::string width_str  = config.get("stream", "width", "");
-    std::string height_str = config.get("stream", "height", "");
-
-    // Default to 1280x720 if not set
-    if (width_str.empty() || height_str.empty())
-    {
-        target_width_  = 1280;
-        target_height_ = 720;
-        std::cout << "[MoonmicBridge] No resolution in config, defaulting to 1280x720" << std::endl;
-    }
-    else
-    {
-        try
-        {
-            target_width_  = static_cast<uint16_t>(std::stoi(width_str));
-            target_height_ = static_cast<uint16_t>(std::stoi(height_str));
-
-            std::cout << "[MoonmicBridge] Loaded target resolution from moonlight.conf: "
-                      << target_width_ << "x" << target_height_ << std::endl;
-        }
-        catch (...)
-        {
-            std::cerr << "[MoonmicBridge] Failed to parse stream resolution, using default 1280x720" << std::endl;
-            target_width_  = 1280;
-            target_height_ = 720;
-        }
-    }
-}
-
-void MoonmicBridge::saveConfig()
-{
-    ConfigManager config;
-    config.load();
-
-    // Save to standard Moonlight settings [stream] section
-    config.set("stream", "width", std::to_string(target_width_));
-    config.set("stream", "height", std::to_string(target_height_));
-    config.save();
-
-    std::cout << "[MoonmicBridge] Saved target resolution to moonlight.conf: "
-              << target_width_ << "x" << target_height_ << std::endl;
+    const StreamConfiguration stream = config.getStreamConfig();
+    setTargetResolution(stream.width, stream.height);
 }
 
 MoonmicBridge::SunshineValidationInfo MoonmicBridge::buildSunshineValidation(const std::string& hostIp)

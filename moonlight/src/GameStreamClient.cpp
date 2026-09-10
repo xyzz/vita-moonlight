@@ -1,15 +1,13 @@
 #include "GameStreamClient.hpp"
 
 #include <curl/curl.h>
-#include <dirent.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 
 #include <algorithm>
-#include <atomic>
 #include <chrono>
+#include <cstdio>
 #include <cstdlib>
-#include <cstring>
 #include <filesystem>
 #include <thread>
 
@@ -20,7 +18,54 @@
 #include "model/HostStorage.hpp"
 #include "moonmic/MoonmicBridge.hpp"
 
-// Directory creation is centralized in ConfigManager (ensureDirExists / ensureKeyDirExists)
+namespace
+{
+
+std::vector<std::string> keyDirectoryCandidates(const std::string& base, const HostInfo& host)
+{
+    std::vector<std::string> candidates;
+    auto add = [&candidates](std::string candidate)
+    {
+        if (std::find(candidates.begin(), candidates.end(), candidate) == candidates.end())
+            candidates.push_back(std::move(candidate));
+    };
+
+    const std::string primary = makeSafeHostId(host.safeId.empty()
+            ? (host.name.empty() ? host.ip : host.name)
+            : host.safeId);
+    add(base + "/" + primary);
+
+    if (!host.name.empty())
+    {
+        const auto separator = host.name.find('.');
+        if (separator != std::string::npos)
+            add(base + "/" + makeSafeHostId(host.name.substr(0, separator)));
+    }
+
+    if (!host.ip.empty())
+    {
+        const std::string safeAddress = makeSafeHostId(host.ip);
+        if (safeAddress == host.ip)
+            add(base + "/" + host.ip);
+        add(base + "/" + safeAddress);
+    }
+    return candidates;
+}
+
+std::string findDeviceKeyDirectory(const std::vector<std::string>& candidates)
+{
+    struct stat state {};
+    for (const auto& candidate : candidates)
+    {
+        const std::string deviceIni = candidate + "/device.ini";
+        if (stat(candidate.c_str(), &state) == 0 && S_ISDIR(state.st_mode)
+            && stat(deviceIni.c_str(), &state) == 0)
+            return candidate;
+    }
+    return {};
+}
+
+}
 
 GameStreamClient& GameStreamClient::instance()
 {
@@ -28,29 +73,9 @@ GameStreamClient& GameStreamClient::instance()
     return instance;
 }
 
-GameStreamClient::GameStreamClient()
-{
-    // empty constructor
-}
-
-GameStreamClient::~GameStreamClient()
-{
-    // Clean server data
-    m_server_data.clear();
-    m_app_lists.clear();
-}
-
-bool GameStreamClient::connect(const std::string& address)
-{
-    HostInfo h;
-    h.ip     = address;
-    h.name   = address;
-    h.safeId = makeSafeHostId(address);
-    return connect(h);
-}
-
 bool GameStreamClient::connect(const HostInfo& host)
 {
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
     if (host.ip.empty())
     {
         vita_log::error("[GameStreamClient] Dirección vacía en connect(host)");
@@ -66,79 +91,12 @@ bool GameStreamClient::connect(const HostInfo& host)
     ConfigManager cfg;
     cfg.load();
     std::string baseDevices = cfg.getKeysDir();
-    std::string safe        = host.safeId.empty() ? makeSafeHostId(host.name.empty() ? host.ip : host.name) : host.safeId;
-    // Resolve possible existing keyDir (migration from previous versions)
-    auto resolveExistingKeyDir = [&](const std::string& base, const HostInfo& h) -> std::string
-    {
-        std::vector<std::string> candidates;
-        // 1. New scheme (safeId derived from name)
-        candidates.push_back(base + "/" + safe);
-        // 2. Name without domain (previously it may have been saved without .local)
-        if (!h.name.empty())
-        {
-            auto pos = h.name.find('.');
-            if (pos != std::string::npos)
-            {
-                std::string shortName = h.name.substr(0, pos);
-                candidates.push_back(base + "/" + makeSafeHostId(shortName));
-            }
-        }
-        // 3. Cruda IP
-        if (!h.ip.empty())
-            candidates.push_back(base + "/" + h.ip);
-        // 4. generated safeId from IP
-        if (!h.ip.empty())
-            candidates.push_back(base + "/" + makeSafeHostId(h.ip));
-        // The first one that contains device.ini we use it
-        for (auto& c : candidates)
-        {
-            struct stat st {};
-            if (stat(c.c_str(), &st) == 0 && S_ISDIR(st.st_mode))
-            {
-                std::string devIni = c + "/device.ini";
-                if (stat(devIni.c_str(), &st) == 0)
-                {
-                    vita_log::info("[GameStreamClient][keyDir-resolver] Reutilizando keyDir existente '%s' (device.ini encontrado)", c.c_str());
-                    return c;
-                }
-            }
-        }
-        // If none have device.ini, we return the new schema
-        return candidates.front();
-    };
-    std::string keyDir = resolveExistingKeyDir(baseDevices, host);
+    std::string safe        = makeSafeHostId(host.safeId.empty() ? (host.name.empty() ? host.ip : host.name) : host.safeId);
+    const auto candidates   = keyDirectoryCandidates(baseDevices, host);
+    std::string keyDir      = findDeviceKeyDirectory(candidates);
+    if (keyDir.empty())
+        keyDir = candidates.front();
     vita_log::info("[GameStreamClient] keyDir elegido para '%s' => '%s' (safeId base='%s')", addr.c_str(), keyDir.c_str(), safe.c_str());
-    // keyDir diagnostics
-    {
-        struct stat st {};
-        if (stat(keyDir.c_str(), &st) == 0 && S_ISDIR(st.st_mode))
-        {
-            vita_log::info("[GameStreamClient][keyDir] EXISTE '%s'", keyDir.c_str());
-            DIR* d = opendir(keyDir.c_str());
-            if (d)
-            {
-                struct dirent* ent;
-                std::string files;
-                while ((ent = readdir(d)) != nullptr)
-                {
-                    if (strcmp(ent->d_name, ".") == 0 || strcmp(ent->d_name, "..") == 0)
-                        continue;
-                    files += ent->d_name;
-                    files += ",";
-                }
-                closedir(d);
-                vita_log::info("[GameStreamClient][keyDir] Archivos: %s", files.empty() ? "(vacío)" : files.c_str());
-            }
-            else
-            {
-                vita_log::error("[GameStreamClient][keyDir] No se pudo abrir directorio '%s'", keyDir.c_str());
-            }
-        }
-        else
-        {
-            vita_log::warning("[GameStreamClient][keyDir] NO EXISTE '%s' antes de gs_init", keyDir.c_str());
-        }
-    }
     int status = gs_init(&serverData, addr, keyDir);
     if (status != GS_OK)
     {
@@ -170,41 +128,39 @@ bool GameStreamClient::connect(const HostInfo& host)
 
 bool GameStreamClient::isConnected(const std::string& address)
 {
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
     return m_server_data.count(address) > 0;
 }
 
-SERVER_DATA& GameStreamClient::serverData(const std::string& address)
+bool GameStreamClient::serverInfo(const std::string& address, SERVER_INFORMATION& out) const
 {
-    if (m_server_data.count(address) == 0)
-    {
-        vita_log::error("[GameStreamClient] No hay datos para servidor %s", address.c_str());
-        // Keep the reference valid when no server data is available.
-        static SERVER_DATA empty;
-        return empty;
-    }
-    return m_server_data[address];
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
+    auto server = m_server_data.find(address);
+    if (server == m_server_data.end())
+        return false;
+    out = server->second.serverInfo;
+    return true;
+}
+
+int GameStreamClient::currentGame(const std::string& address) const
+{
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
+    auto server = m_server_data.find(address);
+    return server == m_server_data.end() ? 0 : server->second.currentGame;
 }
 
 std::string GameStreamClient::getKeyDirFor(const std::string& address) const
 {
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
     auto it = m_key_dirs.find(address);
     if (it == m_key_dirs.end())
         return std::string();
     return it->second;
 }
 
-bool GameStreamClient::startApp(const std::string& address, STREAM_CONFIGURATION& config, int appId)
-{
-    return startApp(address, config, appId, StartMode::AUTO, 0, 0);
-}
-
-bool GameStreamClient::startApp(const std::string& address, STREAM_CONFIGURATION& config, int appId, int displayWidth, int displayHeight)
-{
-    return startApp(address, config, appId, StartMode::AUTO, displayWidth, displayHeight);
-}
-
 bool GameStreamClient::startApp(const std::string& address, STREAM_CONFIGURATION& config, int appId, StartMode mode, int displayWidth, int displayHeight)
 {
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
     if (m_server_data.count(address) == 0)
     {
         vita_log::error("[GameStreamClient] No conectado a %s", address.c_str());
@@ -222,9 +178,7 @@ bool GameStreamClient::startApp(const std::string& address, STREAM_CONFIGURATION
         }
     }
 
-    // If we are attempting a summary requested by the user, mark it so that
-    // probeActiveSession do not show the "Active Session" dialog again
-    // while the resume attempt is in progress.
+    // Suppress the active-session prompt while a resume request is in flight.
     bool markedResume = false;
     if (mode == StartMode::RESUME_ONLY)
     {
@@ -234,37 +188,32 @@ bool GameStreamClient::startApp(const std::string& address, STREAM_CONFIGURATION
         m_resume_attempts[address] = std::chrono::steady_clock::now();
     }
 
-    extern bool g_force_fresh_launch_h264; // defined in vita_session_globals.cpp
+    extern bool g_force_fresh_launch_h264;
     bool prevForce = g_force_fresh_launch_h264;
     if (mode == StartMode::NEW_ONLY)
         g_force_fresh_launch_h264 = true;
 
-    ConfigManager sopsConfig;
-    sopsConfig.load();
-    VideoSettings videoSettings = sopsConfig.getVideoSettings();
-    bool sops                   = videoSettings.sops; // Default is true
+    ConfigManager configManager;
+    configManager.load();
+    VideoSettings videoSettings = configManager.getVideoSettings();
+    bool sops                   = videoSettings.sops;
     vita_log::info("[GameStreamClient] SOPS (Optimize game settings) = %d", sops);
     vita_log::info("[GameStreamClient] Local audio playback on host = %d", videoSettings.localaudio);
 
-    // Pre-start Moonmic resolution handshake (Plan A)
     uint16_t targetWidth  = 0;
     uint16_t targetHeight = 0;
     {
-        ConfigManager micCfg;
-        micCfg.load();
-        VideoSettings micSettings = micCfg.getVideoSettings();
-
-        std::string micHost = micSettings.microphone_host_ip.empty() ? address : micSettings.microphone_host_ip;
-        int micPort         = micSettings.microphone_port;
+        std::string micHost = videoSettings.microphone_host_ip.empty() ? address : videoSettings.microphone_host_ip;
+        int micPort         = videoSettings.microphone_port;
 
         auto& bridge = moonmic::MoonmicBridge::getInstance();
         bridge.loadConfig();
-        auto [w, h]  = bridge.getTargetResolution();
-        targetWidth  = w;
-        targetHeight = h;
-
-        auto handshakeResult = bridge.sendResolutionHandshake(micHost, micPort);
-        vita_log::info("[GameStreamClient] Moonmic pre-start handshake %s to %s:%d (target %dx%d)", handshakeResult.success ? "sent" : "failed", micHost.c_str(), micPort, targetWidth, targetHeight);
+        if (bridge.isAvailable(micHost, micPort))
+        {
+            auto [width, height] = bridge.getTargetResolution();
+            targetWidth          = width;
+            targetHeight         = height;
+        }
     }
 
     if (displayWidth == 0 && displayHeight == 0 && targetWidth > 0 && targetHeight > 0)
@@ -292,32 +241,30 @@ bool GameStreamClient::startApp(const std::string& address, STREAM_CONFIGURATION
         return false;
     }
 
+    // Keep the resume guard until VitaSession confirms startup.
+
     m_last_stream_cfg[address] = config;
     vita_log::info("[GameStreamClient] Aplicación iniciada correctamente (remoteInputKey set)");
 
-    ConfigManager micConfig;
-    micConfig.load();
-    VideoSettings micSettings = micConfig.getVideoSettings();
-
-    if (micSettings.enable_microphone)
+    if (videoSettings.enable_microphone)
     {
         vita_log::info("[GameStreamClient] Microphone enabled in settings - starting transmission");
 
-        std::string micHost = micSettings.microphone_host_ip.empty()
+        std::string micHost = videoSettings.microphone_host_ip.empty()
             ? address
-            : micSettings.microphone_host_ip;
+            : videoSettings.microphone_host_ip;
 
         bool micStarted = MicrophoneManager::getInstance().start(
             micHost,
-            micSettings.microphone_port,
-            micSettings.microphone_sample_rate,
-            micSettings.microphone_channels,
-            micSettings.microphone_bitrate);
+            videoSettings.microphone_port,
+            videoSettings.microphone_sample_rate,
+            videoSettings.microphone_channels,
+            videoSettings.microphone_bitrate);
 
         if (micStarted)
         {
             vita_log::info("[GameStreamClient] Microphone started successfully to %s:%d",
-                micHost.c_str(), micSettings.microphone_port);
+                micHost.c_str(), videoSettings.microphone_port);
         }
         else
         {
@@ -334,6 +281,7 @@ bool GameStreamClient::startApp(const std::string& address, STREAM_CONFIGURATION
 
 bool GameStreamClient::resumeApp(const std::string& address, STREAM_CONFIGURATION& config, int appId)
 {
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
     auto server = m_server_data.find(address);
     if (server == m_server_data.end() || server->second.currentGame == 0)
     {
@@ -359,6 +307,7 @@ bool GameStreamClient::resumeApp(const std::string& address, STREAM_CONFIGURATIO
 
 bool GameStreamClient::lastStreamConfig(const std::string& address, STREAM_CONFIGURATION& out) const
 {
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
     auto it = m_last_stream_cfg.find(address);
     if (it == m_last_stream_cfg.end())
         return false;
@@ -366,50 +315,9 @@ bool GameStreamClient::lastStreamConfig(const std::string& address, STREAM_CONFI
     return true;
 }
 
-bool GameStreamClient::pair(const std::string& address, const std::string& pin)
-{
-    if (m_server_data.count(address) == 0)
-    {
-        vita_log::error("[GameStreamClient] pair: no conectado a %s", address.c_str());
-        return false;
-    }
-    SERVER_DATA& s = m_server_data[address];
-    if (s.paired)
-    {
-        vita_log::info("[GameStreamClient] pair: ya emparejado");
-        return true;
-    }
-    char pinBuf[16];
-    memset(pinBuf, 0, sizeof(pinBuf));
-    strncpy(pinBuf, pin.c_str(), sizeof(pinBuf) - 1);
-    int status = gs_pair(&s, pinBuf);
-    if (status != GS_OK)
-    {
-        vita_log::error("[GameStreamClient] pair fallo status=%d", status);
-        return false;
-    }
-    vita_log::info("[GameStreamClient] pairing OK");
-    // NOTE: we do not clear `currentGame` here to avoid discrepancies with the
-    // actual status reported by the server. Before it was forced to 0 to avoid
-    // that the UI would show an active session immediately after pairing,
-    // but that can cause `gs_start_app` to fail with "An app is already
-    // running" if the server actually has an active session. Now
-    // we keep the value provided by the server.
-    // Invalidate applist cache for this host: after pairing we want to force
-    // The next app fetch asks the server for the current list.
-    if (m_app_lists.count(address) > 0)
-        m_app_lists.erase(address);
-    // If after the pair the server provided us with a valid MAC, update device.ini
-    std::string kd = getKeyDirFor(address);
-    if (!kd.empty() && !s.mac.empty() && s.mac != "00:00:00:00:00:00")
-    {
-        vita_log::info("[GameStreamClient] pair(): MAC '%s' detectado -> (sin acción: persistencia gestionada por flujo de pairing)", s.mac.c_str(), kd.c_str());
-    }
-    return true;
-}
-
 bool GameStreamClient::unpair(const std::string& address)
 {
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
     if (m_server_data.count(address) == 0)
         return false;
     SERVER_DATA& s = m_server_data[address];
@@ -423,19 +331,12 @@ bool GameStreamClient::unpair(const std::string& address)
     return true;
 }
 
-bool GameStreamClient::isPaired(const std::string& address)
-{
-    if (m_server_data.count(address) == 0)
-        return false;
-    return m_server_data[address].paired;
-}
-
 bool GameStreamClient::beginPairing(const HostInfo& host, std::function<void(bool)> onFinished, std::function<void(const std::string&)> onPinReady)
 {
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
     HostInfo localHost = host;
-    if (localHost.safeId.empty())
-        localHost.safeId = makeSafeHostId(localHost.name.empty() ? localHost.ip : localHost.name);
-    std::string addr = localHost.ip;
+    localHost.safeId   = makeSafeHostId(localHost.safeId.empty() ? (localHost.name.empty() ? localHost.ip : localHost.name) : localHost.safeId);
+    std::string addr   = localHost.ip;
     if (addr.empty())
     {
         vita_log::error("[GameStreamClient] beginPairing: host ip vacío");
@@ -448,83 +349,28 @@ bool GameStreamClient::beginPairing(const HostInfo& host, std::function<void(boo
     {
         ConfigManager cfg;
         cfg.load();
-        std::string base = cfg.getKeysDir();
-        std::vector<std::string> candidates;
-        candidates.push_back(base + "/" + localHost.safeId);
-        if (!localHost.name.empty())
+        std::string base         = cfg.getKeysDir();
+        const auto candidates    = keyDirectoryCandidates(base, localHost);
+        const std::string keyDir = findDeviceKeyDirectory(candidates);
+        if (!keyDir.empty())
         {
-            auto pos = localHost.name.find('.');
-            if (pos != std::string::npos)
-                candidates.push_back(base + "/" + makeSafeHostId(localHost.name.substr(0, pos)));
-        }
-        if (!localHost.ip.empty())
-        {
-            candidates.push_back(base + "/" + localHost.ip);
-            candidates.push_back(base + "/" + makeSafeHostId(localHost.ip));
-        }
-        struct stat st {};
-        bool foundDeviceIni = false;
-        for (auto& c : candidates)
-        {
-            std::string di = c + "/device.ini";
-            if (stat(di.c_str(), &st) == 0)
+            try
             {
-                vita_log::info("[Pairing][fast-path] device.ini existente en '%s' -> verificar estado en servidor", c.c_str());
-                foundDeviceIni = true;
-                break;
-            }
-        }
-        if (foundDeviceIni)
-        {
-            // Try to use the exact keyDir where device.ini exists to check
-            // if the server recognizes the pairing. This reproduces the
-            // Moonlight-Switch behavior: use the same keyDir as
-            // contains device.ini instead of letting connect() resolve another
-            // candidate (avoids mismatches between device.ini and certs/uniqueid).
-            std::string foundKeyDir;
-            for (auto& c : candidates)
-            {
-                std::string di = c + "/device.ini";
-                struct stat st {};
-                if (stat(di.c_str(), &st) == 0)
+                SERVER_DATA serverData {};
+                vita_log::info("[Pairing][fast-path] Comprobando emparejamiento con keyDir='%s'", keyDir.c_str());
+                int initResult = gs_init(&serverData, localHost.ip, keyDir);
+                if (initResult == GS_OK && serverData.paired)
                 {
-                    foundKeyDir = c;
-                    break;
+                    m_server_data[localHost.ip] = serverData;
+                    m_key_dirs[localHost.ip]    = keyDir;
+                    if (onFinished)
+                        onFinished(true);
+                    return true;
                 }
             }
-            if (!foundKeyDir.empty())
+            catch (...)
             {
-                try
-                {
-                    SERVER_DATA tmp;
-                    vita_log::info("[Pairing][fast-path] intentando gs_init con keyDir='%s' para comprobar paired en servidor", foundKeyDir.c_str());
-                    int initRes = gs_init(&tmp, localHost.ip, foundKeyDir);
-                    if (initRes == GS_OK)
-                    {
-                        if (tmp.paired)
-                        {
-                            vita_log::info("[Pairing][fast-path] servidor reconoce emparejamiento usando keyDir='%s' -> omitir pairing", foundKeyDir.c_str());
-                            // Save minimal serverData to local map for future use
-                            m_server_data[localHost.ip] = tmp;
-                            if (onFinished)
-                                onFinished(true);
-                            return true;
-                        }
-                        else
-                        {
-                            vita_log::info("[Pairing][fast-path] server PairStatus=0 usando keyDir='%s' -> continuar pairing", foundKeyDir.c_str());
-                        }
-                    }
-                    else
-                    {
-                        vita_log::warning("[Pairing][fast-path] gs_init falló (%d ) con keyDir='%s' -> continuar pairing", initRes, foundKeyDir.c_str());
-                    }
-                }
-                catch (...)
-                {
-                    // In case of error, do not block the pairing flow
-                    vita_log::error("[Pairing][fast-path] excepción al intentar gs_init con keyDir='%s'", foundKeyDir.c_str());
-                }
+                vita_log::error("[Pairing][fast-path] Excepción al usar keyDir='%s'", keyDir.c_str());
             }
         }
     }
@@ -546,206 +392,129 @@ bool GameStreamClient::beginPairing(const HostInfo& host, std::function<void(boo
     dialog->open();
     brls::Application::blockInputs();
 
-    // Flags
-    auto finished  = std::make_shared<std::atomic<bool>>(false);
-    auto cancelled = std::make_shared<std::atomic<bool>>(false); // For compatibility if cancel is added in the future
+    auto completePairing = [dialog, onFinished](bool success)
+    {
+        brls::sync([dialog]()
+            {
+            dialog->dismiss();
+            brls::Application::unblockInputs(); });
+        if (onFinished)
+            onFinished(success);
+    };
 
-    // Hilo principal pairing
     std::thread([=]() mutable
         {
-        auto t_start = std::chrono::high_resolution_clock::now();
-        ConfigManager cfg; cfg.load();
-        std::string base = cfg.getKeysDir();
-        std::string keyDir = base + "/" + localHost.safeId;
-        // Secure directory (simplified, no recursive deletion)
-        struct stat st{};
-        // Resolving keyDir by reusing connect logic to avoid duplicate
-        ConfigManager tmpCfg; tmpCfg.load();
-        std::string baseDir = tmpCfg.getKeysDir();
-        // Reuse simple mini-resolver: test safeId, non-domain name, ip
-        std::vector<std::string> candidates;
-        candidates.push_back(baseDir + "/" + localHost.safeId);
-        if (!localHost.name.empty()) {
-            auto pos = localHost.name.find('.');
-            if (pos != std::string::npos) {
-                candidates.push_back(baseDir + "/" + makeSafeHostId(localHost.name.substr(0,pos)));
+            ConfigManager cfg;
+            cfg.load();
+            std::string base   = cfg.getKeysDir();
+            std::string keyDir = base + "/" + localHost.safeId;
+            if (!cfg.ensureKeyDirExists(localHost.safeId))
+            {
+                vita_log::error("[Pairing] No se pudo crear/asegurar keyDir '%s'", keyDir.c_str());
+                brls::sync([label]()
+                    { label->setText(brls::getStr("host_dialog/pairing_error_init")); });
+                std::this_thread::sleep_for(std::chrono::milliseconds(900));
+                completePairing(false);
+                return;
             }
-        }
-        if (!localHost.ip.empty()) {
-            candidates.push_back(baseDir + "/" + localHost.ip);
-            candidates.push_back(baseDir + "/" + makeSafeHostId(localHost.ip));
-        }
-        // (fast-path already evaluated before creating the dialog)
-        // If it does not exist, we proceed as normal flow
-        // Ensure directory existence using centralized ConfigManager
-        if (!ConfigManager().ensureKeyDirExists(localHost.safeId)) {
-            vita_log::error("[Pairing] No se pudo crear/asegurar keyDir '%s'", keyDir.c_str());
-        } else {
-            vita_log::info("[Pairing] keyDir asegurado %s", keyDir.c_str());
-        }
-        // Initial listing
-        {
-            DIR* d = opendir(keyDir.c_str());
-            if (d) {
-                struct dirent* ent; std::string files;
-                while ((ent = readdir(d)) != nullptr) {
-                    if (strcmp(ent->d_name, ".")==0 || strcmp(ent->d_name, "..")==0) continue;
-                    files += ent->d_name; files += ",";
-                }
-                closedir(d);
-                vita_log::info("[Pairing][keyDir] Inicial archivos: %s", files.empty()? "(vacío)" : files.c_str());
-            }
-        }
 
-        SERVER_DATA serverData{};
-        // Before initializing, clear any cached certificates to
-        // force regeneration from scratch. This prevents m_cert/m_key from
-        // OpenSSLCryptoManager remain in memory and prevent generation
-        // of new certificates when pairing again.
-        try {
-            // Clear client.pem, key.pem and uniqueid.dat to force full regeneration
-            namespace fs = std::filesystem;
-            std::string clientPem = keyDir + "/client.pem";
-            std::string keyPem = keyDir + "/key.pem";
-            std::string uid = keyDir + "/uniqueid.dat";
-            std::error_code ec;
-            if (fs::exists(clientPem)) fs::remove(clientPem, ec);
-            if (fs::exists(keyPem)) fs::remove(keyPem, ec);
-            if (fs::exists(uid)) fs::remove(uid, ec);
-            // Clear cache in memory and any remains on disk
-            CryptoManager::remove_cert_key_pair(keyDir);
-        } catch (...) {
-            vita_log::warning("[Pairing] No se pudo limpiar cache de certificados para keyDir='%s'", keyDir.c_str());
-        }
-        // gs_init (blocking here, we can optimize with native Vita thread later)
-    int initRes = gs_init(&serverData, addr, keyDir);
-        if (initRes != GS_OK) {
-            vita_log::error("[Pairing] gs_init fallo %d", initRes);
-            brls::sync([dialog, label]() { label->setText(brls::getStr("host_dialog/pairing_error_init")); });
-            std::this_thread::sleep_for(std::chrono::milliseconds(900));
-            *finished = true;
-            if (onFinished) onFinished(false);
-            return;
-        }
-        // Listed after gs_init (certificates should exist)
-        {
-            DIR* d = opendir(keyDir.c_str());
-            if (d) {
-                struct dirent* ent; std::string files;
-                while ((ent = readdir(d)) != nullptr) {
-                    if (strcmp(ent->d_name, ".")==0 || strcmp(ent->d_name, "..")==0) continue;
-                    files += ent->d_name; files += ",";
-                }
-                closedir(d);
-                vita_log::info("[Pairing][keyDir] Post-gs_init archivos: %s", files.empty()? "(vacío)" : files.c_str());
+            SERVER_DATA serverData {};
+            try
+            {
+                namespace fs       = std::filesystem;
+                std::string client = keyDir + "/client.pem";
+                std::string key    = keyDir + "/key.pem";
+                std::string uid    = keyDir + "/uniqueid.dat";
+                std::error_code error;
+                fs::remove(client, error);
+                fs::remove(key, error);
+                fs::remove(uid, error);
+                CryptoManager::remove_cert_key_pair(keyDir);
             }
-        }
-        // Generate PIN
-        // If the host is busy (currentGame != 0) we will force pairing.
-        // Legacy clients sometimes allowed force pairing even with an active session.
-        bool forced = false;
-        int oldCurrent = serverData.currentGame;
-        if (serverData.currentGame != 0) {
-            forced = true;
-            vita_log::warning("[Pairing] host ocupado (currentGame=%d) -> forzando emparejado (puede fallar)", serverData.currentGame);
-            brls::sync([label]() {
-                label->setText(brls::getStr("host_dialog/pairing_force_warning"));
+            catch (...)
+            {
+                vita_log::warning("[Pairing] No se pudo limpiar cache de certificados para keyDir='%s'", keyDir.c_str());
+            }
+
+            int initResult = gs_init(&serverData, addr, keyDir);
+            if (initResult != GS_OK)
+            {
+                vita_log::error("[Pairing] gs_init fallo %d", initResult);
+                brls::sync([label]()
+                    { label->setText(brls::getStr("host_dialog/pairing_error_init")); });
+                std::this_thread::sleep_for(std::chrono::milliseconds(900));
+                completePairing(false);
+                return;
+            }
+
+            bool forced   = false;
+            int oldGameId = serverData.currentGame;
+            if (serverData.currentGame != 0)
+            {
+                forced = true;
+                vita_log::warning("[Pairing] host ocupado (currentGame=%d) -> forzando emparejado (puede fallar)", serverData.currentGame);
+                brls::sync([label]()
+                    { label->setText(brls::getStr("host_dialog/pairing_force_warning")); });
+                serverData.currentGame = 0;
+                std::this_thread::sleep_for(std::chrono::milliseconds(600));
+            }
+
+            char pin[5];
+            srand((unsigned int)time(nullptr));
+            snprintf(pin, sizeof(pin), "%d%d%d%d", rand() % 10, rand() % 10, rand() % 10, rand() % 10);
+            std::string pinString(pin);
+            vita_log::info("[Pairing] PIN generado %s", pinString.c_str());
+            brls::sync([label, pinString, spinner]()
+                {
+                std::string message = brls::getStr("host_dialog/pairing_enter_pin");
+                size_t marker       = message.find("$(pin)");
+                if (marker != std::string::npos)
+                    message.replace(marker, 6, pinString);
+                label->setText(message);
+                spinner->setVisibility(brls::Visibility::GONE);
             });
-            // Force gs_pair not to reject for local state
-            serverData.currentGame = 0;
-            // Give a short delay for the user to see the message
-            std::this_thread::sleep_for(std::chrono::milliseconds(600));
-        }
 
-        char pin[5];
-        srand((unsigned int)time(nullptr));
-        snprintf(pin, sizeof(pin), "%d%d%d%d", rand()%10, rand()%10, rand()%10, rand()%10);
-        std::string pinStr(pin);
-        vita_log::info("[Pairing] PIN generado %s", pinStr.c_str());
-        brls::sync([label, pinStr, spinner]() {
-            std::string msg = brls::getStr("host_dialog/pairing_enter_pin");
-            size_t pos = msg.find("$(pin)"); if (pos != std::string::npos) msg.replace(pos, 6, pinStr);
-            label->setText(msg);
-            spinner->setVisibility(brls::Visibility::GONE);
-        });
-        // Notify the caller that the PIN is ready (for example AddHostTab) to
-        // that can unlock inputs or show the PIN in external UI.
-        if (onPinReady) onPinReady(pinStr);
-        // If there is an onPinReady callback (passed by the caller), invoke it with the PIN
-        // out of sync to not touch UI from non-UI threads.
-        if (onFinished) {
-            // There is no onPinReady parameter here; let the caller use onFinished or
-            // added overhead in header (caller can pass onPinReady)
-        }
-        // Llamar gs_pair
-            int pairRes = gs_pair(&serverData, pin);
-        // Restore currentGame if we modify it
-        if (forced) {
-            serverData.currentGame = oldCurrent;
-        }
-        if (pairRes == GS_OK) {
-            vita_log::info("[Pairing] Emparejamiento OK");
-            // Force paired=true on serverData regardless of HTTPS requery,
-            // since the gs_pair handshake was successful. This prevents the UI from displaying
-            // "not paired" after successful pairing if /serverinfo HTTPS timeout.
-            serverData.paired = true;
-            // After a successful pairing we keep the value of
-            // `serverData.currentGame` that the server has reported (if
-            // libgamestream did an HTTPS re-query probably already
-            // contains the correct value). We do not force 0 to avoid
-            // inconsistencies when requesting an app to start immediately
-            // after pairing.
-            HostStorage::savePairedHost(localHost.safeId, addr, serverData.httpPort, serverData.paired, serverData.mac);
-            // Update device.ini (not including uuid) so that the UI/storage
-            // have the paired/ip/port information. This reproduces the
-            // Moonlight-Switch behavior where device.ini does not contain the
-            // uniqueid used in requests.
-            HostStorage::writeDeviceIni(base + "/" + localHost.safeId, localHost.safeId, addr.c_str(), serverData.httpPort, serverData.paired, serverData.mac.empty() ? nullptr : serverData.mac.c_str());
-            // Save serverData in map for future reusable connect()
-            m_server_data[addr] = serverData;
-            brls::sync([label]() { label->setText(brls::getStr("host_dialog/pairing_success")); });
-            std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-            *finished = true; if (onFinished) onFinished(true);
-        } else {
-            // Log gs_error from libgamestream for diagnostics
-            std::string gse_str = gs_error();
-            const char* gse = gse_str.empty() ? "(empty)" : gse_str.c_str();
-            vita_log::error("[Pairing] gs_pair fallo %d -> gs_error='%s'", pairRes, gse);
-            // Also log keyDir content to help playback
-            std::string files;
-            DIR* dchk = opendir(keyDir.c_str());
-            if (dchk) {
-                struct dirent* ent;
-                while ((ent = readdir(dchk)) != nullptr) {
-                    if (strcmp(ent->d_name, ".")==0 || strcmp(ent->d_name, "..")==0) continue;
-                    files += ent->d_name; files += ",";
+            if (onPinReady)
+                onPinReady(pinString);
+
+            int pairResult = gs_pair(&serverData, pin);
+            if (forced)
+                serverData.currentGame = oldGameId;
+
+            if (pairResult == GS_OK)
+            {
+                vita_log::info("[Pairing] Emparejamiento OK");
+                serverData.paired = true;
+                if (!HostStorage::savePairedHost(localHost.safeId, addr, serverData.httpPort,
+                        serverData.paired, serverData.mac, localHost.microphone_port))
+                    vita_log::warning("[Pairing] No se pudo guardar device.ini para %s", addr.c_str());
+
+                {
+                    std::lock_guard<std::recursive_mutex> lock(m_mutex);
+                    m_server_data[addr] = serverData;
+                    m_key_dirs[addr]    = keyDir;
                 }
-                closedir(dchk);
-            } else {
-                files = "(no-open)";
+                brls::sync([label]()
+                    { label->setText(brls::getStr("host_dialog/pairing_success")); });
+                std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+                completePairing(true);
+                return;
             }
-            vita_log::info("[Pairing][keyDir] Estado actual archivos: %s", files.empty()? "(vacío)" : files.c_str());
-            std::string err = brls::getStr("host_dialog/pairing_error");
-            brls::sync([label, err]() { label->setText(err); });
-            std::this_thread::sleep_for(std::chrono::milliseconds(1200));
-            *finished = true; if (onFinished) onFinished(false);
-        } })
-        .detach();
 
-    // Close observer
-    std::thread([dialog, finished]()
-        {
-        while (!finished->load()) std::this_thread::sleep_for(std::chrono::milliseconds(200));
-        brls::sync([dialog]() {
-            dialog->dismiss();
-            brls::Application::unblockInputs();
-        }); })
+            std::string gse_str = gs_error();
+            const char* gse      = gse_str.empty() ? "(empty)" : gse_str.c_str();
+            vita_log::error("[Pairing] gs_pair fallo %d -> gs_error='%s'", pairResult, gse);
+            brls::sync([label]()
+                { label->setText(brls::getStr("host_dialog/pairing_error")); });
+            std::this_thread::sleep_for(std::chrono::milliseconds(1200));
+            completePairing(false); })
         .detach();
     return true;
 }
 
 void GameStreamClient::getAppList(const std::string& address, AppListCallback callback)
 {
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
     if (m_server_data.count(address) == 0)
     {
         vita_log::error("[GameStreamClient] No conectado a %s", address.c_str());
@@ -807,6 +576,7 @@ void GameStreamClient::getAppList(const std::string& address, AppListCallback ca
 
 bool GameStreamClient::getAppBoxart(const std::string& address, int appId, Data& outData)
 {
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
     if (m_server_data.count(address) == 0)
     {
         vita_log::error("[GameStreamClient] getAppBoxart: no conectado a %s", address.c_str());
@@ -823,6 +593,7 @@ bool GameStreamClient::getAppBoxart(const std::string& address, int appId, Data&
 
 bool GameStreamClient::quitApp(const std::string& address)
 {
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
     if (m_server_data.count(address) == 0)
     {
         vita_log::error("[GameStreamClient] No conectado a %s", address.c_str());
@@ -854,42 +625,27 @@ bool GameStreamClient::quitApp(const std::string& address)
 
 void GameStreamClient::setActiveStream(const std::string& address, int appId, const std::string& appName)
 {
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
     m_active_streams[address] = { appId, appName };
-    if (m_resume_in_progress.count(address) > 0)
+    if (m_resume_in_progress.erase(address) > 0)
     {
         vita_log::info("[GameStreamClient] setActiveStream: limpiando resume en progreso para %s", address.c_str());
-        m_resume_in_progress.erase(address);
     }
+    m_resume_attempts.erase(address);
 }
 
 void GameStreamClient::clearActiveStream(const std::string& address)
 {
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
     m_active_streams.erase(address);
 
     MicrophoneManager::getInstance().stop();
     vita_log::debug("[GameStreamClient] clearActiveStream: microphone stopped");
 }
 
-bool GameStreamClient::hasActiveStream(const std::string& address) const
-{
-    return m_active_streams.count(address) > 0;
-}
-
-RemoteAppInfo GameStreamClient::activeAppInfo(const std::string& address) const
-{
-    RemoteAppInfo info;
-    auto it = m_active_streams.find(address);
-    if (it != m_active_streams.end())
-    {
-        info.id      = std::to_string(it->second.appId);
-        info.name    = it->second.appName;
-        info.iconUrl = "";
-    }
-    return info;
-}
-
 bool GameStreamClient::probeActiveSession(const HostInfo& host, RemoteAppInfo& outRunning)
 {
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
     outRunning = RemoteAppInfo();
     if (host.ip.empty())
         return false;
@@ -905,7 +661,7 @@ bool GameStreamClient::probeActiveSession(const HostInfo& host, RemoteAppInfo& o
     if (!connected)
         return false;
 
-    SERVER_DATA& sd        = serverData(address);
+    SERVER_DATA& sd        = m_server_data.at(address);
     bool sunshineRefreshed = false;
     {
         std::string serverinfo;
@@ -1031,6 +787,7 @@ static size_t sunshine_curl_write_callback(void* contents, size_t size, size_t n
 
 bool GameStreamClient::fetchSunshineServerinfo(const std::string& address, std::string& response)
 {
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
     response.clear();
 
     std::string keyDir = getKeyDirFor(address);
@@ -1147,6 +904,7 @@ bool GameStreamClient::parseSunshineCurrentGame(const std::string& response, int
 
 int GameStreamClient::getSunshinePairStatus(const std::string& address)
 {
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
     std::string response;
     if (!fetchSunshineServerinfo(address, response))
     {

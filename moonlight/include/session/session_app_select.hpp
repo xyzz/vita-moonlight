@@ -5,6 +5,7 @@
 */
 #pragma once
 
+#include <atomic>
 #include <memory>
 
 #include "GameStreamClient.hpp"
@@ -16,8 +17,6 @@ class SessionAppSelect : public brls::Box
   public:
     SessionAppSelect(const std::string& hostName);
     ~SessionAppSelect();
-
-    void onLayout() override;
 
   private:
     void populateAppList();
@@ -36,18 +35,7 @@ class SessionAppSelect : public brls::Box
     HostInfo host;
     GridView* gridView             = nullptr;
     brls::ProgressSpinner* spinner = nullptr;
-    // Avoid displaying the active session dialog if the user has already managed it
-    bool suppressActiveDialog = false;
-    // Avoid showing the active session dialog more than once within the same instance
-    bool activeDialogShown = false;
-    // Controls waiting before loading apps until Moonmic/Sunshine responds
-    bool sunshineReady         = false;
-    bool sunshineCheckInFlight = false;
-    bool moonmicNotified       = false;
-    bool moonmicLastStatus     = false;
-    // Resolution prompt (displayed when entering the host, not when launching the app)
-    bool resolutionPromptShown = false;
-
-    // Track if view is still alive to prevent async callbacks from accessing destroyed 'this'
-    std::shared_ptr<bool> isAlive;
+    bool sunshineReady             = false;
+    bool sunshineCheckInFlight     = false;
+    std::shared_ptr<std::atomic<bool>> isAlive;
 };

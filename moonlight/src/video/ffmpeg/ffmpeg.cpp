@@ -5,14 +5,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <climits>
-
-extern "C"
-{
-#include <Platform.h>
-}
-
 #include <atomic>
+#include <climits>
 #include <mutex>
 
 #include "debug.hpp"
@@ -41,9 +35,9 @@ extern "C"
 #include "network/NetworkOptimizations.hpp"
 #include "session/vita_session.hpp"
 #include "video/VitaVideoRenderer.hpp"
+#include "video/runtime_settings.hpp"
 
 #ifdef BOREALIS_USE_GXM
-#include <borealis/extern/nanovg/nanovg_gxm_utils.h>
 #include <psp2/display.h>
 #include <psp2/gxm.h>
 #include <psp2/videodec.h>
@@ -55,7 +49,6 @@ static FFmpegVideoContext* g_ffmpeg_context = nullptr;
 static std::mutex g_ffmpeg_mutex;
 static std::atomic<int> g_active_decodes { 0 };
 static std::atomic<bool> g_ffmpeg_stop_request { false };
-static unsigned g_ffmpeg_frame_index = 0;
 static std::atomic<bool> g_ffmpeg_watchdog_active { false };
 static std::atomic<bool> g_ffmpeg_watchdog_fired { false };
 static std::atomic<bool> g_ffmpeg_last_input_was_idr { false };
@@ -70,23 +63,6 @@ static std::atomic<uint32_t> g_dr_pool_pending { 0 };
 static std::atomic<uint32_t> g_dr_pool_exhaustions { 0 };
 static std::atomic<uint32_t> g_dr_pool_alloc_failures { 0 };
 static std::atomic<uint32_t> g_dr_pool_map_failures { 0 };
-
-static inline void wait_for_borealis_gxm_idle()
-{
-#ifdef BOREALIS_USE_GXM
-    // Delay removed to reduce video transmission latency
-    // The original legacy version does not have this delay
-    // NVGXMwindow* win = gxmGetWindow();
-    // if (win && win->context) {
-    //     sceKernelDelayThread(1000);
-#endif
-}
-
-static bool is_gpu_yuv_experimental_enabled()
-{
-    extern bool g_gpu_yuv_experimental_enabled;
-    return g_gpu_yuv_experimental_enabled;
-}
 
 struct ffmpeg_perf_counters
 {
@@ -388,7 +364,7 @@ static void perf_report_if_due()
     ffmpeg_perf_report report  = {};
     report.perf                = g_perf;
     report.elapsed_ms          = elapsedMs;
-    report.present_fps         = g_stats.current_fps;
+    report.present_fps         = video_stats::load(g_stats.current_fps);
     report.pending_frames      = LiGetPendingVideoFrames();
     report.pool_in_use         = g_dr_pool_in_use.load(std::memory_order_relaxed);
     report.pool_allocated      = g_dr_pool_allocated.load(std::memory_order_relaxed);
@@ -819,16 +795,6 @@ static void reset_global_slots()
     frame_write_idx   = 1;
 }
 
-static uint64_t monotonic_ms_local()
-{
-    return vita_monotonic_ms();
-}
-
-static uint64_t monotonic_us_local()
-{
-    return PltGetMicroseconds();
-}
-
 static uint32_t clamp_u32(uint64_t value)
 {
     return value > UINT32_MAX ? UINT32_MAX : (uint32_t)value;
@@ -932,7 +898,9 @@ static void reset_latency_tracking(FFmpegVideoContext* context)
 
 static uint32_t frame_interval_us()
 {
-    uint32_t targetFps = g_stats.target_fps ? g_stats.target_fps : 60U;
+    uint32_t targetFps = video_stats::load(g_stats.target_fps);
+    if (targetFps == 0)
+        targetFps = 60U;
     return 1000000U / targetFps;
 }
 
@@ -944,7 +912,7 @@ static bool get_stream_age_us(FFmpegVideoContext* context, uint64_t ptsUs, uint3
     }
 
     uint64_t expectedUs = context->latency_epoch_offset_us + ptsUs;
-    uint64_t nowUs      = monotonic_us_local();
+    uint64_t nowUs      = LiGetMicroseconds();
     if (nowUs <= expectedUs)
     {
         *ageUs = 0;
@@ -989,7 +957,7 @@ static bool should_drop_stale_output(FFmpegVideoContext* context, uint64_t ptsUs
             staleThresholdUs, (unsigned long long)ptsUs);
     }
     g_perf.dropped_stale_frames++;
-    g_stats.frames_dropped_pacer++;
+    video_stats::increment(g_stats.frames_dropped_pacer);
     return true;
 }
 
@@ -1016,7 +984,7 @@ static bool should_refresh_stale_stream(FFmpegVideoContext* context, uint64_t pt
         ageUs, refreshThresholdUs);
     g_perf.dropped_stale_frames++;
     g_perf.stale_refreshes++;
-    g_stats.frames_dropped_pacer++;
+    video_stats::increment(g_stats.frames_dropped_pacer);
     return true;
 }
 
@@ -1042,7 +1010,7 @@ static int recover_decoder(FFmpegVideoContext* context, const char* stage, int e
     }
 
     static uint64_t lastForcedIdrUs = 0;
-    uint64_t nowUs                  = monotonic_us_local();
+    uint64_t nowUs                  = LiGetMicroseconds();
     if (!lastForcedIdrUs || nowUs - lastForcedIdrUs >= 100000ULL)
     {
         vita_netopt_force_idr();
@@ -1057,7 +1025,7 @@ static int recover_decoder(FFmpegVideoContext* context, const char* stage, int e
 // directly to CSC textures for GPU-side conversion/sampling.
 static bool k_enable_yuv_csc_fast_path()
 {
-    return is_gpu_yuv_experimental_enabled();
+    return video_runtime::gpuYuvEnabled();
 }
 
 static int format_to_sw_texture_format(enum AVPixelFormat srcFmt)
@@ -1989,8 +1957,6 @@ extern "C"
             return -1;
         }
 
-        wait_for_borealis_gxm_idle();
-
         memset(context, 0, sizeof(*context));
         context->dr_textures[0]      = nullptr;
         context->dr_textures[1]      = nullptr;
@@ -2048,8 +2014,8 @@ extern "C"
         {
             return;
         }
-        stats_start_ms     = monotonic_ms_local();
-        g_stats.target_fps = context->frame_rate > 0 ? (uint32_t)context->frame_rate : 60;
+        video_stats::store(g_stats.target_fps,
+            context->frame_rate > 0 ? (uint32_t)context->frame_rate : 60);
         g_ffmpeg_watchdog_active.store(true, std::memory_order_release);
     }
 
@@ -2078,7 +2044,6 @@ extern "C"
         context->current_frame.has_frame     = false;
         context->current_frame.direct_memory = false;
         context->using_direct_memory         = false;
-        wait_for_borealis_gxm_idle();
         process_pending_vram_frees_if_safe();
         ffmpeg_flush_deferred_releases();
     }
@@ -2169,11 +2134,10 @@ extern "C"
         }
 
 #ifdef BOREALIS_USE_GXM
-        wait_for_borealis_gxm_idle();
 #endif
 
         vitavideo_update_scaling_settings(width, height);
-        video_fullscreen_stretch = g_video_settings_snapshot.fullscreen;
+        video_fullscreen_stretch = video_runtime::fullscreen();
 
         if (!g_sps_ctx)
         {
@@ -2208,10 +2172,10 @@ extern "C"
 #ifdef BOREALIS_USE_GXM
         g_ffmpeg_presented_frames.store(0, std::memory_order_relaxed);
 #endif
-        stats_start_ms       = 0;
-        last_fps_window_ms   = 0;
-        g_stats.target_fps   = redrawRate > 0 ? (uint32_t)redrawRate : 60;
-        g_ffmpeg_frame_index = 0;
+        stats_start_ms     = 0;
+        last_fps_window_ms = 0;
+        video_stats::store(g_stats.target_fps,
+            redrawRate > 0 ? (uint32_t)redrawRate : 60);
         start_perf_reporter();
 
         if (ffmpeg_decoder_init(&context->decoder) < 0)
@@ -2331,7 +2295,7 @@ extern "C"
     {
         g_perf.submit_calls++;
         uint32_t submitStartUs  = perf_now_us();
-        uint64_t callbackTimeUs = monotonic_us_local();
+        uint64_t callbackTimeUs = LiGetMicroseconds();
         record_ingress_timing(decodeUnit, callbackTimeUs);
         uint32_t lockWaitUs = 0;
         uint32_t drainUs    = 0;
@@ -2581,8 +2545,6 @@ extern "C"
             }
         }
 
-        vita_netopt_on_frame_seen(g_ffmpeg_frame_index);
-
         uint32_t recvStartUs         = perf_now_us();
         bool frameReceived           = false;
         static AVFrame* s_recv_frame = nullptr;
@@ -2624,13 +2586,11 @@ extern "C"
         if (frameReceived)
         {
             uint32_t dec_ms = (sendUs + recvUs) / 1000;
-            g_stats.decode_time_ms += dec_ms;
-            if (dec_ms < g_decode_min_ms)
-                g_decode_min_ms = dec_ms;
-            if (dec_ms > g_decode_max_ms)
-                g_decode_max_ms = dec_ms;
-            g_decode_sum_ms += dec_ms;
-            g_decode_count++;
+            video_stats::add(g_stats.decode_time_ms, dec_ms);
+            video_stats::updateMinimum(g_decode_min_ms, dec_ms);
+            video_stats::updateMaximum(g_decode_max_ms, dec_ms);
+            video_stats::add(g_decode_sum_ms, dec_ms);
+            video_stats::increment(g_decode_count);
 
             int64_t framePts = (frame->pts != AV_NOPTS_VALUE) ? frame->pts : (int64_t)decodeUnit->presentationTimeUs;
             int64_t ptsDiff  = (int64_t)decodeUnit->presentationTimeUs - framePts;
@@ -2646,14 +2606,8 @@ extern "C"
             }
 
             publish_frame(context, frame, static_cast<uint64_t>(framePts));
-            if (stats_start_ms == 0)
-            {
-                stats_start_ms = monotonic_ms_local();
-            }
-            g_stats.frames_decoded++;
+            video_stats::increment(g_stats.frames_decoded);
             g_perf.decoded_frames++;
-            vita_netopt_on_frame_completed(g_ffmpeg_frame_index);
-            g_ffmpeg_frame_index++;
             av_frame_unref(frame);
         }
 

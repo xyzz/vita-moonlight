@@ -3,7 +3,7 @@
 
     SPDX-License-Identifier: GPL-3.0-only
 */
-#include "settings.hpp"
+#include "Settings.hpp"
 
 #include <algorithm>
 #include <borealis.hpp>
@@ -11,7 +11,6 @@
 #include <vector>
 
 #include "ConfigManager.hpp"
-#include "tab/settings_tab.hpp"
 
 using namespace brls;
 
@@ -63,28 +62,6 @@ std::size_t settings::languageIndex(const std::string& lang)
     auto found               = std::find_if(languages.begin(), languages.end(), [&locale](const LanguageOption& option)
                       { return locale == option.locale; });
     return found == languages.end() ? 0 : static_cast<std::size_t>(found - languages.begin());
-}
-
-void settings::loadSettingsFromConfig()
-{
-    ConfigManager config;
-    config.load();
-    if (SettingsTab::languageSelectorPtr)
-        SettingsTab::languageSelectorPtr->setSelection(static_cast<int>(languageIndex(config.get("general", "language", "en-US"))));
-}
-
-void settings::saveSettingsToConfig()
-{
-    ConfigManager config;
-    config.load();
-    int langIdx = 0;
-    if (SettingsTab::languageSelectorPtr)
-        langIdx = SettingsTab::languageSelectorPtr->getSelection();
-    const auto& languages = supportedLanguages();
-    if (langIdx < 0 || static_cast<std::size_t>(langIdx) >= languages.size())
-        langIdx = 0;
-    config.set("general", "language", languages[langIdx].locale);
-    config.save();
 }
 
 void settings::applySwapInterval(int swapInterval)

@@ -2,8 +2,6 @@
 
 #include <borealis.hpp>
 #include <chrono>
-#include <cstdio>
-#include <future>
 #include <thread>
 #include <vector>
 
@@ -16,251 +14,125 @@ namespace moonmic
 namespace
 {
 
-    // Forward declaration
-    void waitForApps(const HostInfo host, const PrepCallbacks callbacks);
-
-    void continueHandshake(bool userWantedSwitch,
-        int hostW, int hostH,
-        const HostInfo host,
-        const std::string micHost, int micPort,
-        const PrepCallbacks callbacks)
+    void finish(const PrepCallbacks& callbacks, bool ready)
     {
-
-        brls::async([=]()
+        brls::sync([callbacks, ready]()
             {
-        auto& bridge = moonmic::MoonmicBridge::getInstance();
-
-        if (userWantedSwitch) {
-            // User chose to switch (Restart Host) -> Send FORCE flag
-            vita_log::info("[MoonmicPrep] User chose switch -> Sending FORCE handshake");
-            bridge.sendResolutionHandshake(micHost, micPort, true);
-            // After force, host restarts. We proceed to wait for apps.
-        } else {
-            // User chose to keep host resolution -> Update local target
-            vita_log::info("[MoonmicPrep] User chose keep host res -> Updating local target to %dx%d", hostW, hostH);
-            bridge.setTargetResolution(hostW, hostH);
-        }
-
-        // Give some time for changes to apply or host to restart
-        std::this_thread::sleep_for(std::chrono::milliseconds(500));
-
-        // Proceed to wait for apps
-        waitForApps(host, callbacks); });
+            if (callbacks.onDone)
+                callbacks.onDone(ready); });
     }
 
-    void waitForApps(const HostInfo host, const PrepCallbacks callbacks)
+    void waitForHost(const HostInfo& host, const PrepCallbacks& callbacks)
     {
-        // This runs in async thread already (called from continueHandshake or startHandshake)
-        // But to be safe and consistent with recursive structure, we can ensure we are async logic.
-        // Since we are moving logic here, just put the loop body.
-
-        bool appsReady = false;
-        for (int i = 0; i < 8; ++i)
-        { // Increased retries for restart time
-            bool connected = GameStreamClient::instance().connect(host);
-            if (!connected)
+        for (int attempt = 0; attempt < 8; ++attempt)
+        {
+            if (GameStreamClient::instance().connect(host))
             {
-                std::this_thread::sleep_for(std::chrono::milliseconds(800));
-                continue;
-            }
-
-            std::vector<RemoteAppInfo> apps;
-            GameStreamClient::instance().getAppList(host.ip, [&apps](const std::vector<RemoteAppInfo>& a)
-                { apps = a; });
-            if (!apps.empty())
-            {
-                appsReady = true;
-                break;
+                std::vector<RemoteAppInfo> apps;
+                GameStreamClient::instance().getAppList(host.ip,
+                    [&apps](const std::vector<RemoteAppInfo>& result)
+                    { apps = result; });
+                if (!apps.empty())
+                {
+                    finish(callbacks, true);
+                    return;
+                }
             }
             std::this_thread::sleep_for(std::chrono::milliseconds(800));
         }
 
-        brls::sync([appsReady, callbacks]()
-            {
-        if (callbacks.onDone)
-            callbacks.onDone(appsReady); });
+        finish(callbacks, false);
     }
 
-    void startHandshake(const HostInfo hostCopy,
-        const StreamConfiguration sc,
-        const VideoSettings vs,
-        const PrepCallbacks callbacks)
+    void applyMismatchChoice(bool switchResolution, int hostWidth, int hostHeight,
+        const HostInfo& host, const std::string& moonmicHost, int moonmicPort,
+        const PrepCallbacks& callbacks)
     {
-        if (callbacks.onStart)
-            callbacks.onStart();
-
-        std::string micHost = vs.microphone_host_ip.empty() ? hostCopy.ip : vs.microphone_host_ip;
-        int micPort         = vs.microphone_port > 0 ? vs.microphone_port : MOONMIC_DEFAULT_PORT;
-
-        brls::async([hostCopy, sc, vs, micHost, micPort, callbacks]()
+        brls::async([=]()
             {
-    auto& bridge = moonmic::MoonmicBridge::getInstance();
-    bridge.loadConfig();
-    if (sc.width > 0 && sc.height > 0) {
-      bridge.setTargetResolution(static_cast<uint16_t>(sc.width), static_cast<uint16_t>(sc.height));
-    }
-
-    bool success = false;
-    // Single fast handshake attempt
-    for (int i = 0; i < 1 && !success; ++i) {
-        auto result = bridge.sendResolutionHandshake(micHost, micPort, false);
-        success = result.success;
-
-        if (success) {
-            if (result.mismatch) {
-                int hostW = result.current_width;
-                int hostH = result.current_height;
-                vita_log::warning("[MoonmicPrep] Resolution mismatch detected, Host has %dx%d", hostW, hostH);
-
-                // Show dialog on main thread AND RETURN from this thread
-                brls::sync([hostW, hostH, hostCopy, micHost, micPort, callbacks]() {
-                    brls::Box* holder = new brls::Box(brls::Axis::COLUMN);
-                    holder->setMargins(20, 20, 20, 20);
-
-                    brls::Label* text = new brls::Label();
-                    text->setText(fmt::format(
-                        "Resolution Mismatch\n\n"
-                        "Host: {}x{}\n\n"
-                        "Switch host to match Vita?",
-                        hostW, hostH
-                    ));
-                    text->setHorizontalAlign(brls::HorizontalAlign::CENTER);
-                    text->setMarginBottom(18);
-                    holder->addView(text);
-
-                    brls::Box* buttons = new brls::Box(brls::Axis::ROW);
-                    buttons->setJustifyContent(brls::JustifyContent::CENTER);
-
-                    brls::Button* btnYes = new brls::Button();
-                    btnYes->setText("Switch (Restart)");
-                    btnYes->setMargins(0, 10, 0, 10);
-
-                    brls::Button* btnNo = new brls::Button();
-                    btnNo->setText("Keep Host Res");
-                    btnNo->setMargins(0, 10, 0, 10);
-
-                    buttons->addView(btnYes);
-                    buttons->addView(btnNo);
-                    holder->addView(buttons);
-
-                    brls::Dialog* dialog = new brls::Dialog(holder);
-                    dialog->setCancelable(false);
-
-                    // Actions
-                    btnYes->registerClickAction([dialog, hostW, hostH, hostCopy, micHost, micPort, callbacks](brls::View*) -> bool {
-                        dialog->dismiss();
-                        // Continue workflow: Switch
-                        continueHandshake(true, hostW, hostH, hostCopy, micHost, micPort, callbacks);
-                        return true;
-                    });
-
-                    btnNo->registerClickAction([dialog, hostW, hostH, hostCopy, micHost, micPort, callbacks](brls::View*) -> bool {
-                        dialog->dismiss();
-                        // Continue workflow: Keep
-                        continueHandshake(false, hostW, hostH, hostCopy, micHost, micPort, callbacks);
-                        return true;
-                    });
-
-                    dialog->open();
-                });
-                return; // EXIT ASYNC THREAD - Wait for user interaction
+            auto& bridge = MoonmicBridge::getInstance();
+            if (!switchResolution)
+            {
+                bridge.setTargetResolution(hostWidth, hostHeight);
+                finish(callbacks, true);
+                return;
             }
-        }
-    }
 
-    // If we are here, either success+no mismatch, or failed 1 time
-    // In either case, we proceed to wait for apps (if success) or fail (if !success)
-
-    if (success) {
-        waitForApps(hostCopy, callbacks);
-    } else {
-        // Failed handshake completely
-        brls::sync([callbacks]() {
-            if (callbacks.onDone) callbacks.onDone(false);
-        });
-    } });
-    }
-
-} // namespace
-
-void ensureSunshineReadyWithPrompt(const HostInfo& host,
-    const StreamConfiguration& streamCfg,
-    const VideoSettings& videoCfg,
-    bool& resolutionPromptShown,
-    const PrepCallbacks& callbacks)
-{
-    // Disable blind prompt. We now use interactive handshake check.
-    bool shouldPrompt = false;
-    /*
-    bool shouldPrompt = (!resolutionPromptShown && streamCfg.width > 0 && streamCfg.height > 0 &&
-                         !(streamCfg.width == 1280 && streamCfg.height == 720));
-    */
-
-    auto beginHandshake = [host, streamCfg, videoCfg, callbacks]()
-    {
-        startHandshake(host, streamCfg, videoCfg, callbacks);
-    };
-
-    if (shouldPrompt)
-    {
-        resolutionPromptShown = true;
-
-        std::string msg = brls::getStr("moonlight/session/app_select/resolution_prompt_body");
-        {
-            char buf[32];
-            snprintf(buf, sizeof(buf), "%ux%u", streamCfg.width, streamCfg.height);
-            size_t pos = msg.find("$(res)");
-            if (pos != std::string::npos)
-                msg.replace(pos, 6, buf);
-        }
-
-        auto* holder = new brls::Box(brls::Axis::COLUMN);
-        auto* label  = new brls::Label();
-        label->setText(msg);
-        label->setHorizontalAlign(brls::HorizontalAlign::CENTER);
-        label->setMarginBottom(18);
-        holder->addView(label);
-
-        auto* btnRow = new brls::Box(brls::Axis::ROW);
-        btnRow->setJustifyContent(brls::JustifyContent::CENTER);
-        btnRow->setAlignItems(brls::AlignItems::CENTER);
-
-        auto* btnContinue = new brls::Button();
-        btnContinue->setText(brls::getStr("moonlight/session/app_select/resolution_prompt_continue"));
-        btnContinue->setStyle(&brls::BUTTONSTYLE_HIGHLIGHT);
-        btnContinue->setMargins(0, 8, 8, 0);
-
-        auto* btnCancel = new brls::Button();
-        btnCancel->setText(brls::getStr("moonlight/session/app_select/resolution_prompt_cancel"));
-        btnCancel->setStyle(&brls::BUTTONSTYLE_PRIMARY);
-
-        btnRow->addView(btnContinue);
-        btnRow->addView(btnCancel);
-        holder->addView(btnRow);
-        holder->setPadding(18, 18, 18, 18);
-
-        auto* dialog = new brls::Dialog(holder);
-        dialog->setCancelable(true);
-
-        btnContinue->registerClickAction([dialog, beginHandshake](brls::View*) -> bool
+            auto result = bridge.sendResolutionHandshake(moonmicHost, moonmicPort, true);
+            if (!result.success)
             {
-      dialog->dismiss();
-      beginHandshake();
-      return true; });
-
-        btnCancel->registerClickAction([dialog, callbacks](brls::View*) -> bool
-            {
-      dialog->dismiss();
-      if (callbacks.onCancel)
-        callbacks.onCancel();
-      return true; });
-
-        dialog->open();
-        return;
+                finish(callbacks, false);
+                return;
+            }
+            waitForHost(host, callbacks); });
     }
 
-    resolutionPromptShown = true;
-    beginHandshake();
+    void showResolutionMismatch(const MoonmicBridge::HandshakeResult& result,
+        const HostInfo& host, const std::string& moonmicHost, int moonmicPort,
+        int targetWidth, int targetHeight, const PrepCallbacks& callbacks)
+    {
+        brls::sync([=]()
+            {
+            std::string message = brls::getStr("moonlight/session/app_select/resolution_prompt_body");
+            const auto marker   = message.find("$(res)");
+            if (marker != std::string::npos)
+                message.replace(marker, 6, fmt::format("{}x{}", targetWidth, targetHeight));
+
+            auto* dialog = new brls::Dialog(message);
+            dialog->setCancelable(false);
+            dialog->addButton(brls::getStr("moonlight/session/app_select/resolution_prompt_continue"),
+                [=]()
+                {
+                    applyMismatchChoice(true, result.current_width, result.current_height,
+                        host, moonmicHost, moonmicPort, callbacks);
+                });
+            dialog->addButton(brls::getStr("moonlight/session/app_select/resolution_prompt_cancel"),
+                [=]()
+                {
+                    applyMismatchChoice(false, result.current_width, result.current_height,
+                        host, moonmicHost, moonmicPort, callbacks);
+                });
+            dialog->open(); });
+    }
+
 }
 
-} // namespace moonmic
+void prepareSunshine(const HostInfo& host, const StreamConfiguration& streamConfig,
+    const VideoSettings& videoSettings, const PrepCallbacks& callbacks)
+{
+    if (callbacks.onStart)
+        callbacks.onStart();
+
+    const std::string moonmicHost = videoSettings.microphone_host_ip.empty()
+        ? host.ip
+        : videoSettings.microphone_host_ip;
+    const int moonmicPort         = videoSettings.microphone_port > 0
+                ? videoSettings.microphone_port
+                : MOONMIC_DEFAULT_PORT;
+
+    brls::async([=]()
+        {
+            auto& bridge = MoonmicBridge::getInstance();
+            bridge.loadConfig();
+            if (streamConfig.width > 0 && streamConfig.height > 0)
+                bridge.setTargetResolution(streamConfig.width, streamConfig.height);
+
+            const auto result = bridge.sendResolutionHandshake(moonmicHost, moonmicPort, false);
+            if (!result.success)
+            {
+                finish(callbacks, false);
+                return;
+            }
+            if (!result.mismatch)
+            {
+                finish(callbacks, true);
+                return;
+            }
+
+            vita_log::warning("[MoonmicPrep] Host resolution is %dx%d; requested %dx%d",
+                result.current_width, result.current_height, streamConfig.width, streamConfig.height);
+            showResolutionMismatch(result, host, moonmicHost, moonmicPort,
+                streamConfig.width, streamConfig.height, callbacks); });
+}
+
+}

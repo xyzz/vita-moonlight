@@ -35,23 +35,17 @@
 #endif
 
 #include "ConfigManager.hpp"
+#include "Settings.hpp"
 #include "activity/main_activity.hpp"
+#include "debug.hpp"
 #include "session/vita_session.hpp"
-#include "settings.hpp"
 #include "tab/add_host_tab.hpp"
 #include "tab/hosts_tab.hpp"
 #include "tab/settings_tab.hpp"
 #include "utils/dialog_utils.h"
-#include "utils/host_search.hpp"
-// Include debug wrapper for console/Vita output testing
-#include "debug.hpp"
-// For connectivity tests/certificates
-// #include "check_test.hpp"
 
 #if defined(__PSV__)
-#include <psp2/kernel/threadmgr.h>
 #include <psp2/shellutil.h>
-#include <psp2/vshbridge.h>
 #endif
 
 #if defined(__PSV__) && defined(BOREALIS_USE_OPENGL)
@@ -97,7 +91,7 @@ void finishResumeReconnect(const std::shared_ptr<ResumeReconnectState>& state, b
 
 void reconnectStreamAfterResume(const std::shared_ptr<ResumeReconnectState>& state)
 {
-    VitaSession* session = VitaSession::active();
+    auto session = VitaSession::active();
     if (!session)
     {
         brls::sync([state]()
@@ -252,11 +246,10 @@ int main(int argc, char* argv[])
         brls::Platform::APP_LOCALE_DEFAULT = lang;
     }
 
-    // We recommend to use INFO for real apps
     for (int i = 1; i < argc; i++)
     {
         if (std::strcmp(argv[i], "-d") == 0)
-        { // Set log level (compat)
+        {
             vita_debug_log("[main] -d recibido: usando salida via vita_debug_log");
         }
         else if (std::strcmp(argv[i], "-o") == 0)
@@ -270,7 +263,6 @@ int main(int argc, char* argv[])
         }
     }
 
-    // Init shell util events (for PS button capture)
 #if defined(__PSV__)
     sceShellUtilInitEvents(0);
 #endif
@@ -283,14 +275,6 @@ int main(int argc, char* argv[])
         return EXIT_FAILURE;
     }
 
-    // Change locale on platform after init
-    if (!lang.empty())
-    {
-        // For PS Vita we don't need to change the locale dynamically
-        // The locale was already set before init()
-    }
-
-    // Load translations after applying language from config
     if (!lang.empty())
     {
         brls::loadTranslations();
@@ -307,35 +291,11 @@ int main(int argc, char* argv[])
     std::cout << "[DEBUG] Locale detectado por Borealis: " << brls::Application::getLocale() << std::endl;
 #endif
 
-    // --- LOG TEST BLOCK ---
-    // Print various forms to compare behavior on console/Vita
-    std::string testName = "AorsiniYT-PC.local";
-    std::string testUtf8 = u8"á>Àü↕"; // example with non-ASCII bytes
-    // Correct: pass c_str() to printf-style functions
-    // Enable vita_debug_log as configured (loads early to allow prints from init)
     {
-        extern bool g_debug_log_enabled; // declared in vita_globals.hpp
         ConfigManager cfg;
         cfg.load();
-        VideoSettings vs    = cfg.getVideoSettings();
-        g_debug_log_enabled = vs.save_debug_log;
-        // If enabled, open/truncate session log
-        enable_file_logging(vs.save_debug_log);
+        enable_file_logging(cfg.getVideoSettings().save_debug_log);
     }
-    vita_debug_log("[TEST] vita_debug_log c_str: %s", testName.c_str());
-    // Other outputs to compare
-#if defined(__PSV__)
-    brls::Logger::info("[TEST] cout skipped on Vita, testName={} testUtf8={}", testName, testUtf8);
-#else
-    std::cout << "[TEST] cout: " << testName << " " << testUtf8 << std::endl;
-#endif
-    brls::Logger::info("[TEST] brls::Logger: {} {}", testName, testUtf8);
-    // Run diagnostic tests (connectivity/certificates)
-    // moonlight::tests::run_cert_checks();
-    // --- END OF TESTING BLOCK ---
-
-    // Load visual settings (selector) after init
-    moonlight::settings::loadSettingsFromConfig();
 
     brls::Application::createWindow("moonlight/title"_i18n);
 
@@ -360,28 +320,6 @@ int main(int argc, char* argv[])
     brls::Application::registerXMLView("SettingsTab", SettingsTab::create);
     brls::Application::registerXMLView("HostsTab", HostsTab::create);
 
-#if defined(__PSV__)
-    // CapUnlocker disabled: we prevent affinity/priority change and any behavior
-    // that depends on external modules to expand limits (reduces RAM consumption/fragmentation).
-    /*
-    int search_unk[2];
-    if(_vshKernelSearchModuleByName("CapUnlocker", search_unk) >= 0) {
-        brls::Logger::info("[CapUnlocker] ¡CapUnlocker detectado por _vshKernelSearchModuleByName!");
-        brls::sync([]() {
-            brls::Application::notify("moonlight/capunlocker_notify"_i18n);
-        });
-        int res1 = sceKernelChangeThreadPriority(SCE_KERNEL_THREAD_ID_SELF, 64);
-        int res2 = sceKernelChangeThreadCpuAffinityMask(SCE_KERNEL_THREAD_ID_SELF, 0xF);
-        brls::Logger::info("[CapUnlocker] Cambio de prioridad res={} | Cambio de afinidad res={}", res1, res2);
-    } else {
-        brls::Logger::info("[CapUnlocker] CapUnlocker NO detectado. Solo 1-2 núcleos y RAM limitada disponibles.");
-    }
-    */
-#endif
-
-    // The visual style of the "about" labels (font and color) is applied in the corresponding view controller
-    // using setFontSize and setTextColor after getting each Label by its id.
-    // Padding/margin metrics are only maintained here if the XML layout uses them.
     brls::getStyle().addMetric("about/padding_top_bottom", 50);
     brls::getStyle().addMetric("about/padding_sides", 75);
     brls::getStyle().addMetric("about/description_margin", 50);

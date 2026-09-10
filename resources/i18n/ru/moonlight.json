@@ -156,7 +156,6 @@
     "center_region_title": "Только центр региона",
     "show_fps_title": "Показать FPS",
     "save_debug_log_title": "Сохранить журнал отладки",
-    "ref_frame_title": "Недействительность системы ссылок",
     "swap_interval": {
       "title": "V-Sync (Swap Interval)",
       "options": {
@@ -180,7 +179,9 @@
         "4": "Планшет Multitouch"
       },
       "saved": "Режим сенсорного экрана сохранен",
-      "changed": "Режим сенсорного экрана изменился на:"
+      "changed": "Режим сенсорного экрана изменился на:",
+      "ds4_requires_playstation": "Сенсорная панель DS4 требует тип контроллера PlayStation",
+      "change_failed": "Не удалось изменить режим сенсорного экрана"
     },
     "gamepad_type": {
       "title": "Тип контроллера",

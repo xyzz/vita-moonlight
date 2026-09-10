@@ -4,22 +4,22 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include <atomic>
+
 #if defined(__PSV__)
 #include <psp2/kernel/clib.h>
 #include <psp2/kernel/threadmgr.h>
 
-#include <atomic>
 #include <mutex>
 #endif
 
-// Include to access g_debug_log_enabled
 #include <sys/stat.h>
 
 #include "ConfigManager.hpp"
-#include "video/legacy/modules/vita_globals.hpp"
 
-// File logging state
 static FILE* g_moonlight_log_file = nullptr;
+static std::atomic<bool> g_debug_log_enabled { false };
 
 #if defined(__PSV__)
 namespace
@@ -233,6 +233,7 @@ bool enqueue_log_message(const char* text)
 
 void enable_file_logging(bool enable)
 {
+    g_debug_log_enabled.store(enable, std::memory_order_release);
     if (enable)
     {
         if (g_moonlight_log_file)
@@ -280,8 +281,7 @@ void enable_file_logging(bool enable)
 
 extern "C" void vita_debug_log_raw(const char* text)
 {
-    // Only print if debug log is enabled
-    if (!g_debug_log_enabled || !text)
+    if (!g_debug_log_enabled.load(std::memory_order_acquire) || !text)
     {
         return;
     }
@@ -324,7 +324,7 @@ extern "C" void vita_debug_log_raw(const char* text)
 // Implementation to redirect libgamestream logs on Vita
 extern "C" void vita_debug_log(const char* fmt, ...)
 {
-    if (!g_debug_log_enabled)
+    if (!g_debug_log_enabled.load(std::memory_order_acquire))
     {
         return;
     }

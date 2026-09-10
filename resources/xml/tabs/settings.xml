@@ -71,9 +71,6 @@
                 id="centerRegionToggle"
                 title="@i18n/moonlight/settings_tab/center_region_title"/>
 
-            <brls:BooleanCell
-                id="refFrameInvalidationToggle"
-                title="@i18n/moonlight/settings_tab/ref_frame_title"/>
 
             <brls:BooleanCell
                 id="showFpsToggle"
@@ -167,56 +164,8 @@
                 id="languageSelector"
                 title="@i18n/moonlight/settings/language"/>
 
-            <brls:RadioCell
-                id="radio"
-                visibility="gone"/>
-
-            <brls:BooleanCell
-                id="boolean"
-                visibility="gone"/>
-
-            <brls:SelectorCell
-                id="selector"
-                visibility="gone"/>
-
-            <brls:InputCell
-                id="input"
-                visibility="gone"/>
-
-            <brls:InputNumericCell
-                id="inputNumeric"
-                visibility="gone"/>
-
-            <brls:DetailCell
-                title="@i18n/moonlight/settings/dns"
-                id="dnsServer"
-                visibility="gone"/>
-
-            <brls:BooleanCell
-                id="debug"
-                visibility="gone"/>
-
-            <brls:BooleanCell
-                id="bottomBar"
-                visibility="gone"/>
-
-            <brls:BooleanCell
-                id="alwaysOnTop"
-                visibility="gone"/>
-
-            <brls:BooleanCell
-                id="fps"/>
-
             <brls:SliderCell
                     id="slider"/>
-
-            <brls:DetailCell
-                    title="@i18n/moonlight/settings/notify"
-                    id="notify"
-                    visibility="gone"/>
-
-            <brls:RadioCell id="radio2" visibility="gone"/>
-            <brls:RadioCell id="radio3" visibility="gone"/>
 
         </brls:Box>
 

@@ -86,11 +86,8 @@ KeyboardSettingsTab::KeyboardSettingsTab()
         [this, updateLayoutVisibility](int selected)
         {
             ConfigManager cfg;
-            cfg.load();
-            VideoSettings settings = cfg.getVideoSettings();
-            settings.keyboard_mode = selected;
-            cfg.setVideoSettings(settings);
-            cfg.save();
+            cfg.updateVideoSettings([selected](VideoSettings& settings)
+                { settings.keyboard_mode = selected; });
             brls::Application::notify(
                 brls::getStr("moonlight/keyboard/mode_saved"));
             updateLayoutVisibility(selected);
@@ -105,11 +102,8 @@ KeyboardSettingsTab::KeyboardSettingsTab()
         [this](int selected)
         {
             ConfigManager cfg;
-            cfg.load();
-            VideoSettings settings   = cfg.getVideoSettings();
-            settings.keyboard_layout = selected;
-            cfg.setVideoSettings(settings);
-            cfg.save();
+            cfg.updateVideoSettings([selected](VideoSettings& settings)
+                { settings.keyboard_layout = selected; });
             brls::Application::notify(
                 brls::getStr("moonlight/settings_tab/keyboard_layout/saved"));
         });
@@ -121,11 +115,8 @@ KeyboardSettingsTab::KeyboardSettingsTab()
         [](bool value)
         {
             ConfigManager cfg;
-            cfg.load();
-            VideoSettings settings       = cfg.getVideoSettings();
-            settings.keyboard_input_mode = value;
-            cfg.setVideoSettings(settings);
-            cfg.save();
+            cfg.updateVideoSettings([value](VideoSettings& settings)
+                { settings.keyboard_input_mode = value; });
             brls::Application::notify(value ? brls::getStr("moonlight/keyboard/input_mode_utf8") : brls::getStr("moonlight/keyboard/input_mode_vk"));
         });
 
@@ -136,11 +127,8 @@ KeyboardSettingsTab::KeyboardSettingsTab()
         [](bool value)
         {
             ConfigManager cfg;
-            cfg.load();
-            VideoSettings settings        = cfg.getVideoSettings();
-            settings.keyboard_numbers_row = value;
-            cfg.setVideoSettings(settings);
-            cfg.save();
+            cfg.updateVideoSettings([value](VideoSettings& settings)
+                { settings.keyboard_numbers_row = value; });
         });
 
     keyboardArrowsToggle->init(
@@ -149,11 +137,8 @@ KeyboardSettingsTab::KeyboardSettingsTab()
         [](bool value)
         {
             ConfigManager cfg;
-            cfg.load();
-            VideoSettings settings        = cfg.getVideoSettings();
-            settings.keyboard_show_arrows = value;
-            cfg.setVideoSettings(settings);
-            cfg.save();
+            cfg.updateVideoSettings([value](VideoSettings& settings)
+                { settings.keyboard_show_arrows = value; });
         });
 
     keyboardLegacyDialogToggle->init(
@@ -162,11 +147,8 @@ KeyboardSettingsTab::KeyboardSettingsTab()
         [](bool value)
         {
             ConfigManager cfg;
-            cfg.load();
-            VideoSettings settings          = cfg.getVideoSettings();
-            settings.keyboard_legacy_dialog = value;
-            cfg.setVideoSettings(settings);
-            cfg.save();
+            cfg.updateVideoSettings([value](VideoSettings& settings)
+                { settings.keyboard_legacy_dialog = value; });
         });
 
     keyboardFullscreenToggle->init(
@@ -175,11 +157,8 @@ KeyboardSettingsTab::KeyboardSettingsTab()
         [](bool value)
         {
             ConfigManager cfg;
-            cfg.load();
-            VideoSettings settings       = cfg.getVideoSettings();
-            settings.keyboard_fullscreen = value;
-            cfg.setVideoSettings(settings);
-            cfg.save();
+            cfg.updateVideoSettings([value](VideoSettings& settings)
+                { settings.keyboard_fullscreen = value; });
         });
 
     keyboardPreviewToggle->init(
@@ -188,11 +167,8 @@ KeyboardSettingsTab::KeyboardSettingsTab()
         [](bool value)
         {
             ConfigManager cfg;
-            cfg.load();
-            VideoSettings settings         = cfg.getVideoSettings();
-            settings.keyboard_text_preview = value;
-            cfg.setVideoSettings(settings);
-            cfg.save();
+            cfg.updateVideoSettings([value](VideoSettings& settings)
+                { settings.keyboard_text_preview = value; });
         });
 
     keyboardMouseToggle->init(
@@ -201,11 +177,8 @@ KeyboardSettingsTab::KeyboardSettingsTab()
         [](bool value)
         {
             ConfigManager cfg;
-            cfg.load();
-            VideoSettings settings              = cfg.getVideoSettings();
-            settings.keyboard_mouse_passthrough = value;
-            cfg.setVideoSettings(settings);
-            cfg.save();
+            cfg.updateVideoSettings([value](VideoSettings& settings)
+                { settings.keyboard_mouse_passthrough = value; });
         });
 
     updateLayoutVisibility(videoSettings.keyboard_mode);

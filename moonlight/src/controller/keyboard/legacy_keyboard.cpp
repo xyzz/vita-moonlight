@@ -686,7 +686,7 @@ bool open_legacy_dialog_keyboard()
     const bool opened = ime->openForText(
         [](std::string text)
         {
-            VitaSession* session = VitaSession::active();
+            auto session = VitaSession::active();
             if (session && session->isActive())
             {
                 send_dialog_text(text);

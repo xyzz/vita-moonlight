@@ -29,13 +29,9 @@ TrackpadSettingsTab::TrackpadSettingsTab()
     pointerSpeedSlider->init(brls::getStr("moonlight/trackpad/pointer_speed/title"), initialPointerSpeed, [this](float progress)
         {
         ConfigManager config;
-        config.load();
-        VideoSettings settings = config.getVideoSettings();
         int speed = static_cast<int>(std::round(progress * 200.0f));
         speed = std::max(0, std::min(speed, 200));
-        settings.trackpad_pointer_speed = speed;
-        config.setVideoSettings(settings);
-        config.save();
+        config.updateVideoSettings([speed](VideoSettings& settings) { settings.trackpad_pointer_speed = speed; });
         pointerSpeedSlider->setDetailText(fmt::format("{:.1f}x", speed / 100.0f));
         applyTrackpadSettingsLive(); });
     pointerSpeedSlider->setDetailText(fmt::format("{:.1f}x", videoSettings.trackpad_pointer_speed / 100.0f));
@@ -44,11 +40,7 @@ TrackpadSettingsTab::TrackpadSettingsTab()
     twoFingerRightClickToggle->init(brls::getStr("moonlight/trackpad/two_finger_right_click/title"), videoSettings.trackpad_two_finger_right_click, [this](bool value)
         {
         ConfigManager config;
-        config.load();
-        VideoSettings settings = config.getVideoSettings();
-        settings.trackpad_two_finger_right_click = value;
-        config.setVideoSettings(settings);
-        config.save();
+        config.updateVideoSettings([value](VideoSettings& settings) { settings.trackpad_two_finger_right_click = value; });
         brls::Application::notify(value ?
             brls::getStr("moonlight/trackpad/two_finger_right_click/enabled") :
             brls::getStr("moonlight/trackpad/two_finger_right_click/disabled"));
@@ -58,11 +50,7 @@ TrackpadSettingsTab::TrackpadSettingsTab()
     twoFingerScrollToggle->init(brls::getStr("moonlight/trackpad/two_finger_scroll/title"), videoSettings.trackpad_two_finger_scroll, [this](bool value)
         {
         ConfigManager config;
-        config.load();
-        VideoSettings settings = config.getVideoSettings();
-        settings.trackpad_two_finger_scroll = value;
-        config.setVideoSettings(settings);
-        config.save();
+        config.updateVideoSettings([value](VideoSettings& settings) { settings.trackpad_two_finger_scroll = value; });
         brls::Application::notify(value ?
             brls::getStr("moonlight/trackpad/two_finger_scroll/enabled") :
             brls::getStr("moonlight/trackpad/two_finger_scroll/disabled"));
@@ -72,11 +60,7 @@ TrackpadSettingsTab::TrackpadSettingsTab()
     invertScrollToggle->init(brls::getStr("moonlight/trackpad/invert_scroll/title"), videoSettings.trackpad_invert_scroll, [this](bool value)
         {
         ConfigManager config;
-        config.load();
-        VideoSettings settings = config.getVideoSettings();
-        settings.trackpad_invert_scroll = value;
-        config.setVideoSettings(settings);
-        config.save();
+        config.updateVideoSettings([value](VideoSettings& settings) { settings.trackpad_invert_scroll = value; });
         brls::Application::notify(value ?
             brls::getStr("moonlight/trackpad/invert_scroll/natural") :
             brls::getStr("moonlight/trackpad/invert_scroll/traditional"));
@@ -86,11 +70,7 @@ TrackpadSettingsTab::TrackpadSettingsTab()
     multiTouchGesturesToggle->init(brls::getStr("moonlight/trackpad/multi_touch/title"), videoSettings.trackpad_multi_touch, [this](bool value)
         {
         ConfigManager config;
-        config.load();
-        VideoSettings settings = config.getVideoSettings();
-        settings.trackpad_multi_touch = value;
-        config.setVideoSettings(settings);
-        config.save();
+        config.updateVideoSettings([value](VideoSettings& settings) { settings.trackpad_multi_touch = value; });
         brls::Application::notify(value ?
             brls::getStr("moonlight/trackpad/multi_touch/enabled") :
             brls::getStr("moonlight/trackpad/multi_touch/disabled"));
@@ -101,12 +81,8 @@ TrackpadSettingsTab::TrackpadSettingsTab()
     edgeZoneSlider->init(brls::getStr("moonlight/trackpad/edge_zone/title"), initialEdgeZone, [this](float progress)
         {
         ConfigManager config;
-        config.load();
-        VideoSettings settings = config.getVideoSettings();
         int edgePercentage = static_cast<int>(roundf(progress * 50)); // Max 50%
-        settings.trackpad_edge_zone = edgePercentage;
-        config.setVideoSettings(settings);
-        config.save();
+        config.updateVideoSettings([edgePercentage](VideoSettings& settings) { settings.trackpad_edge_zone = edgePercentage; });
         edgeZoneSlider->setDetailText(std::to_string(edgePercentage) + "%");
         applyTrackpadSettingsLive(); });
     edgeZoneSlider->setDetailText(std::to_string(videoSettings.trackpad_edge_zone) + "%");
@@ -116,12 +92,8 @@ TrackpadSettingsTab::TrackpadSettingsTab()
     deadZoneSlider->init(brls::getStr("moonlight/trackpad/dead_zone/title"), initialDeadZone, [this](float progress)
         {
         ConfigManager config;
-        config.load();
-        VideoSettings settings = config.getVideoSettings();
         int deadZonePixels = static_cast<int>(roundf(progress * 200)); // Max 200px
-        settings.trackpad_dead_zone = deadZonePixels;
-        config.setVideoSettings(settings);
-        config.save();
+        config.updateVideoSettings([deadZonePixels](VideoSettings& settings) { settings.trackpad_dead_zone = deadZonePixels; });
         deadZoneSlider->setDetailText(std::to_string(deadZonePixels) + "px");
         applyTrackpadSettingsLive(); });
     deadZoneSlider->setDetailText(std::to_string(videoSettings.trackpad_dead_zone) + "px");

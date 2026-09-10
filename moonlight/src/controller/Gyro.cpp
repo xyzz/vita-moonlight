@@ -2,14 +2,14 @@
 
 #include <psp2/motion.h>
 
-#include <chrono>
 #include <cmath>
 
 #include "ConfigManager.hpp"
 #include "Limelight.h"
 #include "debug.hpp"
+#include "utils/vita_platform.hpp"
+#include "video/runtime_settings.hpp"
 
-using namespace std::chrono;
 static constexpr float kGyroBaseScale = 28.0f;
 
 GyroManager::GyroManager()
@@ -30,29 +30,22 @@ GyroManager::GyroManager()
     vita_log::info("[Gyro] Motion sensor ready");
 }
 
-static uint64_t nowUs()
-{
-    return (uint64_t)duration_cast<microseconds>(high_resolution_clock::now().time_since_epoch()).count();
-}
-
 void GyroManager::update()
 {
     if (!initialized || !sensorAvailable)
         return;
 
     // Rate limit sends to ~125Hz by default (matches input polling)
-    const uint64_t now           = nowUs();
+    const uint64_t now           = vita::monotonicMicroseconds();
     const uint64_t minIntervalUs = 8000; // 125Hz
     if (lastSendUs != 0 && (now - lastSendUs) < minIntervalUs)
         return;
 
-    extern ::VideoSettings g_video_settings_snapshot;
-    if (!g_video_settings_snapshot.enable_motion_controls)
+    if (!video_runtime::motionControlsEnabled())
     {
         return;
     }
 
-    const ::VideoSettings& settings = g_video_settings_snapshot;
     float gx = 0.0f, gy = 0.0f, gz = 0.0f;
     float ax = 0.0f, ay = 0.0f, az = 0.0f;
     if (!readPlatformSensor(gx, gy, gz, ax, ay, az))
@@ -61,8 +54,8 @@ void GyroManager::update()
     }
 
     // Apply base scale (legacy MOTION_SCALE) and per-axis config scalars
-    float sx = settings.motion_controls_scalar_x;
-    float sy = settings.motion_controls_scalar_y;
+    float sx = video_runtime::motionScaleX();
+    float sy = video_runtime::motionScaleY();
 
     float sx_v = gx * kGyroBaseScale * sx;
     float sy_v = gy * kGyroBaseScale * sy;

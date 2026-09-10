@@ -156,7 +156,6 @@
             "center_region_title": "Center region only",
             "show_fps_title": "Show FPS",
             "save_debug_log_title": "Save debug log",
-            "ref_frame_title": "Reference frame invalidation",
             "swap_interval": {
                 "title": "V-Sync (Swap Interval)",
                 "options": {
@@ -180,7 +179,9 @@
                     "4": "Multitouch tablet"
                 },
                 "saved": "Touchscreen mode saved",
-                "changed": "Touchscreen mode changed to:"
+                "changed": "Touchscreen mode changed to:",
+                "ds4_requires_playstation": "DS4 touchpad requires the PlayStation controller type",
+                "change_failed": "Could not change touchscreen mode"
             },
             "gamepad_type": {
                 "title": "Controller type",

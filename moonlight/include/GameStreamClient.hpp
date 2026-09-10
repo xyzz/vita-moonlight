@@ -10,6 +10,7 @@
 #include <chrono>
 #include <functional>
 #include <map>
+#include <mutex>
 #include <set>
 #include <string>
 #include <vector>
@@ -24,53 +25,39 @@ struct RemoteAppInfo
     std::string iconUrl;
 };
 
-struct HostInfo; // forward
+struct HostInfo;
 
 typedef std::function<void(const std::vector<RemoteAppInfo>&)> AppListCallback;
-typedef std::function<void(bool)> BoolCallback;
 
 class GameStreamClient
 {
   public:
     static GameStreamClient& instance();
 
-    bool connect(const std::string& address);
-    bool connect(const HostInfo& host); // use consistent safeId
+    bool connect(const HostInfo& host);
     bool isConnected(const std::string& address);
 
-    // Get data from server
-    SERVER_DATA& serverData(const std::string& address);
-
-    // Start application (returns true if started successfully)
-    bool startApp(const std::string& address, STREAM_CONFIGURATION& config, int appId);
-    bool startApp(const std::string& address, STREAM_CONFIGURATION& config, int appId, int displayWidth, int displayHeight);
-
+    bool serverInfo(const std::string& address, SERVER_INFORMATION& out) const;
+    int currentGame(const std::string& address) const;
     enum class StartMode
     {
-        AUTO        = 0, // Allow automatic resume if there is an active session
-        RESUME_ONLY = 1, // Just resume, fail if no session active
-        NEW_ONLY    = 2 // Always fresh launch, ignore active session
+        AUTO        = 0,
+        RESUME_ONLY = 1,
+        NEW_ONLY    = 2
     };
     bool startApp(const std::string& address, STREAM_CONFIGURATION& config, int appId, StartMode mode, int displayWidth = 0, int displayHeight = 0);
     bool resumeApp(const std::string& address, STREAM_CONFIGURATION& config, int appId);
     bool lastStreamConfig(const std::string& address, STREAM_CONFIGURATION& out) const;
 
-    // Pairing
-    bool pair(const std::string& address, const std::string& pin);
     bool unpair(const std::string& address);
-    bool isPaired(const std::string& address);
     bool beginPairing(const HostInfo& host, std::function<void(bool)> onFinished, std::function<void(const std::string&)> onPinReady = nullptr);
 
     void getAppList(const std::string& address, AppListCallback callback);
-
     bool getAppBoxart(const std::string& address, int appId, Data& outData);
-
     bool quitApp(const std::string& address);
 
     void setActiveStream(const std::string& address, int appId, const std::string& appName);
     void clearActiveStream(const std::string& address);
-    bool hasActiveStream(const std::string& address) const;
-    RemoteAppInfo activeAppInfo(const std::string& address) const; // returns generic appName/icon if it exists
 
     bool probeActiveSession(const HostInfo& host, RemoteAppInfo& outRunning);
 
@@ -79,14 +66,15 @@ class GameStreamClient
     int getSunshinePairStatus(const std::string& address);
 
   private:
-    GameStreamClient();
-    ~GameStreamClient();
+    GameStreamClient()  = default;
+    ~GameStreamClient() = default;
 
     bool fetchSunshineServerinfo(const std::string& address, std::string& response);
     bool parseSunshineCurrentGame(const std::string& response, int& outCurrentGame);
 
+    mutable std::recursive_mutex m_mutex;
     std::map<std::string, SERVER_DATA> m_server_data;
-    std::map<std::string, STREAM_CONFIGURATION> m_last_stream_cfg; // address -> last released config
+    std::map<std::string, STREAM_CONFIGURATION> m_last_stream_cfg;
     std::map<std::string, std::vector<RemoteAppInfo>> m_app_lists;
     std::map<std::string, std::string> m_key_dirs;
     struct ActiveStream

@@ -156,7 +156,6 @@
         "center_region_title": "僅中心區域",
         "show_fps_title": "顯示 FPS",
         "save_debug_log_title": "保存調試日誌",
-        "ref_frame_title": "參考幀失效",
         "swap_interval": {
             "title": "V-Sync（交換間隔）",
             "options": {
@@ -180,7 +179,9 @@
                 "4": "多觸摸平板電腦"
             },
             "saved": "觸摸屏模式已保存",
-            "changed": "觸摸屏模式改爲:"
+            "changed": "觸摸屏模式改爲:",
+            "ds4_requires_playstation": "DS4 觸摸板需要 PlayStation 控制器類型",
+            "change_failed": "無法變更觸摸屏模式"
         },
         "gamepad_type": {
             "title": "控制器類型",

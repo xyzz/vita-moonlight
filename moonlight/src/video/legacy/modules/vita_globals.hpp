@@ -18,12 +18,14 @@
 #include "debug.hpp"
 #include "video/gxm_texture.hpp"
 #ifdef __cplusplus
+#include <atomic>
 #include <mutex>
 
 #include "gamestream/sps.h"
-extern gs::SpsContext* g_sps_ctx; // SPS context (raw pointer)
+extern gs::SpsContext* g_sps_ctx;
 #endif
 
+// Limelight mouse macros collide with Borealis controller enum members.
 #ifdef BUTTON_LEFT
 #undef BUTTON_LEFT
 #endif
@@ -59,26 +61,6 @@ extern int SCREEN_HEIGHT;
 // Pure copy failure threshold
 #define PURE_COPY_FAILURE_THRESHOLD 3
 
-// Video status info structure
-typedef struct
-{
-    VideoStatus status;
-    uint32_t framesRendered;
-    uint32_t framesDropped;
-    uint32_t framesDecoded;
-    uint32_t currentFps;
-    uint32_t targetFps;
-    uint64_t sessionMs;
-    int decoderWidth;
-    int decoderHeight;
-    int displayWidth;
-    int displayHeight;
-    bool scalingEnabled;
-} VideoStatusInfo;
-
-// Simple VideoSettings structure
-// Note: Using the existing VideoSettings from ConfigManager.hpp
-
 // Extern declarations
 extern VideoStatus video_status;
 extern uint32_t video_status_canary_pre;
@@ -109,7 +91,7 @@ extern uint32_t frame_publish_timestamp_us;
 
 extern image_scaling_settings image_scaling;
 
-extern bool active_video_thread;
+extern std::atomic<bool> active_video_thread;
 
 // Legacy modes removed
 
@@ -157,34 +139,67 @@ extern bool decoder_use_phys_fallback;
 extern VitaVideoStats g_stats;
 extern uint64_t stats_start_ms;
 extern uint64_t last_fps_window_ms;
-extern uint32_t curr_fps[2];
-extern SceUID pacer_thread;
-extern bool active_pacer_thread;
 
-extern indicator_status poor_net_indicator;
+namespace video_stats
+{
 
-// (SPS context temporarily disabled in simplified Vita build)
+inline uint32_t load(const uint32_t& value)
+{
+    return __atomic_load_n(&value, __ATOMIC_RELAXED);
+}
 
-extern VideoStatusInfo g_video_status_info;
+inline void store(uint32_t& target, uint32_t value)
+{
+    __atomic_store_n(&target, value, __ATOMIC_RELAXED);
+}
 
-extern ::VideoSettings g_video_settings_snapshot;
+inline void increment(uint32_t& target)
+{
+    __atomic_fetch_add(&target, 1, __ATOMIC_RELAXED);
+}
 
-// Flag to enable/disable debug logs
-extern bool g_debug_log_enabled;
+inline void add(uint32_t& target, uint32_t value)
+{
+    __atomic_fetch_add(&target, value, __ATOMIC_RELAXED);
+}
+
+inline uint32_t exchange(uint32_t& target, uint32_t value)
+{
+    return __atomic_exchange_n(&target, value, __ATOMIC_RELAXED);
+}
+
+inline void updateMinimum(uint32_t& target, uint32_t value)
+{
+    uint32_t current = load(target);
+    while (value < current
+        && !__atomic_compare_exchange_n(&target, &current, value, true,
+            __ATOMIC_RELAXED, __ATOMIC_RELAXED))
+    {
+    }
+}
+
+inline void updateMaximum(uint32_t& target, uint32_t value)
+{
+    uint32_t current = load(target);
+    while (value > current
+        && !__atomic_compare_exchange_n(&target, &current, value, true,
+            __ATOMIC_RELAXED, __ATOMIC_RELAXED))
+    {
+    }
+}
+
+}
 
 extern uint32_t g_decode_min_ms;
 extern uint32_t g_decode_max_ms;
 extern uint32_t g_decode_sum_ms;
 extern uint32_t g_decode_count;
 
-extern volatile bool g_session_stopping;
-
 // Function declarations
 void vitavideo_update_scaling_settings(int width, int height);
 void yuv_write_canaries();
 bool yuv_check_canaries();
 uint64_t vita_monotonic_ms();
-int vita_pacer_thread_main(SceSize args, void* argp);
 int vitavideo_init_1080p_internal_api(int width, int height, SceVideodecQueryInitInfoHwAvcdec* init);
 
 #endif // VITA_GLOBALS_H

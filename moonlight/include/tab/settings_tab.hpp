@@ -29,25 +29,13 @@ class SettingsTab : public brls::Box
     SettingsTab();
     ~SettingsTab() override;
 
-    BRLS_BIND(brls::RadioCell, radio, "radio");
-    BRLS_BIND(brls::BooleanCell, boolean, "boolean");
-    BRLS_BIND(brls::SelectorCell, selector, "selector");
-    BRLS_BIND(brls::InputCell, input, "input");
-    BRLS_BIND(brls::InputNumericCell, inputNumeric, "inputNumeric");
     BRLS_BIND(brls::DetailCell, ipAddress, "ipAddress");
-    BRLS_BIND(brls::DetailCell, dnsServer, "dnsServer");
-    BRLS_BIND(brls::BooleanCell, debug, "debug");
-    BRLS_BIND(brls::BooleanCell, bottomBar, "bottomBar");
-    BRLS_BIND(brls::BooleanCell, alwaysOnTop, "alwaysOnTop");
-    BRLS_BIND(brls::BooleanCell, fps, "fps");
     BRLS_BIND(brls::SelectorCell, swapInterval, "swapInterval");
     BRLS_BIND(brls::SliderCell, slider, "slider");
     BRLS_BIND(brls::SliderCell, settingsOpacitySlider, "settingsOpacitySlider");
     BRLS_BIND(brls::BooleanCell, keepAwakeToggle, "keepAwakeToggle");
-    BRLS_BIND(brls::DetailCell, notify, "notify");
     BRLS_BIND(brls::SelectorCell, languageSelector, "languageSelector");
 
-    // New elements for streaming configuration
     BRLS_BIND(brls::SelectorCell, renderModeSelector, "renderModeSelector");
     BRLS_BIND(brls::SelectorCell, streamResolutionSelector, "streamResolutionSelector");
     BRLS_BIND(brls::SelectorCell, resolutionSelector, "resolutionSelector");
@@ -58,12 +46,10 @@ class SettingsTab : public brls::Box
     BRLS_BIND(brls::BooleanCell, networkOptimizationsToggle, "networkOptimizationsToggle");
     BRLS_BIND(brls::BooleanCell, localAudioToggle, "localAudioToggle");
     BRLS_BIND(brls::BooleanCell, fullscreenToggle, "fullscreenToggle");
-    // lowLatencyToggle eliminated
     BRLS_BIND(brls::BooleanCell, framePacerToggle, "framePacerToggle");
     BRLS_BIND(brls::BooleanCell, centerRegionToggle, "centerRegionToggle");
     BRLS_BIND(brls::BooleanCell, showFpsToggle, "showFpsToggle");
     BRLS_BIND(brls::BooleanCell, debugLogToggle, "debugLogToggle");
-    BRLS_BIND(brls::BooleanCell, refFrameInvalidationToggle, "refFrameInvalidationToggle");
     BRLS_BIND(brls::DetailCell, gyroSettingsEntry, "gyroSettingsEntry");
     BRLS_BIND(brls::BooleanCell, doubleTapSprintToggle, "doubleTapSprintToggle");
     BRLS_BIND(brls::SelectorCell, touchscreenModeSelector, "touchscreenModeSelector");
@@ -76,11 +62,8 @@ class SettingsTab : public brls::Box
     BRLS_BIND(brls::DetailCell, frontTouchSettingsEntry, "frontTouchSettingsEntry");
     BRLS_BIND(brls::DetailCell, trackpadSettingsEntry, "trackpadSettingsEntry");
 
-    // Microphone settings
     BRLS_BIND(brls::BooleanCell, microphoneToggle, "microphoneToggle");
     BRLS_BIND(brls::DetailCell, microphoneConfigureCell, "microphoneConfigureCell");
-
-    static inline brls::SelectorCell* languageSelectorPtr = nullptr;
 
     static brls::View* create();
 

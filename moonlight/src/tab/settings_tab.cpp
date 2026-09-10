@@ -20,16 +20,16 @@
 #include <fmt/format.h>
 
 #include <algorithm>
-#include <cstdlib>
 #include <memory>
 #include <string>
 
 #include "ConfigManager.hpp"
 #include "controller/ControllerInput.hpp"
 #include "session/session_main.hpp"
+#include "session/stream_config.hpp"
 #include "tab/front_touch_settings_tab.hpp"
 #include "tab/gyro_settings_tab.hpp"
-#include "tab/keyboard_settings_tab.hpp" // NUEVO
+#include "tab/keyboard_settings_tab.hpp"
 #include "tab/microphone_settings_tab.hpp"
 #include "tab/rear_touch_settings_tab.hpp"
 #include "tab/shortcuts_settings_tab.hpp"
@@ -43,42 +43,20 @@
 #ifdef _WIN32
 #include <windows.h>
 #endif
-#include "audio/MicrophoneTester.hpp"
-#include "network/NetworkOptimizations.hpp"
-#include "settings.hpp"
-#include "video/render_mode_cache.hpp"
-
-using namespace brls::literals; // for _i18n
-
+#include "Settings.hpp"
 #include "debug.hpp"
-
-bool radioSelected = false;
-
-static std::vector<std::string> NOTIFICATIONS = {
-    "You have cool hair",
-    "I like your shoes",
-    "borealis is powered by nanovg",
-    "The Triforce is an inside job",
-    "Pozznx will trigger in one day and twelve hours",
-    "Aurora Borealis? At this time of day, at this time of year, in this part of the gaming market, located entirely within your Switch?!",
-    "May I see it?",
-    "Hmm, Steamed Hams!",
-    "Hello\nWorld!"
-};
+#include "network/NetworkOptimizations.hpp"
+#include "video/runtime_settings.hpp"
 
 static void saveSettingsOpacity(float value)
 {
     ConfigManager config;
-    config.load();
-    VideoSettings settings               = config.getVideoSettings();
-    settings.settings_background_opacity = value;
-    config.setVideoSettings(settings);
-    config.save();
+    config.updateVideoSettings([value](VideoSettings& settings)
+        { settings.settings_background_opacity = value; });
 }
 
 SettingsTab::SettingsTab()
 {
-    // Inflate the tab from the XML file
     this->inflateFromXMLRes("xml/tabs/settings.xml");
 
     ConfigManager config;
@@ -96,9 +74,6 @@ SettingsTab::SettingsTab()
             value = std::max(0.0f, std::min(1.0f, value));
             moonlight::settings::applyBackground(this, value);
             settingsOpacitySlider->setDetailText(fmt::format("{:.0f}%", value * 100.0f));
-
-            extern VideoSettings g_video_settings_snapshot;
-            g_video_settings_snapshot.settings_background_opacity = value;
 
             std::shared_ptr<AsyncState> state = asyncState;
             state->pendingOpacity.store(value, std::memory_order_release);
@@ -121,23 +96,17 @@ SettingsTab::SettingsTab()
         [](bool value)
         {
             ConfigManager config;
-            config.load();
-            VideoSettings settings              = config.getVideoSettings();
-            settings.keep_awake_while_streaming = value;
-            config.setVideoSettings(settings);
-            config.save();
-            extern VideoSettings g_video_settings_snapshot;
-            g_video_settings_snapshot.keep_awake_while_streaming = value;
+            config.updateVideoSettings([value](VideoSettings& settings)
+                { settings.keep_awake_while_streaming = value; });
             SessionMainView::setKeepAwakeWhileStreaming(value);
         });
 
-    // Auto-synchronize correct format settings on startup
     bool configChanged = false;
     if (videoSettings.render_mode == 0)
     {
         if (videoSettings.pixel_format_mode != 0 && videoSettings.pixel_format_mode != 1)
         {
-            videoSettings.pixel_format_mode = 1; // Default to YUV for high performance
+            videoSettings.pixel_format_mode = 1;
             configChanged                   = true;
         }
     }
@@ -151,31 +120,24 @@ SettingsTab::SettingsTab()
     }
     if (configChanged)
     {
-        config.setVideoSettings(videoSettings);
-        config.save();
+        const int pixelFormat = videoSettings.pixel_format_mode;
+        config.updateVideoSettings([pixelFormat](VideoSettings& settings)
+            { settings.pixel_format_mode = pixelFormat; });
     }
-    extern VideoSettings g_video_settings_snapshot;
-    g_video_settings_snapshot.pixel_format_mode = videoSettings.pixel_format_mode;
+    video_runtime::setPixelFormatMode(videoSettings.pixel_format_mode);
 
-    // Initialize global flag for debug logs
-    extern bool g_debug_log_enabled;
-    g_debug_log_enabled = videoSettings.save_debug_log;
     if (videoSettings.save_debug_log)
     {
         enable_file_logging(true);
     }
 
-    // Initialize network optimizations
     vita_netopt_set_enabled(videoSettings.enable_network_optimizations ? 1 : 0);
 
-    // Render mode selector (Direct GXM removed): 0=Legacy, 1=FFmpeg (future)
     std::vector<std::string> renderModes;
     renderModes.push_back(brls::getStr("moonlight/settings_tab/render_mode/legacy_option"));
     renderModes.push_back(brls::getStr("moonlight/settings_tab/render_mode/modern_option"));
-    auto updateModeDependentVisibility = [this](int renderMode, bool persistReset)
+    auto updateModeDependentVisibility = [this](int renderMode)
     {
-        (void)persistReset;
-
         if (pixelFormatSelector)
         {
             if (renderMode == 0)
@@ -191,29 +153,26 @@ SettingsTab::SettingsTab()
 
     int initialRenderMode = videoSettings.render_mode;
     if (initialRenderMode < 0 || initialRenderMode >= (int)renderModes.size())
-        initialRenderMode = 0; // clamp if config has unknown value
-    renderModeSelector->init(brls::getStr("moonlight/settings_tab/render_mode/title"), renderModes, initialRenderMode, [this, updateModeDependentVisibility](int selected)
+        initialRenderMode = 0;
+    renderModeSelector->init(brls::getStr("moonlight/settings_tab/render_mode/title"), renderModes, initialRenderMode, [updateModeDependentVisibility](int selected)
         {
         ConfigManager config;
-        config.load();
-        VideoSettings settings = config.getVideoSettings();
-        int chosen = selected; // allow modern/ffmpeg
-        settings.render_mode = chosen; // 0=legacy,1=ffmpeg
-        if (chosen == 0) {
-            if (settings.pixel_format_mode != 0 && settings.pixel_format_mode != 1) {
-                settings.pixel_format_mode = 1; // Default to YUV for high performance
+        int chosen = selected;
+        int pixelFormat = 1;
+        config.updateVideoSettings([chosen, &pixelFormat](VideoSettings& settings) {
+            settings.render_mode = chosen;
+            if (chosen == 0) {
+                if (settings.pixel_format_mode != 0 && settings.pixel_format_mode != 1) {
+                    settings.pixel_format_mode = 1;
+                }
+            } else if (chosen == 1) {
+                settings.pixel_format_mode = 1;
             }
-        } else if (chosen == 1) {
-            settings.pixel_format_mode = 1; // FFmpeg uses YUV
-        }
-        config.setVideoSettings(settings);
-        config.save();
-        // Update atomic cache without subsequent re-reading
-        set_render_mode_cached(chosen);
-        updateModeDependentVisibility(chosen, true);
-        extern VideoSettings g_video_settings_snapshot;
-        g_video_settings_snapshot.render_mode = chosen;
-        g_video_settings_snapshot.pixel_format_mode = settings.pixel_format_mode;
+            pixelFormat = settings.pixel_format_mode;
+        });
+        updateModeDependentVisibility(chosen);
+        video_runtime::setRenderMode(chosen);
+        video_runtime::setPixelFormatMode(pixelFormat);
         const char* modeNameKey = nullptr;
         if (chosen == 0) {
             modeNameKey = "moonlight/settings_tab/render_mode/legacy_name";
@@ -227,40 +186,22 @@ SettingsTab::SettingsTab()
         brls::Application::notify(
             brls::getStr("moonlight/settings_tab/render_mode/notify", brls::getStr(modeNameKey))); });
 
-    // Pixel format selector (for RGBA vs YUV tests)
     std::vector<std::string> pixelFormats = {
         brls::getStr("moonlight/settings_tab/pixel_format/rgba"),
         brls::getStr("moonlight/settings_tab/pixel_format/yuv")
     };
-    pixelFormatSelector->init(brls::getStr("moonlight/settings_tab/pixel_format/title"), pixelFormats, videoSettings.pixel_format_mode, [this, pixelFormats](int selected)
+    pixelFormatSelector->init(brls::getStr("moonlight/settings_tab/pixel_format/title"), pixelFormats, videoSettings.pixel_format_mode, [pixelFormats](int selected)
         {
         ConfigManager config;
-        config.load();
-        VideoSettings settings = config.getVideoSettings();
-        settings.pixel_format_mode = selected;
-        config.setVideoSettings(settings);
-        config.save();
-        extern VideoSettings g_video_settings_snapshot;
-        g_video_settings_snapshot.pixel_format_mode = selected;
+        config.updateVideoSettings([selected](VideoSettings& settings) { settings.pixel_format_mode = selected; });
+        video_runtime::setPixelFormatMode(selected);
         const std::string& label = pixelFormats.at(static_cast<std::size_t>(selected));
         brls::Application::notify(
             brls::getStr("moonlight/settings_tab/pixel_format/notify", label)); });
 
-    updateModeDependentVisibility(initialRenderMode, false);
+    updateModeDependentVisibility(initialRenderMode);
 
-    const std::vector<std::pair<int, int>> streamResolutionValues = {
-        { 848, 480 },
-        { 960, 540 },
-        { 960, 544 },
-        { 1024, 576 },
-        { 1152, 648 },
-        { 1280, 540 },
-        { 1280, 720 },
-        { 1366, 768 },
-        // Higher modes build up decoder latency instead of sustaining the requested frame rate.
-        // {1600, 900},
-        // {1920, 1080}
-    };
+    const auto& streamResolutionValues = stream::supportedStreamResolutions();
     std::vector<std::string> streamResolutions;
     streamResolutions.reserve(streamResolutionValues.size());
     for (std::size_t i = 0; i < streamResolutionValues.size(); ++i)
@@ -269,38 +210,30 @@ SettingsTab::SettingsTab()
             "moonlight/settings_tab/stream_resolution/options/" + std::to_string(i)));
     }
 
-    int currentStreamResolution = 2;
-    for (std::size_t i = 0; i < streamResolutionValues.size(); ++i)
-    {
-        if (streamResolutionValues[i].first == streamConfig.streamWidth && streamResolutionValues[i].second == streamConfig.streamHeight)
-        {
-            currentStreamResolution = static_cast<int>(i);
-            break;
-        }
-    }
+    int currentStreamResolution = static_cast<int>(stream::streamResolutionIndex(
+        streamConfig.streamWidth, streamConfig.streamHeight));
     streamResolutionSelector->init(
         brls::getStr("moonlight/settings_tab/stream_resolution/title"),
         streamResolutions,
         currentStreamResolution,
-        [streamResolutionValues](int selected)
+        [](int selected)
         {
+            const auto& streamResolutionValues = stream::supportedStreamResolutions();
             if (selected < 0 || selected >= static_cast<int>(streamResolutionValues.size()))
             {
                 return;
             }
 
             ConfigManager config;
-            config.load();
-            StreamConfiguration settings = config.getStreamConfig();
-            settings.streamWidth         = streamResolutionValues[selected].first;
-            settings.streamHeight        = streamResolutionValues[selected].second;
-            config.setStreamConfig(settings);
-            config.save();
+            const auto resolution = streamResolutionValues[selected];
+            config.updateStreamConfig([resolution](StreamConfiguration& settings)
+                {
+                settings.streamWidth  = resolution.width;
+                settings.streamHeight = resolution.height; });
             brls::Application::notify(
                 brls::getStr("moonlight/settings_tab/stream_resolution/saved"));
         });
 
-    // Host monitor resolution is applied by Moonmic and is independent of the decoder mode.
     std::vector<std::string> resolutions = {
         brls::getStr("moonlight/settings_tab/resolution/options/0"),
         brls::getStr("moonlight/settings_tab/resolution/options/1"),
@@ -313,27 +246,8 @@ SettingsTab::SettingsTab()
         brls::getStr("moonlight/settings_tab/resolution/options/8")
     };
 
-    const std::vector<std::pair<int, int>> hostResolutions = {
-        { 0, 0 },
-        { 960, 544 },
-        { 1024, 576 },
-        { 1152, 648 },
-        { 1280, 540 },
-        { 1280, 720 },
-        { 1366, 768 },
-        { 1600, 900 },
-        { 1920, 1080 }
-    };
-
-    int currentRes = 0;
-    for (std::size_t i = 0; i < hostResolutions.size(); ++i)
-    {
-        if (hostResolutions[i].first == streamConfig.width && hostResolutions[i].second == streamConfig.height)
-        {
-            currentRes = static_cast<int>(i);
-            break;
-        }
-    }
+    const auto& hostResolutions = stream::supportedHostResolutions();
+    int currentRes              = static_cast<int>(stream::hostResolutionIndex(streamConfig.width, streamConfig.height));
 
     resolutionSelector->init(brls::getStr("moonlight/settings_tab/resolution/title"), resolutions, currentRes, [hostResolutions](int selected)
         {
@@ -342,15 +256,13 @@ SettingsTab::SettingsTab()
         }
 
         ConfigManager config;
-        config.load();
-        StreamConfiguration streamConfig = config.getStreamConfig();
-        streamConfig.width = hostResolutions[selected].first;
-        streamConfig.height = hostResolutions[selected].second;
-        config.setStreamConfig(streamConfig);
-        config.save();
+        const auto resolution = hostResolutions[selected];
+        config.updateStreamConfig([resolution](StreamConfiguration& streamConfig) {
+            streamConfig.width  = resolution.width;
+            streamConfig.height = resolution.height;
+        });
         brls::Application::notify(brls::getStr("moonlight/settings_tab/resolution/saved")); });
 
-    // Configure FPS selector with legacy values
     std::vector<std::string> fpsOptions = {
         brls::getStr("moonlight/settings_tab/fps/options/0"),
         brls::getStr("moonlight/settings_tab/fps/options/1"),
@@ -358,34 +270,18 @@ SettingsTab::SettingsTab()
         brls::getStr("moonlight/settings_tab/fps/options/3"),
         brls::getStr("moonlight/settings_tab/fps/options/4")
     };
-    int currentFps = 4; // Default 60 FPS (index 4)
-    if (streamConfig.fps == 24)
-        currentFps = 0;
-    else if (streamConfig.fps == 30)
-        currentFps = 1;
-    else if (streamConfig.fps == 40)
-        currentFps = 2;
-    else if (streamConfig.fps == 50)
-        currentFps = 3;
+    int currentFps = static_cast<int>(stream::frameRateIndex(streamConfig.fps));
 
-    fpsSelector->init(brls::getStr("moonlight/settings_tab/fps/title"), fpsOptions, currentFps, [this](int selected)
+    fpsSelector->init(brls::getStr("moonlight/settings_tab/fps/title"), fpsOptions, currentFps, [](int selected)
         {
         ConfigManager config;
-        config.load();
-        StreamConfiguration streamConfig = config.getStreamConfig();
-
-        switch (selected) {
-            case 0: streamConfig.fps = 24; break; // Cine
-            case 1: streamConfig.fps = 30; break; // Standard
-            case 2: streamConfig.fps = 40; break;
-            case 3: streamConfig.fps = 50; break; // PAL
-            case 4: streamConfig.fps = 60; break; // NTSC
-        }
-        config.setStreamConfig(streamConfig);
-        config.save();
+        const auto& fpsValues = stream::supportedFrameRates();
+        if (selected < 0 || selected >= static_cast<int>(fpsValues.size()))
+            return;
+        const int fps = fpsValues[selected];
+        config.updateStreamConfig([fps](StreamConfiguration& streamConfig) { streamConfig.fps = fps; });
         brls::Application::notify(brls::getStr("moonlight/settings_tab/fps/saved")); });
 
-    // Configure bitrate selector with appropriate values ​​for PS Vita
     std::vector<std::string> bitrateOptions = {
         brls::getStr("moonlight/settings_tab/bitrate/options/0"),
         brls::getStr("moonlight/settings_tab/bitrate/options/1"),
@@ -398,154 +294,63 @@ SettingsTab::SettingsTab()
         brls::getStr("moonlight/settings_tab/bitrate/options/8")
     };
 
-    int currentBitrate = 0; // Auto by default
-    if (streamConfig.bitrate == 2000)
-        currentBitrate = 1;
-    else if (streamConfig.bitrate == 5000)
-        currentBitrate = 2;
-    else if (streamConfig.bitrate == 8000)
-        currentBitrate = 3;
-    else if (streamConfig.bitrate == 10000)
-        currentBitrate = 4;
-    else if (streamConfig.bitrate == 15000)
-        currentBitrate = 5;
-    else if (streamConfig.bitrate == 20000)
-        currentBitrate = 6;
-    else if (streamConfig.bitrate == 30000)
-        currentBitrate = 7;
-    else if (streamConfig.bitrate == 50000)
-        currentBitrate = 8;
+    int currentBitrate = static_cast<int>(stream::bitrateIndex(streamConfig.bitrate));
 
-    bitrateSelector->init(brls::getStr("moonlight/settings_tab/bitrate/title"), bitrateOptions, currentBitrate, [this](int selected)
+    bitrateSelector->init(brls::getStr("moonlight/settings_tab/bitrate/title"), bitrateOptions, currentBitrate, [](int selected)
         {
         ConfigManager config;
-        config.load();
-        StreamConfiguration streamConfig = config.getStreamConfig();
-
-        switch (selected) {
-            case 0: streamConfig.bitrate = -1; break; // Auto
-            case 1: streamConfig.bitrate = 2000; break;
-            case 2: streamConfig.bitrate = 5000; break;
-            case 3: streamConfig.bitrate = 8000; break;
-            case 4: streamConfig.bitrate = 10000; break;
-            case 5: streamConfig.bitrate = 15000; break;
-            case 6: streamConfig.bitrate = 20000; break;
-            case 7: streamConfig.bitrate = 30000; break;
-            case 8: streamConfig.bitrate = 50000; break;
-        }
-        config.setStreamConfig(streamConfig);
-        config.save();
+        const auto& bitrateValues = stream::supportedBitrates();
+        if (selected < 0 || selected >= static_cast<int>(bitrateValues.size()))
+            return;
+        const int bitrate = bitrateValues[selected];
+        config.updateStreamConfig([bitrate](StreamConfiguration& streamConfig) { streamConfig.bitrate = bitrate; });
         brls::Application::notify(brls::getStr("moonlight/settings_tab/bitrate/saved")); });
 
-    // SOPS (Sound Over PS Network) - Force Enabled for MoonMic compatibility
-    // Hidden from UI to prevent accidental disable
     sopsToggle->setVisibility(brls::Visibility::GONE);
     if (!videoSettings.sops)
     {
         ConfigManager config;
-        config.load();
-        VideoSettings settings = config.getVideoSettings();
-        settings.sops          = true;
-        config.setVideoSettings(settings);
-        config.save();
+        config.updateVideoSettings([](VideoSettings& settings)
+            { settings.sops = true; });
     }
-    /*
-    sopsToggle->init(brls::getStr("moonlight/settings_tab/sops_title"), videoSettings.sops, [this](bool value) {
-        ConfigManager config;
-        config.load();
-        VideoSettings settings = config.getVideoSettings();
-        settings.sops = value;
-        config.setVideoSettings(settings);
-        config.save();
-    });
-    */
-
-    // Toggle for network optimizations (IDR smart, pacing, etc.)
-    networkOptimizationsToggle->init(brls::getStr("moonlight/settings_tab/network_opt_title"), videoSettings.enable_network_optimizations, [this](bool value)
+    networkOptimizationsToggle->init(brls::getStr("moonlight/settings_tab/network_opt_title"), videoSettings.enable_network_optimizations, [](bool value)
         {
         ConfigManager config;
-        config.load();
-        VideoSettings settings = config.getVideoSettings();
-        settings.enable_network_optimizations = value;
-        config.setVideoSettings(settings);
-        config.save();
-        // Apply immediately
+        config.updateVideoSettings([value](VideoSettings& settings) { settings.enable_network_optimizations = value; });
         vita_netopt_set_enabled(value ? 1 : 0);
         brls::Application::notify(brls::getStr(value ? "moonlight/settings_tab/network_opt_enabled" : "moonlight/settings_tab/network_opt_disabled")); });
 
-    localAudioToggle->init(brls::getStr("moonlight/settings_tab/local_audio_title"), videoSettings.localaudio, [this](bool value)
+    localAudioToggle->init(brls::getStr("moonlight/settings_tab/local_audio_title"), videoSettings.localaudio, [](bool value)
         {
         ConfigManager config;
-        config.load();
-        VideoSettings settings = config.getVideoSettings();
-        settings.localaudio = value;
-        config.setVideoSettings(settings);
-        config.save(); });
+        config.updateVideoSettings([value](VideoSettings& settings) { settings.localaudio = value; }); });
 
-    fullscreenToggle->init(brls::getStr("moonlight/settings_tab/fullscreen_title"), videoSettings.fullscreen, [this](bool value)
+    fullscreenToggle->init(brls::getStr("moonlight/settings_tab/fullscreen_title"), videoSettings.fullscreen, [](bool value)
         {
         ConfigManager config;
-        config.load();
-        VideoSettings settings = config.getVideoSettings();
-        settings.fullscreen = value;
-        config.setVideoSettings(settings);
-        config.save(); });
+        config.updateVideoSettings([value](VideoSettings& settings) { settings.fullscreen = value; }); });
 
-    // Low Latency removed: toggle removed
-
-    framePacerToggle->init(brls::getStr("moonlight/settings_tab/frame_pacer_title"), videoSettings.enable_frame_pacer, [this](bool value)
+    framePacerToggle->init(brls::getStr("moonlight/settings_tab/frame_pacer_title"), videoSettings.enable_frame_pacer, [](bool value)
         {
         ConfigManager config;
-        config.load();
-        VideoSettings settings = config.getVideoSettings();
-        settings.enable_frame_pacer = value;
-        config.setVideoSettings(settings);
-        config.save();
-        extern VideoSettings g_video_settings_snapshot;
-        g_video_settings_snapshot.enable_frame_pacer = value; });
+        config.updateVideoSettings([value](VideoSettings& settings) { settings.enable_frame_pacer = value; }); });
 
-    centerRegionToggle->init(brls::getStr("moonlight/settings_tab/center_region_title"), videoSettings.center_region_only, [this](bool value)
+    centerRegionToggle->init(brls::getStr("moonlight/settings_tab/center_region_title"), videoSettings.center_region_only, [](bool value)
         {
         ConfigManager config;
-        config.load();
-        VideoSettings settings = config.getVideoSettings();
-        settings.center_region_only = value;
-        config.setVideoSettings(settings);
-        config.save(); });
+        config.updateVideoSettings([value](VideoSettings& settings) { settings.center_region_only = value; }); });
 
-    showFpsToggle->init(brls::getStr("moonlight/settings_tab/show_fps_title"), videoSettings.show_fps, [this](bool value)
+    showFpsToggle->init(brls::getStr("moonlight/settings_tab/show_fps_title"), videoSettings.show_fps, [](bool value)
         {
         ConfigManager config;
-        config.load();
-        VideoSettings settings = config.getVideoSettings();
-        settings.show_fps = value;
-        config.setVideoSettings(settings);
-        config.save();
-        // Update global snapshot for immediate changes
-        extern VideoSettings g_video_settings_snapshot;
-        g_video_settings_snapshot.show_fps = value; });
+        config.updateVideoSettings([value](VideoSettings& settings) { settings.show_fps = value; });
+        video_runtime::setShowFps(value); });
 
-    debugLogToggle->init(brls::getStr("moonlight/settings_tab/save_debug_log_title"), videoSettings.save_debug_log, [this](bool value)
+    debugLogToggle->init(brls::getStr("moonlight/settings_tab/save_debug_log_title"), videoSettings.save_debug_log, [](bool value)
         {
         ConfigManager config;
-        config.load();
-        VideoSettings settings = config.getVideoSettings();
-        settings.save_debug_log = value;
-        config.setVideoSettings(settings);
-        config.save();
-        // Update global flag for debug logs
-        extern bool g_debug_log_enabled;
-        g_debug_log_enabled = value;
+        config.updateVideoSettings([value](VideoSettings& settings) { settings.save_debug_log = value; });
         enable_file_logging(value); });
-
-    refFrameInvalidationToggle->init(brls::getStr("moonlight/settings_tab/ref_frame_title"), videoSettings.enable_ref_frame_invalidation, [this](bool value)
-        {
-        ConfigManager config;
-        config.load();
-        VideoSettings settings = config.getVideoSettings();
-        settings.enable_ref_frame_invalidation = value;
-        config.setVideoSettings(settings);
-        config.save(); });
 
     if (gyroSettingsEntry)
     {
@@ -557,14 +362,10 @@ SettingsTab::SettingsTab()
             return true; });
     }
 
-    doubleTapSprintToggle->init(brls::getStr("moonlight/settings_tab/double_tap_sprint_title"), videoSettings.enable_double_tap_sprint, [this](bool value)
+    doubleTapSprintToggle->init(brls::getStr("moonlight/settings_tab/double_tap_sprint_title"), videoSettings.enable_double_tap_sprint, [](bool value)
         {
         ConfigManager config;
-        config.load();
-        VideoSettings settings = config.getVideoSettings();
-        settings.enable_double_tap_sprint = value;
-        config.setVideoSettings(settings);
-        config.save(); });
+        config.updateVideoSettings([value](VideoSettings& settings) { settings.enable_double_tap_sprint = value; }); });
 
     if (rearTouchSettingsEntry)
     {
@@ -586,7 +387,6 @@ SettingsTab::SettingsTab()
             return true; });
     }
 
-    // Trackpad Settings Entry
     if (trackpadSettingsEntry)
     {
         trackpadSettingsEntry->setDetailText(brls::getStr("moonlight/trackpad/header"));
@@ -597,7 +397,6 @@ SettingsTab::SettingsTab()
             return true; });
     }
 
-    // Configure touchscreen mode selector
     std::vector<std::string> touchscreenModes = {
         brls::getStr("moonlight/settings_tab/touchscreen_mode/options/0"),
         brls::getStr("moonlight/settings_tab/touchscreen_mode/options/1"),
@@ -605,39 +404,29 @@ SettingsTab::SettingsTab()
         brls::getStr("moonlight/settings_tab/touchscreen_mode/options/3"),
         brls::getStr("moonlight/settings_tab/touchscreen_mode/options/4")
     };
-    touchscreenModeSelector->init(brls::getStr("moonlight/settings_tab/touchscreen_mode/title"), touchscreenModes, videoSettings.touchscreen_mode, [this, touchscreenModes](int selected)
+    touchscreenModeSelector->init(brls::getStr("moonlight/settings_tab/touchscreen_mode/title"), touchscreenModes, videoSettings.touchscreen_mode, [touchscreenModes](int selected)
         {
-        // Change touch mode at runtime (same as gamepad type)
         if (g_controllerInput && g_controllerInput->setTouchscreenModeRuntime(selected)) {
-            // Success: Show notification with mode selected
             std::string message = brls::getStr("moonlight/settings_tab/touchscreen_mode/changed") +
                                   " " + touchscreenModes.at(selected);
             brls::Application::notify(message);
         } else {
-            // Error: show incompatibility notification
-            if (selected == 2) { // TOUCHSCREEN_MODE_DS4_TOUCHPAD
-                brls::Application::notify("⚠ DS4 Touchpad solo compatible con PlayStation");
+            if (selected == TOUCHSCREEN_MODE_DS4_TOUCHPAD) {
+                brls::Application::notify(brls::getStr("moonlight/settings_tab/touchscreen_mode/ds4_requires_playstation"));
             } else {
-                brls::Application::notify("⚠ No se pudo cambiar el modo táctil");
+                brls::Application::notify(brls::getStr("moonlight/settings_tab/touchscreen_mode/change_failed"));
             }
         } });
 
-    // Configure gamepad type selector (Xbox vs PS4)
     std::vector<std::string> gamepadTypes = {
         brls::getStr("moonlight/settings_tab/gamepad_type/options/xbox"),
         brls::getStr("moonlight/settings_tab/gamepad_type/options/ps4")
     };
-    gamepadTypeSelector->init(brls::getStr("moonlight/settings_tab/gamepad_type/title"), gamepadTypes, (int)videoSettings.gamepad_type, [this, gamepadTypes](int selected)
+    gamepadTypeSelector->init(brls::getStr("moonlight/settings_tab/gamepad_type/title"), gamepadTypes, (int)videoSettings.gamepad_type, [gamepadTypes](int selected)
         {
         ConfigManager config;
-        config.load();
-        VideoSettings settings = config.getVideoSettings();
         GamepadType newType = (selected == 0) ? GAMEPAD_TYPE_XBOX : GAMEPAD_TYPE_PS4;
-        settings.gamepad_type = newType;
-        config.setVideoSettings(settings);
-        config.save();
-
-        // Change gamepad type live without restarting session
+        config.updateVideoSettings([newType](VideoSettings& settings) { settings.gamepad_type = newType; });
         if (g_controllerInput) {
             g_controllerInput->setGamepadType(newType);
             std::string message = brls::getStr("moonlight/settings_tab/gamepad_type/notify_prefix") +
@@ -651,26 +440,18 @@ SettingsTab::SettingsTab()
         [](bool value)
         {
             ConfigManager config;
-            config.load();
-            VideoSettings settings     = config.getVideoSettings();
-            settings.capture_ps_button = value;
-            config.setVideoSettings(settings);
-            config.save();
+            config.updateVideoSettings([value](VideoSettings& settings)
+                { settings.capture_ps_button = value; });
             if (g_controllerInput)
             {
                 g_controllerInput->setPSButtonCapture(value);
             }
         });
 
-    // Configure swap shoulder buttons toggle
-    swapShoulderButtonsToggle->init(brls::getStr("moonlight/settings_tab/swap_shoulder_buttons/title"), videoSettings.swap_shoulder_buttons, [this](bool value)
+    swapShoulderButtonsToggle->init(brls::getStr("moonlight/settings_tab/swap_shoulder_buttons/title"), videoSettings.swap_shoulder_buttons, [](bool value)
         {
         ConfigManager config;
-        config.load();
-        VideoSettings settings = config.getVideoSettings();
-        settings.swap_shoulder_buttons = value;
-        config.setVideoSettings(settings);
-        config.save();
+        config.updateVideoSettings([value](VideoSettings& settings) { settings.swap_shoulder_buttons = value; });
         if (g_controllerInput) {
             g_controllerInput->setSwapShoulderButtons(value);
         }
@@ -678,7 +459,6 @@ SettingsTab::SettingsTab()
             ? "moonlight/settings_tab/swap_shoulder_buttons/notify_enabled"
             : "moonlight/settings_tab/swap_shoulder_buttons/notify_disabled")); });
 
-    // NUEVO: Configure Keyboard button
     if (keyboardConfigureCell)
     {
         keyboardConfigureCell->setDetailText(brls::getStr("moonlight/keyboard/configure_detail"));
@@ -699,108 +479,34 @@ SettingsTab::SettingsTab()
             return true; });
     }
 
-    // Enable Microphone toggle
     microphoneToggle->init(
         brls::getStr("moonlight/settings_tab/microphone_enabled_title"),
         videoSettings.enable_microphone,
-        [this](bool value)
+        [](bool value)
         {
             ConfigManager config;
-            config.load();
-            VideoSettings settings     = config.getVideoSettings();
-            settings.enable_microphone = value;
-            config.setVideoSettings(settings);
-            config.save();
-
-            // Note: Microphone will auto-start when streaming session begins
-            // if enable_microphone is true
+            config.updateVideoSettings([value](VideoSettings& settings)
+                { settings.enable_microphone = value; });
 
             brls::Application::notify(
                 value ? brls::getStr("moonlight/settings_tab/microphone_enabled")
                       : brls::getStr("moonlight/settings_tab/microphone_disabled"));
-
-            return true; // Return true to indicate successful save
         });
 
-    // Configure Microphone button (opens dedicated settings view)
-    microphoneConfigureCell->registerClickAction([](brls::View* view)
+    microphoneConfigureCell->registerClickAction([](brls::View*)
         {
         auto* micView = new MicrophoneSettingsTab();
         moonlight::settings::pushView(micView, brls::getStr("moonlight/microphone/title"));
         return true; });
 
-    // Configure system options (original)
-    radio->title->setText("Radio cell");
-    radio->setSelected(radioSelected);
-    radio->registerClickAction([this](brls::View* view)
-        {
-        radioSelected = !radioSelected;
-        this->radio->setSelected(radioSelected);
-        return true; });
-
-    boolean->title->setText("Switcher");
-
-    debug->init("Debug Layer", brls::Application::isDebuggingViewEnabled(), [](bool value)
-        {
-        brls::Application::enableDebuggingView(value);
-        brls::sync([value](){
-            vita_log::info("%s the debug layer", value ? "Open" : "Close");
-        }); });
-
-    bottomBar->init("Bottom Bar", !brls::AppletFrame::HIDE_BOTTOM_BAR, [](bool value)
-        {
-        brls::AppletFrame::HIDE_BOTTOM_BAR = !value;
-        auto stack = brls::Application::getActivitiesStack();
-        for (auto& activity : stack) {
-            auto* frame = dynamic_cast<brls::AppletFrame*>(
-                activity->getContentView());
-            if (!frame) continue;
-            frame->setFooterVisibility(!value ? brls::Visibility::GONE
-                                             : brls::Visibility::VISIBLE);
-        } });
-
-    fps->init("FPS", brls::Application::getFPSStatus(), [](bool value)
-        { brls::Application::setFPSStatus(value); });
-
-    alwaysOnTop->init("Always On Top", false, [](bool value)
-        { brls::Application::getPlatform()->setWindowAlwaysOnTop(value); });
-
-    selector->init("Selector", { "Test 1", "Test 2", "Test 3", "Test 4", "Test 5", "Test 6", "Test 7", "Test 8", "Test 9", "Test 10", "Test 11", "Test 12", "Test 13" }, 0, [](int selected) {}, [](int selected)
-        {
-        auto dialog = new brls::Dialog(fmt::format("selected {}", selected));
-        dialog->addButton("hints/ok"_i18n, []() {});
-        dialog->open(); });
-
-    input->init(
-        "Input text", "https://github.com", [](std::string text) {
-
-        },
-        "Placeholder", "Hint");
-
-    inputNumeric->init(
-        "Input number", 2448, [](int number) {
-
-        },
-        "Hint");
-
-    // Async Init for system stats (IP, DNS, Brightness) to avoid lag
     ipAddress->setDetailText("...");
-    dnsServer->setDetailText("...");
 
-    input->registerAction("hints/open"_i18n, brls::BUTTON_X, [](brls::View* view)
-        {
-        brls::DetailCell *cell = dynamic_cast<brls::DetailCell *>(view);
-        brls::Application::getPlatform()->openBrowser(cell->detail->getFullText());
-        return true; }, false, false, brls::SOUND_CLICK);
-
-    // Initial dummy value, updated async
     slider->init("Brightness", 0.0f, [this](float value)
         {
         brls::Application::getPlatform()->setBacklightBrightness(value);
         slider->setDetailText(fmt::format("{:.2f}", value)); });
     slider->setDetailText("...");
 
-    // Configure Swap Interval (V-Sync)
     std::vector<std::string> swapIntervalOptions = {
         brls::getStr("moonlight/settings_tab/swap_interval/options/0"),
         brls::getStr("moonlight/settings_tab/swap_interval/options/1"),
@@ -815,27 +521,13 @@ SettingsTab::SettingsTab()
         {
         if (selected >= 0 && selected <= 4) {
             ConfigManager config;
-            config.load();
-            VideoSettings settings = config.getVideoSettings();
-            settings.swap_interval = selected;
-            config.setVideoSettings(settings);
-            config.save();
-
-            extern VideoSettings g_video_settings_snapshot;
-            g_video_settings_snapshot.swap_interval = selected;
+            config.updateVideoSettings([selected](VideoSettings& settings) { settings.swap_interval = selected; });
 
             moonlight::settings::applySwapInterval(selected);
             brls::Application::notify(brls::getStr("moonlight/settings_tab/swap_interval/saved"));
         } });
 
-    // Start background loading
     this->initAsync();
-
-    notify->registerClickAction([](...)
-        {
-        std::string notification = NOTIFICATIONS[std::rand() % NOTIFICATIONS.size()];
-        brls::Application::notify(notification);
-        return true; });
 
     std::vector<std::string> languages;
     const auto& languageOptions = moonlight::settings::supportedLanguages();
@@ -851,7 +543,6 @@ SettingsTab::SettingsTab()
                 return;
             std::string locale = languageOptions[selected].locale;
 
-            // Create directory if it does not exist
             std::string configPath = ConfigManager::getConfigPath();
             size_t pos             = configPath.find_last_of("/\\");
             if (pos != std::string::npos)
@@ -886,7 +577,6 @@ SettingsTab::SettingsTab()
             brls::Application::notify(brls::getStr("moonlight/settings_tab/language_changed"));
 #endif
         });
-    SettingsTab::languageSelectorPtr = languageSelector;
 }
 
 SettingsTab::~SettingsTab()
@@ -895,10 +585,6 @@ SettingsTab::~SettingsTab()
     if (asyncState->opacityDirty.exchange(false, std::memory_order_acq_rel))
     {
         saveSettingsOpacity(asyncState->pendingOpacity.load(std::memory_order_acquire));
-    }
-    if (languageSelectorPtr == languageSelector)
-    {
-        languageSelectorPtr = nullptr;
     }
 }
 
@@ -913,19 +599,13 @@ void SettingsTab::initAsync()
 
     std::thread([this, state]()
         {
-        // Fetch system info in background (may block on network)
         std::string ip = brls::Application::getPlatform()->getIpAddress();
-        std::string dns = brls::Application::getPlatform()->getDnsServer();
         float brightness = brls::Application::getPlatform()->getBacklightBrightness();
 
-        brls::sync([this, state, ip, dns, brightness]() {
+        brls::sync([this, state, ip, brightness]() {
             if (!state->alive.load(std::memory_order_acquire)) return;
 
-            // Update UI
             ipAddress->setDetailText(ip);
-            dnsServer->setDetailText(dns);
-
-            // Update slider (re-init to set value correctly)
             slider->init("Brightness", brightness, [this](float value){
                 brls::Application::getPlatform()->setBacklightBrightness(value);
                 slider->setDetailText(fmt::format("{:.2f}", value));

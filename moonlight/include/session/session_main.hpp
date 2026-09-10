@@ -14,7 +14,7 @@
 class SessionMainView : public brls::Box
 {
   public:
-    SessionMainView(const HostInfo& host, const RemoteAppInfo& app);
+    SessionMainView(const HostInfo& host, const RemoteAppInfo& app, std::shared_ptr<class VitaSession> session);
     ~SessionMainView();
     void draw(NVGcontext* vg, float x, float y, float width, float height, brls::Style style, brls::FrameContext* ctx) override;
     static void setKeepAwakeWhileStreaming(bool enabled);
@@ -24,7 +24,8 @@ class SessionMainView : public brls::Box
     bool isPauseOverlayOpen() const { return pauseOverlayOpen.load(); }
     HostInfo host;
     RemoteAppInfo app;
-    std::unique_ptr<VitaStreamOverlayView> overlayStatsView;
+    std::shared_ptr<VitaSession> session;
+    VitaStreamOverlayView* overlayStatsView = nullptr;
     brls::VoidEvent::Subscription prePresentSub;
     bool prePresentSubscribed = false;
     BRLS_BIND(brls::Label, title, "title");
@@ -34,6 +35,3 @@ class SessionMainView : public brls::Box
     static inline std::atomic<bool> pauseOverlayOpen { false };
     static inline std::atomic<bool> sessionActive { false };
 };
-
-// Function to launch the main session screen
-void showSessionMain(const HostInfo& host, const RemoteAppInfo& app);

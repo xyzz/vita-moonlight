@@ -28,9 +28,8 @@ namespace check_host
 {
 
 #if defined(__PSV__)
-static SceUID vitaDiscoveryThread       = -1;
-static volatile int vitaDiscoveryStatus = 0; // 0: idle, 1: running, 2: finished
-static std::atomic<bool> vitaThreadActive { false };
+static SceUID vitaDiscoveryThread = -1;
+static std::atomic<int> vitaDiscoveryStatus { 0 }; // 0: idle, 1: running, 2: finished
 
 void stopVitaDiscovery()
 {
@@ -43,7 +42,6 @@ void stopVitaDiscovery()
         vitaDiscoveryThread = -1;
     }
     udp_sniffer_vita_deinit();
-    vitaThreadActive = false;
 }
 
 extern "C"
@@ -137,7 +135,6 @@ void startVitaDiscovery(void (*hostFoundCb)(int, const char*, const char*, const
 #if defined(__PSV__)
     vita_log::info("[check_host] startVitaDiscovery: udp_sniffer_vita_set_callback called\n");
 #endif
-    vitaThreadActive = true;
     vita_log::info("[check_host] startVitaDiscovery: antes de crear hilo");
 #if defined(__PSV__)
     vita_log::info("[check_host] startVitaDiscovery: about to create discovery thread\n");
@@ -168,14 +165,12 @@ void startVitaDiscovery(void (*hostFoundCb)(int, const char*, const char*, const
     vita_log::debug("[mdns_log] Hilo de descubrimiento mDNS finalizado (VITA)\n");
 #endif
         vitaDiscoveryStatus = 2;
-        vitaThreadActive = false;
         brls::sync([]() {
-            if (AddHostTab::vitaInstance) {
-                brls::View* spinnerRow = AddHostTab::vitaInstance->getView("spinner_row");
+            AddHostTab* instance = AddHostTab::activeInstance.load(std::memory_order_acquire);
+            if (instance) {
+                brls::View* spinnerRow = instance->getView("spinner_row");
                 if (spinnerRow)
                     spinnerRow->setVisibility(brls::Visibility::GONE);
-                // Clean up the AddHostTab instance
-                AddHostTab::vitaInstance = nullptr;
             }
         });
         return 0; }, 0x10000100, 0x10000, 0, 0, NULL);
@@ -192,13 +187,13 @@ void startVitaDiscovery(void (*hostFoundCb)(int, const char*, const char*, const
             vitaDiscoveryThread = -1;
             udp_sniffer_vita_deinit();
             vitaDiscoveryStatus = 0;
-            vitaThreadActive    = false;
             brls::sync([startResult]()
                 {
                 char msg[96];
                 std::snprintf(msg, sizeof(msg), "[mDNS] No se pudo iniciar la búsqueda (0x%08X)", static_cast<unsigned int>(startResult));
-                if (AddHostTab::vitaInstance) {
-                    brls::View* spinnerRow = AddHostTab::vitaInstance->getView("spinner_row");
+                AddHostTab* instance = AddHostTab::activeInstance.load(std::memory_order_acquire);
+                if (instance) {
+                    brls::View* spinnerRow = instance->getView("spinner_row");
                     if (spinnerRow)
                         spinnerRow->setVisibility(brls::Visibility::GONE);
                     brls::Application::notify(msg);
@@ -214,12 +209,14 @@ void startVitaDiscovery(void (*hostFoundCb)(int, const char*, const char*, const
     else
     {
         vita_log::error("[check_host] Error creando hilo de descubrimiento mDNS Vita");
+        udp_sniffer_vita_deinit();
+        vitaDiscoveryStatus.store(0, std::memory_order_release);
     }
 }
 
 bool isVitaDiscoveryActive()
 {
-    return vitaThreadActive;
+    return vitaDiscoveryStatus.load(std::memory_order_acquire) == 1;
 }
 #endif
 
@@ -253,8 +250,9 @@ void startWinDiscovery(void (*hostFoundCb)(int, const char*, const char*, const 
         udp_sniffer_win_deinit();
         winThreadActive = false;
         brls::sync([]() {
-            if (AddHostTab::winInstance) {
-                brls::View* spinnerRow = AddHostTab::winInstance->getView("spinner_row");
+            AddHostTab* instance = AddHostTab::activeInstance.load(std::memory_order_acquire);
+            if (instance) {
+                brls::View* spinnerRow = instance->getView("spinner_row");
                 if (spinnerRow)
                     spinnerRow->setVisibility(brls::Visibility::GONE);
             }

@@ -13,44 +13,66 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <mutex>
 #include <string>
 
 #include "ConfigManager.hpp"
 
 namespace fs = std::filesystem;
 
+namespace
+{
+
+std::recursive_mutex hostStorageMutex;
+
+int parsePort(const std::string& value, int fallback)
+{
+    try
+    {
+        int port = std::stoi(value);
+        return port >= 1 && port <= 65535 ? port : fallback;
+    }
+    catch (...)
+    {
+        return fallback;
+    }
+}
+
+}
+
 std::string makeSafeHostId(const std::string& raw)
 {
     std::string out = raw;
     for (char& c : out)
     {
-        if (c == '/' || c == '\\' || c == ':' || c == '*' || c == '?' || c == '"' || c == '<' || c == '>' || c == '|')
+        const unsigned char value = static_cast<unsigned char>(c);
+        if (value < 32 || value == 127 || c == '/' || c == '\\' || c == ':' || c == '*' || c == '?' || c == '"' || c == '<' || c == '>' || c == '|')
             c = '_';
     }
-    // Limit excessive length to avoid problems in filesystem
+    while (!out.empty() && (out.front() == ' ' || out.front() == '.'))
+        out.erase(out.begin());
+    while (!out.empty() && (out.back() == ' ' || out.back() == '.'))
+        out.pop_back();
     if (out.size() > 60)
         out = out.substr(0, 60);
     if (out.empty())
-        out = "host"; // fallback
+        out = "host";
     return out;
 }
 
-// Generate the device.ini file in the host folder
-bool HostStorage::writeDeviceIni(const std::string& hostDir, const std::string& safeHostName, const char* address, int port, bool paired, const char* mac)
+bool HostStorage::writeDeviceIni(const std::string& hostDir, const std::string& safeHostName, const char* address, int port, bool paired, const char* mac, int microphonePort)
 {
+    if (address == nullptr)
+        return false;
+
+    std::lock_guard<std::recursive_mutex> lock(hostStorageMutex);
     std::string deviceIniPath = hostDir + "/device.ini";
     FILE* f                   = fopen(deviceIniPath.c_str(), "w");
     if (!f)
         return false;
 
     fprintf(f, "[Device]\n");
-    // Note: we do not write the `uuid` field in device.ini.
-    // The Moonlight-Switch reference does not persist this field in device.ini; in
-    // instead the client uses `uniqueid` internally when constructing URLs
-    // (for example: /serverinfo?uniqueid=...). To keep the same
-    // behavior and avoid inconsistencies, we omit writing the
-    // uuid here. This prevents device.ini from being the source of truth for the
-    // uniqueid and reduces risk of desynchronization.
+    // The client identity lives in uniqueid.dat; device.ini only stores host data.
     fprintf(f, "name=%s\n", safeHostName.c_str());
     fprintf(f, "type=psvita\n");
     fprintf(f, "paired=%s\n", paired ? "true" : "false");
@@ -58,16 +80,13 @@ bool HostStorage::writeDeviceIni(const std::string& hostDir, const std::string& 
     fprintf(f, "external=\n");
     fprintf(f, "port=%d\n", port);
     fprintf(f, "prefer_external=false\n");
-    fprintf(f, "microphone_port=48100\n");
+    fprintf(f, "microphone_port=%d\n", microphonePort);
 
-    // mac: write only if a valid value was passed
     if (mac != nullptr)
     {
         std::string macs(mac);
-        // Avoid writing known placeholder or empty strings
         if (!macs.empty() && macs != "00:00:00:00:00:00")
         {
-            // Normalize: remove leading/trailing spaces
             size_t b = 0;
             while (b < macs.size() && isspace((unsigned char)macs[b]))
                 ++b;
@@ -80,56 +99,48 @@ bool HostStorage::writeDeviceIni(const std::string& hostDir, const std::string& 
         }
     }
 
-    fclose(f);
-    return true;
+    return fclose(f) == 0;
 }
-// Save a host after successful pairing
-bool HostStorage::savePairedHost(const std::string& name, const std::string& ip, int port, bool paired, const std::string& mac)
+bool HostStorage::savePairedHost(const std::string& name, const std::string& ip, int port, bool paired, const std::string& mac, int microphonePort)
 {
-    HostInfo host;
-    host.name   = name;
-    host.ip     = ip;
-    host.port   = port;
-    host.paired = paired;
-    host.mac    = mac;
-    return HostStorage::addHost(host);
+    std::lock_guard<std::recursive_mutex> lock(hostStorageMutex);
+    ConfigManager config;
+    config.load();
+    const std::string safe = makeSafeHostId(name.empty() ? ip : name);
+    if (!config.ensureKeyDirExists(safe))
+        return false;
+    return writeDeviceIni(config.getKeysDir() + "/" + safe, safe, ip.c_str(), port,
+        paired, mac.empty() ? nullptr : mac.c_str(), microphonePort);
 }
 
-// Load all hosts by scanning folders and reading device.ini
 std::vector<HostInfo> HostStorage::loadHosts()
 {
+    std::lock_guard<std::recursive_mutex> lock(hostStorageMutex);
     std::vector<HostInfo> hosts;
     ConfigManager config;
+    config.load();
     std::string baseDir = config.getKeysDir();
-    // Make sure the base directory exists before trying to open it
     if (!config.ensureKeysDirExists())
     {
-        std::cout << "[DEBUG][HostStorage] No se pudo asegurar baseDir: '" << baseDir << "'\n";
         return hosts;
     }
-    std::cout << "[DEBUG][HostStorage] baseDir usado para hosts: '" << baseDir << "'\n";
     DIR* dir = opendir(baseDir.c_str());
     if (!dir)
     {
-        std::cout << "[DEBUG][HostStorage] No se pudo abrir el directorio: '" << baseDir << "'\n";
         return hosts;
     }
     struct dirent* entry;
-    // Helper to sanitize strings coming from filesystem (folder names, values)
     auto sanitize_display = [](const std::string& s)
     {
         std::string out;
         out.reserve(s.size());
         for (unsigned char c : s)
         {
-            // We allow ASCII printable characters and, to avoid problems with
-            // control bytes or corrupt sequences, we replace others with '?'
             if (c >= 32 && c != 127)
                 out.push_back(c);
             else
                 out.push_back('?');
         }
-        // Basic trim
         size_t b = 0;
         while (b < out.size() && std::isspace((unsigned char)out[b]))
             ++b;
@@ -142,29 +153,24 @@ std::vector<HostInfo> HostStorage::loadHosts()
     while ((entry = readdir(dir)) != nullptr)
     {
         std::string folder = entry->d_name;
-        std::cout << "[DEBUG][HostStorage] Carpeta encontrada: '" << folder << "'\n";
         if (folder.empty() || folder == "." || folder == ".." || folder.length() > 60)
             continue;
         std::string path = baseDir + "/" + folder;
         struct stat st;
-        if (::stat(path.c_str(), &st) != 0 || !(st.st_mode & S_IFDIR))
+        if (::stat(path.c_str(), &st) != 0 || !S_ISDIR(st.st_mode))
             continue;
         std::string iniPath = path + "/device.ini";
         std::ifstream ini(iniPath);
         if (!ini.is_open())
         {
-            std::cout << "[DEBUG][HostStorage] No se pudo abrir: '" << iniPath << "'\n";
             continue;
         }
         HostInfo host;
-        // Show a strong name to the user avoiding control characters
-        host.name   = sanitize_display(folder); // For backward compatibility: the folder was the name
+        host.name   = sanitize_display(folder);
         host.safeId = makeSafeHostId(folder);
-        std::cout << "[DEBUG][HostStorage] Leyendo device.ini para host: '" << folder << "'\n";
         std::string line;
         while (std::getline(ini, line))
         {
-            std::cout << "[DEBUG][HostStorage] device.ini: " << line << "\n";
             if (line.find("internal=") == 0)
             {
                 std::string v = line.substr(strlen("internal="));
@@ -177,14 +183,7 @@ std::vector<HostInfo> HostStorage::loadHosts()
             }
             else if (line.find("port=") == 0)
             {
-                try
-                {
-                    host.port = std::stoi(line.substr(strlen("port=")));
-                }
-                catch (...)
-                {
-                    host.port = 0;
-                }
+                host.port = parsePort(line.substr(strlen("port=")), host.port);
             }
             else if (line.find("paired=") == 0)
             {
@@ -193,47 +192,39 @@ std::vector<HostInfo> HostStorage::loadHosts()
             }
             else if (line.find("microphone_port=") == 0)
             {
-                try
-                {
-                    host.microphone_port = std::stoi(line.substr(strlen("microphone_port=")));
-                }
-                catch (...)
-                {
-                    host.microphone_port = 48100;
-                }
+                host.microphone_port = parsePort(
+                    line.substr(strlen("microphone_port=")), host.microphone_port);
             }
         }
+        if (host.ip.empty())
+            continue;
         hosts.push_back(host);
     }
     closedir(dir);
-    std::cout << "[DEBUG][HostStorage] Total hosts encontrados: " << hosts.size() << "\n";
     return hosts;
 }
 
-// saveHosts: not implemented, not used with device.ini
-bool HostStorage::saveHosts(const std::vector<HostInfo>&) { return false; }
-
-// addHost: Use device configurable path
 bool HostStorage::addHost(const HostInfo& host)
 {
+    std::lock_guard<std::recursive_mutex> lock(hostStorageMutex);
     ConfigManager config;
+    config.load();
     std::string baseDir = config.getKeysDir();
-    // Secure base directory
     if (!config.ensureKeysDirExists())
         return false;
-    std::string safe          = host.safeId.empty() ? makeSafeHostId(host.name.empty() ? host.ip : host.name) : host.safeId;
+    std::string safe          = makeSafeHostId(host.safeId.empty() ? (host.name.empty() ? host.ip : host.name) : host.safeId);
     std::string keyDirStr     = baseDir + "/" + safe;
     std::string deviceIniPath = keyDirStr + "/device.ini";
     if (fs::exists(deviceIniPath))
         return false;
-    // Create per-host directory (if it does not exist)
     if (!config.ensureKeyDirExists(safe))
         return false;
-    return HostStorage::writeDeviceIni(keyDirStr, safe, host.ip.c_str(), host.port, host.paired, host.mac.empty() ? nullptr : host.mac.c_str());
+    return HostStorage::writeDeviceIni(keyDirStr, safe, host.ip.c_str(), host.port, host.paired, host.mac.empty() ? nullptr : host.mac.c_str(), host.microphone_port);
 }
 
 std::optional<HostInfo> HostStorage::findHost(const std::string& name)
 {
+    std::lock_guard<std::recursive_mutex> lock(hostStorageMutex);
     auto hosts = loadHosts();
     for (const auto& h : hosts)
     {
@@ -245,20 +236,15 @@ std::optional<HostInfo> HostStorage::findHost(const std::string& name)
 
 bool HostStorage::removeHost(const std::string& name)
 {
+    std::lock_guard<std::recursive_mutex> lock(hostStorageMutex);
     ConfigManager config;
-    std::string baseDir = config.getKeysDir();
-    // name can be the display name; try both routes (name and derived safeId)
-    std::string keyDirStr = baseDir + "/" + name;
-    if (!fs::exists(keyDirStr))
-    {
-        std::string safe = makeSafeHostId(name);
-        std::string alt  = baseDir + "/" + safe;
-        if (fs::exists(alt))
-            keyDirStr = alt;
-    }
+    config.load();
+    std::string baseDir          = config.getKeysDir();
+    auto host                    = findHost(name);
+    const std::string identifier = host && !host->safeId.empty() ? host->safeId : name;
+    std::string keyDirStr        = baseDir + "/" + makeSafeHostId(identifier);
     if (!fs::exists(keyDirStr))
         return false;
-    // Clear any certificates/keys loaded in memory for this directory
     try
     {
         std::cout << "[DEBUG][HostStorage] Eliminando archivos de certificados en: '" << keyDirStr << "'\n";
@@ -267,7 +253,6 @@ bool HostStorage::removeHost(const std::string& name)
         fs::remove(keyDirStr + "/key.pem", ec);
         fs::remove(keyDirStr + "/client.p12", ec);
         fs::remove(keyDirStr + "/uniqueid.dat", ec);
-        // Also delete old files if they exist
         fs::remove(keyDirStr + "/client.pem.bak", ec);
         fs::remove(keyDirStr + "/key.pem.bak", ec);
     }
@@ -276,12 +261,12 @@ bool HostStorage::removeHost(const std::string& name)
         std::cout << "[DEBUG][HostStorage] Error eliminando certificados (ignorado)\n";
     }
 
-    // Then delete the entire folder from the host
     return fs::remove_all(keyDirStr) > 0;
 }
 
 bool HostStorage::updateHostIp(const std::string& name, const std::string& newIp)
 {
+    std::lock_guard<std::recursive_mutex> lock(hostStorageMutex);
     if (newIp.empty())
         return false;
 
@@ -293,8 +278,9 @@ bool HostStorage::updateHostIp(const std::string& name, const std::string& newIp
     host.ip       = newIp;
 
     ConfigManager config;
+    config.load();
     std::string baseDir = config.getKeysDir();
-    std::string safe    = !host.safeId.empty() ? host.safeId : makeSafeHostId(name);
+    std::string safe    = makeSafeHostId(!host.safeId.empty() ? host.safeId : name);
     std::string hostDir = baseDir + "/" + safe;
 
     if (!fs::exists(hostDir))
@@ -306,5 +292,5 @@ bool HostStorage::updateHostIp(const std::string& name, const std::string& newIp
         host.safeId = safe;
     }
 
-    return HostStorage::writeDeviceIni(hostDir, safe, host.ip.c_str(), host.port, host.paired, host.mac.empty() ? nullptr : host.mac.c_str());
+    return HostStorage::writeDeviceIni(hostDir, safe, host.ip.c_str(), host.port, host.paired, host.mac.empty() ? nullptr : host.mac.c_str(), host.microphone_port);
 }

@@ -168,6 +168,9 @@ bool load_layout_from_xml(KeyboardLayout layout, const char* filename)
             if (with)
             {
                 std::string with_str = with;
+                // Caps Lock is keyboard state, not a modifier for a single character.
+                if (with_str.find("VK_CAPITAL") != std::string::npos)
+                    continue;
                 if (with_str.find("VK_SHIFT") != std::string::npos)
                     needs_shift = true;
                 if (with_str.find("VK_CONTROL") != std::string::npos && with_str.find("VK_MENU") != std::string::npos)

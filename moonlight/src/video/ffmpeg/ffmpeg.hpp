@@ -48,17 +48,9 @@ typedef struct FFmpegVideoContext
     int stream_width;
     int stream_height;
     uint64_t last_pts_us;
-    uint64_t latency_epoch_offset_us;
-    uint64_t last_input_pts_us;
-    int last_input_frame_number;
-    uint32_t latency_samples;
-    uint32_t output_age_floor_us;
     bool using_direct_memory;
     bool is_legacy_mode;
     const char* render_mode;
-    bool output_age_floor_valid;
-    bool decoder_prime_pending;
-    bool decoder_resync_pending;
     bool initialized;
 } FFmpegVideoContext;
 

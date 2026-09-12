@@ -303,14 +303,9 @@ int main(int argc, char* argv[])
     brls::Application::getWindowFocusChangedEvent()->subscribe(handleWindowFocusChanged);
 #endif
 
-    {
-        ConfigManager startupCfg;
-        startupCfg.load();
-        VideoSettings vs = startupCfg.getVideoSettings();
-        moonlight::settings::applySwapInterval(vs.swap_interval);
-        vita_log::info("[Main] Display timing: swapInterval=%d", vs.swap_interval);
-        vita_log::info("[Main] FPS status enabled: %d", brls::Application::getFPSStatus());
-    }
+    moonlight::settings::applyMenuDisplayMode();
+    vita_log::info("[Main] Display timing: synchronized menu");
+    vita_log::info("[Main] FPS status enabled: %d", brls::Application::getFPSStatus());
 
     brls::Application::getPlatform()->setThemeVariant(brls::ThemeVariant::DARK);
 

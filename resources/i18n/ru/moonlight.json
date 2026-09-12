@@ -157,15 +157,13 @@
     "show_fps_title": "Показать FPS",
     "save_debug_log_title": "Сохранить журнал отладки",
     "swap_interval": {
-      "title": "V-Sync (Swap Interval)",
+      "title": "Режим вывода",
       "options": {
-        "0": "V-Sync OFF (неограниченный)",
-        "1": "V-Sync ON (60 FPS)",
-        "2": "V-Sync 2x (30 FPS)",
-        "3": "V-Sync 3x (20 FPS)",
-        "4": "V-Sync 4x (15 FPS)"
+        "0": "Немедленно (минимальная задержка)",
+        "1": "VBlank (плавнее)",
+        "2": "Следующий кадр (без разрывов)"
       },
-      "saved": "V-Sync сохранён"
+      "saved": "Режим вывода сохранён"
     },
     "motion_controls_title": "гироскоп",
     "double_tap_sprint_title": "Двойной удар в спринт",

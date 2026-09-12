@@ -432,7 +432,7 @@ VideoSettings ConfigManager::getVideoSettings() const
     settings.pixel_format_mode            = parseInt(get("video", "pixel_format_mode", "1"), 1);
     settings.gamepad_type                 = static_cast<GamepadType>(parseInt(get("video", "gamepad_type", "0"), 0));
     settings.swap_shoulder_buttons        = get("video", "swap_shoulder_buttons", "false") == "true";
-    settings.swap_interval                = parseInt(get("video", "swap_interval", "1"), 1);
+    settings.swap_interval                = parseInt(get("video", "swap_interval", "0"), 0);
     // Trackpad Settings
     settings.trackpad_pointer_speed          = parseInt(get("trackpad", "pointer_speed", "100"), 100);
     settings.trackpad_dead_zone              = parseInt(get("trackpad", "dead_zone", "50"), 50);
@@ -505,7 +505,7 @@ VideoSettings ConfigManager::getVideoSettings() const
     settings.keyboard_mode            = std::clamp(settings.keyboard_mode, 0, 1);
     settings.render_mode              = std::clamp(settings.render_mode, 0, 1);
     settings.pixel_format_mode        = std::clamp(settings.pixel_format_mode, 0, 1);
-    settings.swap_interval            = std::clamp(settings.swap_interval, 0, 4);
+    settings.swap_interval            = std::clamp(settings.swap_interval, 0, 2);
     settings.trackpad_pointer_speed   = std::clamp(settings.trackpad_pointer_speed, 0, 200);
     settings.trackpad_dead_zone       = std::clamp(settings.trackpad_dead_zone, 0, 200);
     settings.trackpad_edge_zone       = std::clamp(settings.trackpad_edge_zone, 0, 50);

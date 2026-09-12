@@ -51,8 +51,18 @@ extern "C"
 
     void vita_frame_pacer_start(int paceFps)
     {
-        if (s_active || paceFps <= 0)
+        if (paceFps <= 0)
             return;
+
+        s_frameBudgetUs = (uint32_t)(1000000 / paceFps);
+
+        if (s_active)
+        {
+            brls::Application::setLimitedFPS(0);
+            vita_log::info("[FramePacer] target updated: %d fps (idle=%u us)",
+                paceFps, s_frameBudgetUs * 2);
+            return;
+        }
 
         if (s_frameSema.load(std::memory_order_acquire) < 0)
         {
@@ -64,8 +74,6 @@ extern "C"
             }
             s_frameSema.store(sema, std::memory_order_release);
         }
-
-        s_frameBudgetUs = (uint32_t)(1000000 / paceFps);
 
         brls::Application::setLimitedFPS(0);
 

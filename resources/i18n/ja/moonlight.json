@@ -157,15 +157,13 @@
         "show_fps_title": "FPSを表示する",
         "save_debug_log_title": "デバッグログを保存",
         "swap_interval": {
-            "title": "V-Sync(スワップインターバル)",
+            "title": "表示モード",
             "options": {
-                "0": "V-Sync OFF(無制限)",
-                "1": "V-シンクオン(60 FPS)",
-                "2": "V-Sync 2x(30 FPS)",
-                "3": "V-Sync 3x(20 FPS)",
-                "4": "V-Sync 4x(15 FPS)"
+                "0": "即時 (最小遅延)",
+                "1": "VBlank (滑らか)",
+                "2": "次のフレーム (ティアリングなし)"
             },
-            "saved": "V-Sync保存"
+            "saved": "表示モードを保存しました"
         },
         "motion_controls_title": "ジャイロスコープ",
         "double_tap_sprint_title": "ダブルタップでスプリント",

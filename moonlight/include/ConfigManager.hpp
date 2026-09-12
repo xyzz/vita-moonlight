@@ -90,8 +90,7 @@ struct VideoSettings
 
     bool swap_shoulder_buttons = false;
 
-    // Swap interval (V-Sync): 0 = Sin V-Sync, 1 = 60 FPS, 2 = 30 FPS, etc.
-    int swap_interval = 1;
+    int swap_interval = 0;
 
     bool enable_front_touchzones         = false;
     int front_touch_offset               = 0; // px from screen edge

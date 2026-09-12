@@ -2,17 +2,23 @@ diff --git a/library/include/borealis/core/application.hpp b/library/include/bor
 index cfff62bf9edebb44efc387c49405fe6adea880c8..3bf5925bf311e1a4e67bdce059f03b1df5bcd727 100644
 --- a/library/include/borealis/core/application.hpp
 +++ b/library/include/borealis/core/application.hpp
-@@ -219,6 +219,9 @@ class Application
+@@ -219,6 +219,15 @@ class Application
       */
      static void setLimitedFPS(size_t fps);
  
 +    /** Enable the platform low-latency presentation policy. */
 +    static void setLowLatencyMode(bool enabled);
 +
++    /** Use immediate display updates where supported. */
++    static void setImmediatePresentation(bool enabled);
++
++    /** Synchronize common dialogs without changing the application swap interval. */
++    static void setCommonDialogVSync(bool enabled);
++
      /**
       * Set the swap interval
       * Must be called after createWindow. On some platforms, it is impossible to set it back
-@@ -273,6 +276,8 @@ class Application
+@@ -273,6 +282,8 @@ class Application
      static GenericEvent* getGlobalFocusChangeEvent();
      static VoidEvent* getGlobalHintsUpdateEvent();
      static Event<InputType>* getGlobalInputTypeChangeEvent();
@@ -21,7 +27,7 @@ index cfff62bf9edebb44efc387c49405fe6adea880c8..3bf5925bf311e1a4e67bdce059f03b1d
      static VoidEvent* getRunLoopEvent();
      static VoidEvent* getExitEvent();
      static VoidEvent* getExitDoneEvent();
-@@ -418,6 +423,7 @@ class Application
+@@ -418,6 +429,7 @@ class Application
      inline static GenericEvent globalFocusChangeEvent;
      inline static VoidEvent globalHintsUpdateEvent;
      inline static Event<InputType> globalInputTypeChangeEvent;
@@ -33,12 +39,14 @@ diff --git a/library/include/borealis/core/video.hpp b/library/include/borealis/
 index c02cde7790aa7cecd63a87cc71a198883b81de55..4cd0f2876bb7306cf173164cf927b90ec267c8c7 100644
 --- a/library/include/borealis/core/video.hpp
 +++ b/library/include/borealis/core/video.hpp
-@@ -64,6 +64,9 @@ class VideoContext
+@@ -64,6 +64,11 @@ class VideoContext
  
      virtual NVGcontext* getNVGContext() = 0;
  
 +    // Platforms may override this when presentation requires a different queue policy.
 +    virtual void setLowLatencyMode(bool enabled) { (void)enabled; }
++    virtual void setImmediatePresentation(bool enabled) { (void)enabled; }
++    virtual void setCommonDialogVSync(bool enabled) { (void)enabled; }
 +
      virtual void setSwapInterval(int interval) = 0;
  
@@ -56,19 +64,91 @@ index 28a06ed63849d5f2f10d871960cbdb448b2ff68a..d442b231a44427c5e325c5aaa7548211
  #define MAX_PENDING_SWAPS (DISPLAY_BUFFER_COUNT - 1)
  
  #define DISPLAY_COLOR_FORMAT SCE_GXM_COLOR_FORMAT_A8B8G8R8
+@@ -224,6 +224,9 @@ void gxmClear(void);
+  */
+ void gxmSwapInterval(int interval);
+ 
++void gxmSetImmediatePresentation(int enabled);
++void gxmSetCommonDialogVSync(int enabled);
++
+ int gxmDialogUpdate(void);
+ 
+ unsigned short *gxmGetSharedIndices(void);
+@@ -258,4 +261,6 @@ struct display_queue_callback_data {
+     void *addr;
++    int immediatePresentation;
++    int swapInterval;
+ };
+ 
+ struct clear_vertex {
+@@ -266,6 +271,8 @@ static struct gxm_internal {
+     SceGxmContext *context;
+     SceGxmShaderPatcher *shader_patcher;
+     NVGXMinitOptions initOptions;
++    int commonDialogVSync;
++    int immediatePresentation;
+ 
+     // clear shader
+     NVGXMshaderProgram clearProg;
+@@ -352,10 +359,13 @@ static void display_queue_callback(const void *callbackData) {
+     display_fb.width = DISPLAY_WIDTH;
+     display_fb.height = DISPLAY_HEIGHT;
+ 
+-    sceDisplaySetFrameBuf(&display_fb, SCE_DISPLAY_SETBUF_NEXTFRAME);
++    int swapInterval = cb_data->swapInterval;
++    int immediatePresentation = cb_data->immediatePresentation;
+ 
+-    if (gxm_internal.initOptions.swapInterval) {
+-        GXM_CHECK_VOID(sceDisplayWaitVblankStartMulti(gxm_internal.initOptions.swapInterval));
++    sceDisplaySetFrameBuf(&display_fb, immediatePresentation ? SCE_DISPLAY_SETBUF_IMMEDIATE : SCE_DISPLAY_SETBUF_NEXTFRAME);
++
++    if (swapInterval) {
++        GXM_CHECK_VOID(sceDisplayWaitVblankStartMulti(swapInterval));
+     }
+ }
+ 
+@@ -1033,5 +1043,11 @@ void gxmSwapBuffer(void) {
+     struct display_queue_callback_data queue_cb_data;
+     queue_cb_data.addr = fb->gxm_color_surfaces[fb->gxm_back_buffer_index].surface_addr;
++    queue_cb_data.immediatePresentation = gxm_internal.immediatePresentation;
++    queue_cb_data.swapInterval = gxm_internal.initOptions.swapInterval;
++    if (gxm_internal.commonDialogVSync) {
++        queue_cb_data.immediatePresentation = 0;
++        queue_cb_data.swapInterval = 1;
++    }
+ 
+     GXM_CHECK_VOID(sceGxmDisplayQueueAddEntry(
+             fb->gxm_color_surfaces[fb->gxm_front_buffer_index].sync_object,
+@@ -1045,6 +1061,14 @@ void gxmSwapInterval(int interval) {
+     gxm_internal.initOptions.swapInterval = interval;
+ }
+ 
++void gxmSetImmediatePresentation(int enabled) {
++    gxm_internal.immediatePresentation = enabled;
++}
++
++void gxmSetCommonDialogVSync(int enabled) {
++    gxm_internal.commonDialogVSync = enabled;
++}
++
+ int gxmDialogUpdate(void) {
+     NVGXMwindow *window = gxm_internal.window;
+     if (!window) return SCE_COMMON_DIALOG_RESULT_ABORTED;
 diff --git a/library/include/borealis/platforms/psv/psv_video.hpp b/library/include/borealis/platforms/psv/psv_video.hpp
 index 5ea4bb8aff4a584bb14dfd35f2ffadffa6bbaaa5..1b789d631098be208601e507330bd8579c689539 100644
 --- a/library/include/borealis/platforms/psv/psv_video.hpp
 +++ b/library/include/borealis/platforms/psv/psv_video.hpp
-@@ -32,6 +32,7 @@ class PsvVideoContext : public VideoContext
+@@ -32,6 +32,9 @@ class PsvVideoContext : public VideoContext
      void resetState() override;
      void beginFrame() override;
      void endFrame() override;
 +    void setLowLatencyMode(bool enabled) override;
++    void setImmediatePresentation(bool enabled) override;
++    void setCommonDialogVSync(bool enabled) override;
      void setSwapInterval(int interval) override;
      double getScaleFactor() override;
      NVGcontext* getNVGContext() override;
-@@ -41,6 +42,7 @@ class PsvVideoContext : public VideoContext
+@@ -41,6 +44,7 @@ class PsvVideoContext : public VideoContext
    private:
      NVGcontext* nvgContext;
      NVGXMwindow* window;
@@ -88,7 +168,7 @@ index a45103da2747e71b2367e4ad59fab26e3c073849..49990a65897bd20e22055c64e09b98af
      nvgEndFrame(Application::getNVGContext());
  
      Application::platform->getVideoContext()->endFrame();
-@@ -869,6 +870,11 @@ void Application::setLimitedFPS(size_t fps)
+@@ -869,6 +870,21 @@ void Application::setLimitedFPS(size_t fps)
      Application::limitedFrameTime = fps == 0 ? 0 : 1000000.0f / fps;
  }
  
@@ -97,10 +177,20 @@ index a45103da2747e71b2367e4ad59fab26e3c073849..49990a65897bd20e22055c64e09b98af
 +    Application::platform->getVideoContext()->setLowLatencyMode(enabled);
 +}
 +
++void Application::setImmediatePresentation(bool enabled)
++{
++    Application::platform->getVideoContext()->setImmediatePresentation(enabled);
++}
++
++void Application::setCommonDialogVSync(bool enabled)
++{
++    Application::platform->getVideoContext()->setCommonDialogVSync(enabled);
++}
++
  void Application::setSwapInterval(int interval)
  {
      Application::platform->getVideoContext()->setSwapInterval(interval);
-@@ -1233,6 +1239,11 @@ Event<InputType>* Application::getGlobalInputTypeChangeEvent()
+@@ -1233,6 +1249,11 @@ Event<InputType>* Application::getGlobalInputTypeChangeEvent()
      return &Application::globalInputTypeChangeEvent;
  }
  
@@ -116,7 +206,7 @@ diff --git a/library/lib/platforms/psv/psv_video.cpp b/library/lib/platforms/psv
 index 9352721f2a533ccd846378ca660b6ce7861b9de4..d3f798ec1824a885b2c97db647aa83fc88c48d42 100644
 --- a/library/lib/platforms/psv/psv_video.cpp
 +++ b/library/lib/platforms/psv/psv_video.cpp
-@@ -87,10 +87,20 @@ void PsvVideoContext::beginFrame() {
+@@ -87,10 +87,28 @@ void PsvVideoContext::beginFrame() {
  
  void PsvVideoContext::endFrame() {
      gxmEndFrame();
@@ -134,10 +224,18 @@ index 9352721f2a533ccd846378ca660b6ce7861b9de4..d3f798ec1824a885b2c97db647aa83fc
 +    lowLatencyMode = enabled;
 +}
 +
++void PsvVideoContext::setImmediatePresentation(bool enabled) {
++    gxmSetImmediatePresentation(enabled);
++}
++
++void PsvVideoContext::setCommonDialogVSync(bool enabled) {
++    gxmSetCommonDialogVSync(enabled);
++}
++
  void PsvVideoContext::setSwapInterval(int interval) {
      VideoContext::swapInterval = interval;
      gxmSwapInterval(interval);
-@@ -109,4 +119,4 @@ NVGXMwindow* PsvVideoContext::getWindow()
+@@ -109,4 +127,4 @@ NVGXMwindow* PsvVideoContext::getWindow()
      return this->window;
  }
  

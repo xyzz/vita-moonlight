@@ -19,9 +19,23 @@ namespace moonlight
 
 namespace
 {
-
     constexpr std::size_t UNSYNCED_FRAME_LIMIT = 61;
 
+    void applyPresentationMode(StreamDisplayMode displayMode)
+    {
+        const bool immediate   = displayMode == StreamDisplayMode::Immediate;
+        const int swapInterval = displayMode == StreamDisplayMode::VBlank ? 1 : 0;
+
+        Application::setImmediatePresentation(immediate);
+        Application::setSwapInterval(swapInterval);
+        Application::setLimitedFPS(swapInterval == 0 ? UNSYNCED_FRAME_LIMIT : 0);
+    }
+} // namespace
+
+extern "C"
+{
+    void vita_frame_pacer_start(int paceFps);
+    void vita_frame_pacer_stop(int restoreFps);
 }
 
 const std::vector<LanguageOption>& settings::supportedLanguages()
@@ -64,10 +78,50 @@ std::size_t settings::languageIndex(const std::string& lang)
     return found == languages.end() ? 0 : static_cast<std::size_t>(found - languages.begin());
 }
 
-void settings::applySwapInterval(int swapInterval)
+void settings::applyMenuDisplayMode()
 {
-    Application::setSwapInterval(swapInterval);
-    Application::setLimitedFPS(swapInterval == 0 ? UNSYNCED_FRAME_LIMIT : 0);
+    vita_frame_pacer_stop(0);
+    applyPresentationMode(StreamDisplayMode::VBlank);
+}
+
+const std::vector<StreamDisplayMode>& settings::streamDisplayModes(int renderMode)
+{
+    static const std::vector<StreamDisplayMode> legacyModes = {
+        StreamDisplayMode::Immediate,
+        StreamDisplayMode::NextFrame,
+        StreamDisplayMode::VBlank,
+    };
+    static const std::vector<StreamDisplayMode> ffmpegModes = {
+        StreamDisplayMode::NextFrame,
+        StreamDisplayMode::VBlank,
+    };
+
+    return renderMode == 1 ? ffmpegModes : legacyModes;
+}
+
+StreamDisplayMode settings::normalizeStreamDisplayMode(int displayMode, int renderMode)
+{
+    const auto& modes = streamDisplayModes(renderMode);
+    const auto found  = std::find(modes.begin(), modes.end(), static_cast<StreamDisplayMode>(displayMode));
+    return found == modes.end() ? modes.front() : *found;
+}
+
+void settings::applyStreamDisplayMode(int displayMode, int renderMode, bool enableFramePacer, int targetFps)
+{
+    const auto mode = normalizeStreamDisplayMode(displayMode, renderMode);
+
+    const bool waitsForVBlank = mode == StreamDisplayMode::VBlank;
+    targetFps                 = std::clamp(targetFps, 1, 60);
+
+    if (!waitsForVBlank && enableFramePacer)
+    {
+        applyPresentationMode(mode);
+        vita_frame_pacer_start(targetFps);
+        return;
+    }
+
+    vita_frame_pacer_stop(waitsForVBlank ? 0 : static_cast<int>(UNSYNCED_FRAME_LIMIT));
+    applyPresentationMode(mode);
 }
 
 std::string settings::getLanguageFromConfig()

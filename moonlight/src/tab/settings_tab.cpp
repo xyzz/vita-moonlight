@@ -22,11 +22,13 @@
 #include <algorithm>
 #include <memory>
 #include <string>
+#include <utility>
 
 #include "ConfigManager.hpp"
 #include "controller/ControllerInput.hpp"
 #include "session/session_main.hpp"
 #include "session/stream_config.hpp"
+#include "session/vita_session.hpp"
 #include "tab/front_touch_settings_tab.hpp"
 #include "tab/gyro_settings_tab.hpp"
 #include "tab/keyboard_settings_tab.hpp"
@@ -53,6 +55,37 @@ static void saveSettingsOpacity(float value)
     ConfigManager config;
     config.updateVideoSettings([value](VideoSettings& settings)
         { settings.settings_background_opacity = value; });
+}
+
+int SettingsTab::prepareDisplayModeOptions(int renderMode, int displayMode, std::vector<std::string>& labels)
+{
+    const auto& modes = moonlight::settings::streamDisplayModes(renderMode);
+    labels.clear();
+    labels.reserve(modes.size());
+    displayModeValues.clear();
+    displayModeValues.reserve(modes.size());
+
+    int selected = 0;
+    for (std::size_t i = 0; i < modes.size(); ++i)
+    {
+        const int value = static_cast<int>(modes[i]);
+        displayModeValues.push_back(value);
+        labels.push_back(brls::getStr(
+            "moonlight/settings_tab/swap_interval/options/" + std::to_string(value)));
+        if (value == displayMode)
+            selected = static_cast<int>(i);
+    }
+
+    return selected;
+}
+
+void SettingsTab::updateDisplayModeOptions(int renderMode, int displayMode)
+{
+    std::vector<std::string> labels;
+    const int selected = prepareDisplayModeOptions(renderMode, displayMode, labels);
+
+    swapInterval->setData(std::move(labels));
+    swapInterval->setSelection(selected, true);
 }
 
 SettingsTab::SettingsTab()
@@ -118,11 +151,21 @@ SettingsTab::SettingsTab()
             configChanged                   = true;
         }
     }
+    const auto normalizedDisplayMode = moonlight::settings::normalizeStreamDisplayMode(
+        videoSettings.swap_interval, videoSettings.render_mode);
+    if (videoSettings.swap_interval != static_cast<int>(normalizedDisplayMode))
+    {
+        videoSettings.swap_interval = static_cast<int>(normalizedDisplayMode);
+        configChanged               = true;
+    }
     if (configChanged)
     {
         const int pixelFormat = videoSettings.pixel_format_mode;
-        config.updateVideoSettings([pixelFormat](VideoSettings& settings)
-            { settings.pixel_format_mode = pixelFormat; });
+        const int displayMode = videoSettings.swap_interval;
+        config.updateVideoSettings([pixelFormat, displayMode](VideoSettings& settings)
+            {
+                settings.pixel_format_mode = pixelFormat;
+                settings.swap_interval     = displayMode; });
     }
     video_runtime::setPixelFormatMode(videoSettings.pixel_format_mode);
 
@@ -154,12 +197,13 @@ SettingsTab::SettingsTab()
     int initialRenderMode = videoSettings.render_mode;
     if (initialRenderMode < 0 || initialRenderMode >= (int)renderModes.size())
         initialRenderMode = 0;
-    renderModeSelector->init(brls::getStr("moonlight/settings_tab/render_mode/title"), renderModes, initialRenderMode, [updateModeDependentVisibility](int selected)
+    renderModeSelector->init(brls::getStr("moonlight/settings_tab/render_mode/title"), renderModes, initialRenderMode, [this, updateModeDependentVisibility](int selected)
         {
         ConfigManager config;
         int chosen = selected;
         int pixelFormat = 1;
-        config.updateVideoSettings([chosen, &pixelFormat](VideoSettings& settings) {
+        int displayMode = static_cast<int>(moonlight::StreamDisplayMode::Immediate);
+        config.updateVideoSettings([chosen, &pixelFormat, &displayMode](VideoSettings& settings) {
             settings.render_mode = chosen;
             if (chosen == 0) {
                 if (settings.pixel_format_mode != 0 && settings.pixel_format_mode != 1) {
@@ -168,9 +212,13 @@ SettingsTab::SettingsTab()
             } else if (chosen == 1) {
                 settings.pixel_format_mode = 1;
             }
+            settings.swap_interval = static_cast<int>(
+                moonlight::settings::normalizeStreamDisplayMode(settings.swap_interval, chosen));
             pixelFormat = settings.pixel_format_mode;
+            displayMode = settings.swap_interval;
         });
         updateModeDependentVisibility(chosen);
+        updateDisplayModeOptions(chosen, displayMode);
         video_runtime::setRenderMode(chosen);
         video_runtime::setPixelFormatMode(pixelFormat);
         const char* modeNameKey = nullptr;
@@ -333,7 +381,15 @@ SettingsTab::SettingsTab()
     framePacerToggle->init(brls::getStr("moonlight/settings_tab/frame_pacer_title"), videoSettings.enable_frame_pacer, [](bool value)
         {
         ConfigManager config;
-        config.updateVideoSettings([value](VideoSettings& settings) { settings.enable_frame_pacer = value; }); });
+        config.updateVideoSettings([value](VideoSettings& settings) { settings.enable_frame_pacer = value; });
+
+        auto session = VitaSession::active();
+        if (session && session->isActive()) {
+            const VideoSettings videoSettings = config.getVideoSettings();
+            const StreamConfiguration stream  = config.getStreamConfig();
+            moonlight::settings::applyStreamDisplayMode(
+                videoSettings.swap_interval, videoSettings.render_mode, value, stream.fps);
+        } });
 
     centerRegionToggle->init(brls::getStr("moonlight/settings_tab/center_region_title"), videoSettings.center_region_only, [](bool value)
         {
@@ -507,23 +563,23 @@ SettingsTab::SettingsTab()
         slider->setDetailText(fmt::format("{:.2f}", value)); });
     slider->setDetailText("...");
 
-    std::vector<std::string> swapIntervalOptions = {
-        brls::getStr("moonlight/settings_tab/swap_interval/options/0"),
-        brls::getStr("moonlight/settings_tab/swap_interval/options/1"),
-        brls::getStr("moonlight/settings_tab/swap_interval/options/2"),
-        brls::getStr("moonlight/settings_tab/swap_interval/options/3"),
-        brls::getStr("moonlight/settings_tab/swap_interval/options/4")
-    };
-    int currentSwapInterval = videoSettings.swap_interval;
-    if (currentSwapInterval < 0 || currentSwapInterval > 4)
-        currentSwapInterval = 1;
-    swapInterval->init(brls::getStr("moonlight/settings_tab/swap_interval/title"), swapIntervalOptions, currentSwapInterval, [](int selected)
+    std::vector<std::string> displayModeLabels;
+    const int currentDisplayMode = prepareDisplayModeOptions(
+        videoSettings.render_mode, videoSettings.swap_interval, displayModeLabels);
+    swapInterval->init(brls::getStr("moonlight/settings_tab/swap_interval/title"), displayModeLabels, currentDisplayMode, [this](int selected)
         {
-        if (selected >= 0 && selected <= 4) {
+        if (selected >= 0 && static_cast<std::size_t>(selected) < displayModeValues.size()) {
+            const int displayMode = displayModeValues[selected];
             ConfigManager config;
-            config.updateVideoSettings([selected](VideoSettings& settings) { settings.swap_interval = selected; });
+            config.updateVideoSettings([displayMode](VideoSettings& settings) { settings.swap_interval = displayMode; });
 
-            moonlight::settings::applySwapInterval(selected);
+            auto session = VitaSession::active();
+            if (session && session->isActive()) {
+                const VideoSettings videoSettings = config.getVideoSettings();
+                const StreamConfiguration stream  = config.getStreamConfig();
+                moonlight::settings::applyStreamDisplayMode(
+                    displayMode, videoSettings.render_mode, videoSettings.enable_frame_pacer, stream.fps);
+            }
             brls::Application::notify(brls::getStr("moonlight/settings_tab/swap_interval/saved"));
         } });
 

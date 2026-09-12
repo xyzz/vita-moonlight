@@ -157,15 +157,13 @@
         "show_fps_title": "Mostrar FPS",
         "save_debug_log_title": "Gravar o registo de depuração",
         "swap_interval": {
-            "title": "V-Sync (Intervalo de troca)",
+            "title": "Modo de exibição",
             "options": {
-                "0": "V-Sync OFF (Ilimitado)",
-                "1": "V-Sync ON (60 FPS)",
-                "2": "V-Sync 2x (30 FPS)",
-                "3": "V-Sync 3x (20 FPS)",
-                "4": "V-Sync 4x (15 FPS)"
+                "0": "Imediato (menor latência)",
+                "1": "VBlank (mais fluido)",
+                "2": "Próximo quadro (sem cortes)"
             },
-            "saved": "V- Sync gravado"
+            "saved": "Modo de exibição salvo"
         },
         "motion_controls_title": "Giroscópio",
         "double_tap_sprint_title": "Toque duplo para correr",

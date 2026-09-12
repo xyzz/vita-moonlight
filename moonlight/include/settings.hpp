@@ -22,10 +22,20 @@ struct LanguageOption
     const char* label;
 };
 
+enum class StreamDisplayMode
+{
+    Immediate = 0,
+    VBlank,
+    NextFrame,
+};
+
 class settings
 {
   public:
-    static void applySwapInterval(int swapInterval);
+    static void applyMenuDisplayMode();
+    static const std::vector<StreamDisplayMode>& streamDisplayModes(int renderMode);
+    static StreamDisplayMode normalizeStreamDisplayMode(int displayMode, int renderMode);
+    static void applyStreamDisplayMode(int displayMode, int renderMode, bool enableFramePacer, int targetFps);
     static std::string getLanguageFromConfig();
     static void applyLanguageEnv(const std::string& lang);
     static const std::vector<LanguageOption>& supportedLanguages();

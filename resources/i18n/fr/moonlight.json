@@ -157,15 +157,13 @@
     "show_fps_title": "Afficher FPS",
     "save_debug_log_title": "Enregistrer le journal de débogage",
     "swap_interval": {
-      "title": "V-Sync (intervalle de rotation)",
+      "title": "Mode d’affichage",
       "options": {
-        "0": "OFF V-Sync (non limité)",
-        "1": "V-Sync ON (60 FPS)",
-        "2": "V-Sync 2x (30 FPS)",
-        "3": "V-Sync 3x (20 FPS)",
-        "4": "V-Sync 4x (15 FPS)"
+        "0": "Immédiat (latence minimale)",
+        "1": "VBlank (plus fluide)",
+        "2": "Image suivante (sans déchirement)"
       },
-      "saved": "V-Sync enregistré"
+      "saved": "Mode d’affichage enregistré"
     },
     "motion_controls_title": "Gyroscope",
     "double_tap_sprint_title": "Double pression sur sprint",

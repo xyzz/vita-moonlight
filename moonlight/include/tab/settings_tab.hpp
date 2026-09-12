@@ -22,6 +22,7 @@
 #include <borealis.hpp>
 #include <cstdint>
 #include <memory>
+#include <vector>
 
 class SettingsTab : public brls::Box
 {
@@ -77,5 +78,9 @@ class SettingsTab : public brls::Box
     };
 
     std::shared_ptr<AsyncState> asyncState = std::make_shared<AsyncState>();
+    std::vector<int> displayModeValues;
+
     void initAsync();
+    int prepareDisplayModeOptions(int renderMode, int displayMode, std::vector<std::string>& labels);
+    void updateDisplayModeOptions(int renderMode, int displayMode);
 };

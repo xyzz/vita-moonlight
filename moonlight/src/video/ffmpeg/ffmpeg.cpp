@@ -85,8 +85,7 @@ struct ffmpeg_perf_counters
     uint32_t send_max_us;
     uint64_t recv_total_us;
     uint32_t recv_max_us;
-    uint32_t dropped_stale_frames;
-    uint32_t stale_refreshes;
+    uint32_t discarded_decoder_frames;
     uint32_t ingress_samples;
     uint64_t assembly_total_us;
     uint32_t assembly_max_us;
@@ -102,9 +101,6 @@ struct ffmpeg_perf_counters
     uint32_t enqueue_gap_over_50ms;
     uint64_t host_latency_total_us;
     uint32_t host_latency_max_us;
-    uint32_t output_age_samples;
-    uint64_t output_age_total_us;
-    uint32_t output_age_max_us;
     uint64_t publish_total_us;
     uint32_t publish_max_us;
     uint64_t publish_direct_total_us;
@@ -179,7 +175,6 @@ static void write_perf_report(const ffmpeg_perf_report& report)
     uint32_t callbackGapAvgUs        = perf.callback_gap_samples ? (uint32_t)(perf.callback_gap_total_us / perf.callback_gap_samples) : 0;
     uint32_t enqueueGapAvgUs         = perf.enqueue_gap_samples ? (uint32_t)(perf.enqueue_gap_total_us / perf.enqueue_gap_samples) : 0;
     uint32_t hostAvgUs               = perf.ingress_samples ? (uint32_t)(perf.host_latency_total_us / perf.ingress_samples) : 0;
-    uint32_t outputAgeAvgUs          = perf.output_age_samples ? (uint32_t)(perf.output_age_total_us / perf.output_age_samples) : 0;
 
     VITA_DEBUG_LOG("[PERF][VIDEO] win=%ums submit=%u/s dec=%u/s pub=%u/s present=%u/s queue=%d",
         report.elapsed_ms, submitFps, decodedFps, publishedFps,
@@ -188,20 +183,19 @@ static void write_perf_report(const ffmpeg_perf_report& report)
         submitAvgUs, perf.submit_max_us, lockAvgUs, perf.lock_wait_max_us,
         drainAvgUs, perf.drain_max_us, copyAvgUs, perf.copy_max_us,
         sendAvgUs, perf.send_max_us, recvAvgUs, perf.recv_max_us);
-    VITA_DEBUG_LOG("[PERF][VIDEO] pub_avg=%u/%umax dr=%u/%umax sw=%u/%umax slots_mtx=%u/%umax sws=%u/%umax stale=%u refresh=%u",
+    VITA_DEBUG_LOG("[PERF][VIDEO] pub_avg=%u/%umax dr=%u/%umax sw=%u/%umax slots_mtx=%u/%umax sws=%u/%umax dec_drop=%u",
         publishAvgUs, perf.publish_max_us,
         pubDirectAvgUs, perf.publish_direct_max_us,
         pubSwAvgUs, perf.publish_sw_max_us,
         slotsMtxAvgUs, perf.slots_mutex_max_us,
         swsAvgUs, perf.sws_max_us,
-        perf.dropped_stale_frames, perf.stale_refreshes);
-    VITA_DEBUG_LOG("[PERF][VIDEO] ingress assembly=%u/%umax callback=%u/%umax enqueue_gap=%u/%umax enqueue50=%u callback_gap=%u/%umax callback50=%u host=%u/%umax age=%u/%umax",
+        perf.discarded_decoder_frames);
+    VITA_DEBUG_LOG("[PERF][VIDEO] ingress assembly=%u/%umax callback=%u/%umax enqueue_gap=%u/%umax enqueue50=%u callback_gap=%u/%umax callback50=%u host=%u/%umax",
         assemblyAvgUs, perf.assembly_max_us,
         callbackAvgUs, perf.callback_delay_max_us,
         enqueueGapAvgUs, perf.enqueue_gap_max_us, perf.enqueue_gap_over_50ms,
         callbackGapAvgUs, perf.callback_gap_max_us, perf.callback_gap_over_50ms,
-        hostAvgUs, perf.host_latency_max_us,
-        outputAgeAvgUs, perf.output_age_max_us);
+        hostAvgUs, perf.host_latency_max_us);
     VITA_DEBUG_LOG("[PERF][VIDEO] pool=%u/%u pending=%u exhaust=%u alloc_fail=%u map_fail=%u",
         report.pool_in_use, report.pool_allocated, report.pool_pending,
         report.pool_exhaustions, report.pool_alloc_failures, report.pool_map_failures);
@@ -862,132 +856,6 @@ static void record_ingress_timing(PDECODE_UNIT decodeUnit, uint64_t callbackTime
         g_perf.host_latency_max_us = hostLatencyUs;
 }
 
-static void update_latency_epoch(FFmpegVideoContext* context, PDECODE_UNIT decodeUnit)
-{
-    if (!context || !decodeUnit || !decodeUnit->presentationTimeUs || decodeUnit->receiveTimeUs < decodeUnit->presentationTimeUs)
-    {
-        return;
-    }
-
-    if (context->latency_samples > 0 && (decodeUnit->frameNumber < context->last_input_frame_number || decodeUnit->presentationTimeUs < context->last_input_pts_us))
-    {
-        context->latency_epoch_offset_us = 0;
-        context->latency_samples         = 0;
-    }
-
-    uint64_t offsetUs = decodeUnit->receiveTimeUs - decodeUnit->presentationTimeUs;
-    if (context->latency_samples == 0 || offsetUs < context->latency_epoch_offset_us)
-    {
-        context->latency_epoch_offset_us = offsetUs;
-    }
-    context->last_input_frame_number = decodeUnit->frameNumber;
-    context->last_input_pts_us       = decodeUnit->presentationTimeUs;
-    context->latency_samples++;
-}
-
-static void reset_latency_tracking(FFmpegVideoContext* context)
-{
-    context->last_pts_us             = 0;
-    context->latency_epoch_offset_us = 0;
-    context->last_input_pts_us       = 0;
-    context->last_input_frame_number = 0;
-    context->latency_samples         = 0;
-    context->output_age_floor_us     = 0;
-    context->output_age_floor_valid  = false;
-}
-
-static uint32_t frame_interval_us()
-{
-    uint32_t targetFps = video_stats::load(g_stats.target_fps);
-    if (targetFps == 0)
-        targetFps = 60U;
-    return 1000000U / targetFps;
-}
-
-static bool get_stream_age_us(FFmpegVideoContext* context, uint64_t ptsUs, uint32_t* ageUs)
-{
-    if (!context || !ptsUs || !ageUs || context->latency_samples < 4)
-    {
-        return false;
-    }
-
-    uint64_t expectedUs = context->latency_epoch_offset_us + ptsUs;
-    uint64_t nowUs      = LiGetMicroseconds();
-    if (nowUs <= expectedUs)
-    {
-        *ageUs = 0;
-        return true;
-    }
-
-    *ageUs = clamp_u32(nowUs - expectedUs);
-    return true;
-}
-
-static bool should_drop_stale_output(FFmpegVideoContext* context, uint64_t ptsUs)
-{
-    uint32_t ageUs = 0;
-    if (!get_stream_age_us(context, ptsUs, &ageUs))
-    {
-        return false;
-    }
-
-    g_perf.output_age_samples++;
-    g_perf.output_age_total_us += ageUs;
-    if (ageUs > g_perf.output_age_max_us)
-        g_perf.output_age_max_us = ageUs;
-
-    if (!context->output_age_floor_valid || ageUs < context->output_age_floor_us)
-    {
-        context->output_age_floor_us    = ageUs;
-        context->output_age_floor_valid = true;
-    }
-    uint32_t excessAgeUs = ageUs - context->output_age_floor_us;
-
-    uint32_t staleThresholdUs = frame_interval_us() * 4U;
-    if (excessAgeUs <= staleThresholdUs)
-    {
-        return false;
-    }
-
-    static uint32_t staleLogCounter = 0;
-    if ((staleLogCounter++ % 30) == 0)
-    {
-        VITA_DEBUG_LOG("[FFMPEG][LAT] suppressing stale output age=%uus floor=%uus excess=%uus threshold=%uus pts=%llu",
-            ageUs, context->output_age_floor_us, excessAgeUs,
-            staleThresholdUs, (unsigned long long)ptsUs);
-    }
-    g_perf.dropped_stale_frames++;
-    video_stats::increment(g_stats.frames_dropped_pacer);
-    return true;
-}
-
-static bool should_refresh_stale_stream(FFmpegVideoContext* context, uint64_t ptsUs)
-{
-    if (!context || context->latency_samples < 8)
-    {
-        return false;
-    }
-
-    uint32_t ageUs = 0;
-    if (!get_stream_age_us(context, ptsUs, &ageUs))
-    {
-        return false;
-    }
-
-    uint32_t refreshThresholdUs = frame_interval_us() * 12U;
-    if (ageUs <= refreshThresholdUs)
-    {
-        return false;
-    }
-
-    VITA_DEBUG_LOG("[FFMPEG][LAT] abandoning stale stream age=%uus threshold=%uus; requesting IDR",
-        ageUs, refreshThresholdUs);
-    g_perf.dropped_stale_frames++;
-    g_perf.stale_refreshes++;
-    video_stats::increment(g_stats.frames_dropped_pacer);
-    return true;
-}
-
 static int recover_decoder(FFmpegVideoContext* context, const char* stage, int error)
 {
     char errorText[AV_ERROR_MAX_STRING_SIZE] = {};
@@ -996,7 +864,6 @@ static int recover_decoder(FFmpegVideoContext* context, const char* stage, int e
         snprintf(errorText, sizeof(errorText), "unknown error");
     }
     vita_log::error("[FFMPEG] %s error=0x%X (%s); reopening decoder", stage, error, errorText);
-    context->decoder_resync_pending = false;
     ffmpeg_decoder_destroy(&context->decoder);
     process_pending_vram_frees_if_safe();
     if (ffmpeg_decoder_init(&context->decoder) < 0)
@@ -1004,11 +871,6 @@ static int recover_decoder(FFmpegVideoContext* context, const char* stage, int e
         context->initialized = false;
         vita_log::error("[FFMPEG] decoder recovery failed");
     }
-    else
-    {
-        context->decoder_prime_pending = true;
-    }
-
     static uint64_t lastForcedIdrUs = 0;
     uint64_t nowUs                  = LiGetMicroseconds();
     if (!lastForcedIdrUs || nowUs - lastForcedIdrUs >= 100000ULL)
@@ -1776,20 +1638,6 @@ static bool publish_frame(FFmpegVideoContext* ctx, AVFrame* frame, uint64_t ptsU
         return false;
     }
 
-    if (!ctx->decoder_resync_pending)
-    {
-        if (should_refresh_stale_stream(ctx, ptsUs))
-        {
-            ctx->decoder_resync_pending = true;
-            vita_netopt_force_idr();
-            return false;
-        }
-        if (should_drop_stale_output(ctx, ptsUs))
-        {
-            return false;
-        }
-    }
-
     uint32_t publishStartUs = perf_now_us();
 
     bool published       = false;
@@ -2184,8 +2032,6 @@ extern "C"
             ffmpeg_release_locked(context);
             return -1;
         }
-        context->decoder_prime_pending  = true;
-        context->decoder_resync_pending = false;
         if (context->decoder.use_direct_render)
         {
             VITA_DEBUG_LOG("[FFMPEG] Decoder initialized with direct render enabled");
@@ -2370,24 +2216,6 @@ extern "C"
         AVPacket* pkt         = context->decoder.pkt;
         AVFrame* frame        = context->decoder.frame;
 
-        if (context->decoder_resync_pending && decodeUnit->frameType == FRAME_TYPE_IDR)
-        {
-            VITA_DEBUG_LOG("[FFMPEG][LAT] resync IDR received; flushing decoder before decode");
-            avcodec_flush_buffers(avctx);
-            reset_latency_tracking(context);
-            context->decoder_resync_pending = false;
-        }
-
-        update_latency_epoch(context, decodeUnit);
-
-        if (!context->decoder_resync_pending && should_refresh_stale_stream(context, decodeUnit->presentationTimeUs))
-        {
-            avcodec_flush_buffers(avctx);
-            reset_latency_tracking(context);
-            finalize_submit_metrics();
-            return DR_NEED_IDR;
-        }
-
         uint32_t drainStartUs         = perf_now_us();
         bool drainReceived            = false;
         static AVFrame* s_drain_frame = nullptr;
@@ -2411,7 +2239,7 @@ extern "C"
                 if (drainReceived)
                 {
                     av_frame_unref(frame);
-                    g_perf.dropped_stale_frames++;
+                    g_perf.discarded_decoder_frames++;
                 }
                 av_frame_move_ref(frame, s_drain_frame);
                 drainReceived = true;
@@ -2532,19 +2360,6 @@ extern "C"
             finalize_submit_metrics();
             return recover_decoder(context, "send_packet", sendRes);
         }
-        if (context->decoder_prime_pending)
-        {
-            context->decoder_prime_pending   = false;
-            uint32_t primeBacklogThresholdUs = frame_interval_us() * 4U;
-            if (sendUs > primeBacklogThresholdUs)
-            {
-                VITA_DEBUG_LOG("[FFMPEG][LAT] decoder priming took %uus; requesting resync IDR",
-                    sendUs);
-                context->decoder_resync_pending = true;
-                vita_netopt_force_idr();
-            }
-        }
-
         uint32_t recvStartUs         = perf_now_us();
         bool frameReceived           = false;
         static AVFrame* s_recv_frame = nullptr;
@@ -2569,7 +2384,7 @@ extern "C"
                 if (frameReceived)
                 {
                     av_frame_unref(frame);
-                    g_perf.dropped_stale_frames++;
+                    g_perf.discarded_decoder_frames++;
                 }
                 av_frame_move_ref(frame, s_recv_frame);
                 frameReceived = true;

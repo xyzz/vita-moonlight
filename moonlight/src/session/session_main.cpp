@@ -9,6 +9,7 @@
 #include <utility>
 
 #include "ConfigManager.hpp"
+#include "Settings.hpp"
 #include "borealis.hpp"
 #include "controller/ControllerInput.hpp"
 #include "controller/keyboard/keyboard_launcher.hpp"
@@ -26,8 +27,6 @@ extern "C"
     void vita_dp_fini(void);
     int vita_dp_present_frame(void);
     bool vita_dp_is_active(void);
-    void vita_frame_pacer_start(int paceFps);
-    void vita_frame_pacer_stop(int restoreFps);
 }
 
 SessionMainView::SessionMainView(const HostInfo& host, const RemoteAppInfo& app, std::shared_ptr<VitaSession> session)
@@ -150,25 +149,31 @@ SessionMainView::SessionMainView(const HostInfo& host, const RemoteAppInfo& app,
     if (targetFps > 60)
         targetFps = 60;
 
-    // FPS and swapInterval are already configured in main.cpp
-    // No need to reconfigure here - main.cpp handles both UI and streaming
-    brls::Application::setFPSStatus(true); // Enable FPS status for logging
-    vita_log::info("[SessionMainView] Init render config (cfg_fps=%d -> swapInterval=%d)", targetFps, videoSettings.swap_interval);
+    brls::Application::setFPSStatus(true);
+    const auto streamDisplayMode = moonlight::settings::normalizeStreamDisplayMode(
+        videoSettings.swap_interval, videoSettings.render_mode);
+    moonlight::settings::applyStreamDisplayMode(
+        static_cast<int>(streamDisplayMode), videoSettings.render_mode,
+        videoSettings.enable_frame_pacer, static_cast<int>(targetFps));
+    const char* displayMode = "immediate";
+    if (streamDisplayMode == moonlight::StreamDisplayMode::VBlank)
+        displayMode = "vblank";
+    else if (streamDisplayMode == moonlight::StreamDisplayMode::NextFrame)
+        displayMode = "next-frame";
+    vita_log::info("[SessionMainView] Display mode=%s target=%u fps pacer=%d",
+        displayMode, targetFps, videoSettings.enable_frame_pacer);
 
     brls::Application::setLowLatencyMode(true);
-
-    // Wake the render loop as soon as the decoder publishes a frame.
-    if (videoSettings.swap_interval == 0 && videoSettings.enable_frame_pacer)
-    {
-        vita_frame_pacer_start((int)targetFps);
-    }
 
     const bool directPresenterReady = vita_dp_init() == 0;
     prePresentSub                   = brls::Application::getPrePresentEvent()->subscribe([]()
         {
+        const bool legacyDialogActive = is_legacy_dialog_keyboard_active();
+        brls::Application::setCommonDialogVSync(legacyDialogActive);
+
         if (vita_dp_is_active()) {
             vita_dp_present_frame();
-        } else if (is_legacy_dialog_keyboard_active()) {
+        } else if (legacyDialogActive) {
             VitaVideoRenderer::instance().drawNVG(
                 brls::Application::getNVGContext(),
                 static_cast<float>(brls::Application::windowWidth),
@@ -233,7 +238,8 @@ SessionMainView::~SessionMainView()
         prePresentSubscribed = false;
     }
 
-    vita_frame_pacer_stop(60);
+    brls::Application::setCommonDialogVSync(false);
+    moonlight::settings::applyMenuDisplayMode();
     brls::Application::setLowLatencyMode(false);
     vita_dp_fini();
     if (session)

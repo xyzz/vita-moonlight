@@ -157,15 +157,13 @@
         "show_fps_title": "顯示 FPS",
         "save_debug_log_title": "保存調試日誌",
         "swap_interval": {
-            "title": "V-Sync（交換間隔）",
+            "title": "顯示模式",
             "options": {
-                "0": "V-Sync 關閉（無限制）",
-                "1": "V-Sync 開開（60 FPS）",
-                "2": "V-Sync 2x（30 FPS）",
-                "3": "V-Sync 3x（20 FPS）",
-                "4": "V-Sync 4x（15 FPS）"
+                "0": "立即（最低延遲）",
+                "1": "VBlank（較流暢）",
+                "2": "下一幀（無畫面撕裂）"
             },
-            "saved": "V-Sync 已儲存"
+            "saved": "已儲存顯示模式"
         },
         "motion_controls_title": "陀螺儀",
         "double_tap_sprint_title": "點兩下衝刺",

@@ -157,15 +157,13 @@
             "show_fps_title": "Show FPS",
             "save_debug_log_title": "Save debug log",
             "swap_interval": {
-                "title": "V-Sync (Swap Interval)",
+                "title": "Display mode",
                 "options": {
-                    "0": "V-Sync OFF (Unlimited)",
-                    "1": "V-Sync ON (60 FPS)",
-                    "2": "V-Sync 2x (30 FPS)",
-                    "3": "V-Sync 3x (20 FPS)",
-                    "4": "V-Sync 4x (15 FPS)"
+                    "0": "Immediate (lowest latency)",
+                    "1": "VBlank (smoother)",
+                    "2": "Next frame (no tearing)"
                 },
-                "saved": "V-Sync saved"
+                "saved": "Display mode saved"
             },
             "motion_controls_title": "Gyroscope",
             "double_tap_sprint_title": "Double tap to sprint",

@@ -432,7 +432,7 @@ VideoSettings ConfigManager::getVideoSettings() const
     settings.pixel_format_mode            = parseInt(get("video", "pixel_format_mode", "1"), 1);
     settings.gamepad_type                 = static_cast<GamepadType>(parseInt(get("video", "gamepad_type", "0"), 0));
     settings.swap_shoulder_buttons        = get("video", "swap_shoulder_buttons", "false") == "true";
-    settings.swap_interval                = parseInt(get("video", "swap_interval", "0"), 0);
+    settings.swap_interval                = parseInt(get("video", "swap_interval", "2"), 2);
     // Trackpad Settings
     settings.trackpad_pointer_speed          = parseInt(get("trackpad", "pointer_speed", "100"), 100);
     settings.trackpad_dead_zone              = parseInt(get("trackpad", "dead_zone", "50"), 50);

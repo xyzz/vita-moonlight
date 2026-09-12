@@ -87,8 +87,8 @@ void settings::applyMenuDisplayMode()
 const std::vector<StreamDisplayMode>& settings::streamDisplayModes(int renderMode)
 {
     static const std::vector<StreamDisplayMode> legacyModes = {
-        StreamDisplayMode::Immediate,
         StreamDisplayMode::NextFrame,
+        StreamDisplayMode::Immediate,
         StreamDisplayMode::VBlank,
     };
     static const std::vector<StreamDisplayMode> ffmpegModes = {

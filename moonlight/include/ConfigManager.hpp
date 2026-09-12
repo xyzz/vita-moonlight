@@ -83,14 +83,15 @@ struct VideoSettings
     bool trackpad_multi_touch            = true;
     int trackpad_edge_zone               = 15; // 0-50%
 
-    int render_mode       = 0; // 0=Legacy, 1=Modern (FFmpeg)
-    int pixel_format_mode = 1; // 0=RGBA direct, 1=YUV420 (testing)
+    int render_mode       = 0; // Legacy or FFmpeg
+    int pixel_format_mode = 1; // RGBA or YUV420
 
-    GamepadType gamepad_type = GAMEPAD_TYPE_XBOX; // 0=Xbox, 1=PS4 (to emulate controller)
+    GamepadType gamepad_type = GAMEPAD_TYPE_XBOX;
 
     bool swap_shoulder_buttons = false;
 
-    int swap_interval = 0;
+    // Immediate, VBlank, or next-frame presentation.
+    int swap_interval = 2;
 
     bool enable_front_touchzones         = false;
     int front_touch_offset               = 0; // px from screen edge

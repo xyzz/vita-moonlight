@@ -202,7 +202,7 @@ SettingsTab::SettingsTab()
         ConfigManager config;
         int chosen = selected;
         int pixelFormat = 1;
-        int displayMode = static_cast<int>(moonlight::StreamDisplayMode::Immediate);
+        int displayMode = static_cast<int>(moonlight::StreamDisplayMode::NextFrame);
         config.updateVideoSettings([chosen, &pixelFormat, &displayMode](VideoSettings& settings) {
             settings.render_mode = chosen;
             if (chosen == 0) {

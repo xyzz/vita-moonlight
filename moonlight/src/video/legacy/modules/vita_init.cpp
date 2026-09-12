@@ -12,14 +12,9 @@
 #include <borealis/core/application.hpp>
 #include <memory>
 
-#include "video/pixel_format/pixel_format.hpp"
 #include "video/runtime_settings.hpp"
 #include "vita_globals.hpp"
 #include "vita_sceAvcInternal.hpp"
-
-// External pixel processor from vita_decode.cpp
-extern PixelFormat::IPixelProcessor* g_pixelProcessor;
-
 static inline size_t align_up_size(size_t value, size_t alignment)
 {
     if (alignment == 0)
@@ -75,15 +70,7 @@ extern "C" int vitavideo_setup(int videoFormat, int width, int height, int redra
 
         vitavideo_update_scaling_settings(width, height); // define image_scaling based on original resolution
 
-        decoder_src_width            = width;
-        decoder_src_height           = height;
-        decoder_tried_direct_texture = false;
-        decoder_use_phys_fallback    = false; // try first decode direct to texture; activate dynamic fallback if it fails
-        decoder_output_mode          = video_runtime::pixelFormatMode();
-        decoder_yuv_raw              = nullptr;
-        decoder_yuv_buffer           = nullptr;
-        decoder_yuv_buffer_size      = 0;
-        decoder_yuv_total_alloc      = 0;
+        decoder_output_mode = video_runtime::pixelFormatMode();
         if (decoder_output_mode != 0 && decoder_output_mode != 1)
         {
             VITA_DEBUG_LOG("[Video][INIT] pixel_format_mode desconocido=%d -> forzando RGBA", decoder_output_mode);

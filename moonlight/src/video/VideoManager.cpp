@@ -99,7 +99,7 @@ DECODER_RENDERER_CALLBACKS VideoManager::getDecoderCallbacks()
         callbacks.stop             = vitavideo_stop;
         callbacks.cleanup          = vita_cleanup;
         callbacks.submitDecodeUnit = vitavideo_submit_decode_unit;
-        callbacks.capabilities     = CAPABILITY_DIRECT_SUBMIT | CAPABILITY_SLICES_PER_FRAME(2);
+        callbacks.capabilities     = CAPABILITY_SLICES_PER_FRAME(2);
     }
     else
     {

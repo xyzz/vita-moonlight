@@ -26,11 +26,7 @@ extern "C"
 {
 #include "Platform.h"
 }
-#include "video/pixel_format/pixel_format.hpp"
 #include "vita_sceAvcInternal.hpp"
-
-// Global pixel format processor (modular RGBA/YUV handling)
-PixelFormat::IPixelProcessor* g_pixelProcessor = nullptr;
 
 extern "C" void vita_video_frame_published(void);
 
@@ -101,22 +97,27 @@ int vitavideo_init_1080p_internal_api(int width, int height, SceVideodecQueryIni
 #define SCE_AVCDEC_PIXELFORMAT_YUV420_PLANAR 0x4
 #endif
 
-// Internal control to avoid log spam in physical fallback
-static bool decoder_phys_fallback_permanent_disable = false; // if true do not retry physical alloc
-static int decoder_phys_fallback_fail_count         = 0;
-
 extern "C" int vitavideo_submit_decode_unit(PDECODE_UNIT decodeUnit)
 {
-    static uint32_t vd_submit_counter            = 0;
-    static bool last_call_had_output             = false;
-    static const uint64_t texture_guard_sig_tail = 0xA55AA55AA55AA55AULL;
-    static const uint64_t texture_guard_sig_head = 0xDEADBEEFCAFEBABEULL;
-    static const uint8_t texture_guard_fill      = 0xD6;
-    uint8_t* texBack                             = (uint8_t*)gxm_texture_get_datap(FRAME_BACK());
-    unsigned int strideBytes                     = gxm_texture_get_stride(FRAME_BACK());
+    static uint32_t vd_submit_counter = 0;
+    if (!decodeUnit)
+    {
+        video_stats_record_corruption(true);
+        return DR_NEED_IDR;
+    }
+
+    video_stats_record_input_frame(decodeUnit);
+    if (video_decode_backlog_requires_refresh(decodeUnit))
+    {
+        return DR_NEED_IDR;
+    }
+    int currentWrite = __atomic_load_n(&frame_write_idx, __ATOMIC_ACQUIRE);
+    video_frame_wait_for_slot(currentWrite);
+    GxmTexture* writeTexture = __atomic_load_n(&frame_textures[currentWrite], __ATOMIC_ACQUIRE);
+    uint8_t* texBack         = writeTexture ? (uint8_t*)gxm_texture_get_datap(writeTexture) : nullptr;
+    unsigned int strideBytes = writeTexture ? gxm_texture_get_stride(writeTexture) : 0;
     if (!strideBytes)
         strideBytes = image_scaling.texture_width * 4;
-    // Force no physical fallback in RGBA mode (stable debugging)
     if (vd_submit_counter < 4 || (vd_submit_counter % 300) == 0)
     {
         VITA_DEBUG_LOG("[Video] submit_decode_unit #%u", vd_submit_counter);
@@ -134,83 +135,6 @@ extern "C" int vitavideo_submit_decode_unit(PDECODE_UNIT decodeUnit)
     uint32_t baseH    = (decoder_height > 0 ? decoder_height : image_scaling.texture_height);
     bool decodeYuv    = (decoder_output_mode == 1);
 
-    // Staging logic is handled by the modular pixel processor
-
-    bool useFallbackBuffer       = false;
-    uint8_t* fallbackPtr         = nullptr;
-    uint32_t fallbackPitchPixels = 0;
-    if (!decodeYuv && decoder_use_phys_fallback)
-    {
-        size_t needed               = (size_t)image_scaling.texture_width * (size_t)image_scaling.texture_height * 4;
-        constexpr size_t kPhysAlign = 256 * 1024;
-        size_t allocSize            = (needed + (kPhysAlign - 1)) & ~(kPhysAlign - 1);
-        if (allocSize < needed)
-        {
-            allocSize = needed;
-        }
-        decoder_output_phys_size = allocSize;
-        if (!decoder_output_phys_ptr && decoder_output_phys_size > 0)
-        {
-            int types[] = {
-                SCE_KERNEL_MEMBLOCK_TYPE_USER_CDRAM_RW,
-                SCE_KERNEL_MEMBLOCK_TYPE_USER_MAIN_PHYCONT_NC_RW,
-                SCE_KERNEL_MEMBLOCK_TYPE_USER_MAIN_PHYCONT_RW
-            };
-            for (unsigned ti = 0; ti < sizeof(types) / sizeof(types[0]) && !decoder_output_phys_ptr; ++ti)
-            {
-                decoder_output_phys_block = sceKernelAllocMemBlock("dec_phys_rgba", types[ti], decoder_output_phys_size, NULL);
-                if (decoder_output_phys_block < 0)
-                {
-                    VITA_DEBUG_LOG("[Video][FB_PHY] Alloc phys type=0x%X err=0x%08X", types[ti], decoder_output_phys_block);
-                    continue;
-                }
-                if (sceKernelGetMemBlockBase(decoder_output_phys_block, &decoder_output_phys_ptr) < 0 || !decoder_output_phys_ptr)
-                {
-                    VITA_DEBUG_LOG("[Video][FB_PHY] GetMemBlockBase fallo type=0x%X", types[ti]);
-                    sceKernelFreeMemBlock(decoder_output_phys_block);
-                    decoder_output_phys_block = -1;
-                }
-                else
-                {
-                    if (!decoder_output_phys_mapped)
-                    {
-                        int mapRes = sceGxmMapMemory(decoder_output_phys_ptr, (SceSize)decoder_output_phys_size, SCE_GXM_MEMORY_ATTRIB_RW);
-                        if (mapRes < 0)
-                        {
-                            VITA_DEBUG_LOG("[Video][FB_PHY] Map memoria fallo type=0x%X err=0x%08X", types[ti], mapRes);
-                            sceKernelFreeMemBlock(decoder_output_phys_block);
-                            decoder_output_phys_block = -1;
-                            decoder_output_phys_ptr   = nullptr;
-                            decoder_output_phys_size  = 0;
-                            continue;
-                        }
-                        decoder_output_phys_mapped = true;
-                    }
-                    decoder_phys_fallback_fail_count = 0;
-                    VITA_DEBUG_LOG("[Video][FB_PHY] Buffer físico RGBA asignado size=%lu type=0x%X", (unsigned long)decoder_output_phys_size, types[ti]);
-                }
-            }
-        }
-        if (decoder_output_phys_ptr)
-        {
-            fallbackPtr         = static_cast<uint8_t*>(decoder_output_phys_ptr);
-            fallbackPitchPixels = image_scaling.texture_width;
-            useFallbackBuffer   = true;
-        }
-        else if (!decoder_phys_fallback_permanent_disable)
-        {
-            decoder_phys_fallback_fail_count++;
-            if (decoder_phys_fallback_fail_count > 2)
-            {
-                decoder_phys_fallback_permanent_disable = true;
-                decoder_use_phys_fallback               = false;
-                VITA_DEBUG_LOG("[Video][FB_PHY] Fallback físico RGBA deshabilitado tras %d fallos", decoder_phys_fallback_fail_count);
-            }
-        }
-    }
-
-    // Configure decoder output directly from mode to avoid virtual dispatch in decode thread.
-    bool decodeUsesFallback = false;
     uint8_t* decodeTarget   = nullptr;
     picture.frame.pixelType = decodeYuv ? SCE_AVCDEC_PIXELFORMAT_YUV420_PACKED_RASTER : SCE_AVCDEC_PIXELFORMAT_RGBA8888;
     decodeTarget            = texBack;
@@ -221,26 +145,16 @@ extern "C" int vitavideo_submit_decode_unit(PDECODE_UNIT decodeUnit)
         return DR_NEED_IDR;
     }
 
-    picture.frame.frameWidth       = alignedW;
-    picture.frame.horizontalSize   = alignedW;
-    uint32_t frameHeightForDecoder = baseH;
-    if (decodeUsesFallback)
-    {
-        frameHeightForDecoder = baseH;
-    }
-
-    picture.frame.frameHeight  = frameHeightForDecoder;
-    picture.frame.verticalSize = frameHeightForDecoder;
+    picture.frame.frameWidth     = alignedW;
+    picture.frame.horizontalSize = alignedW;
+    picture.frame.frameHeight    = baseH;
+    picture.frame.verticalSize   = baseH;
 
     uint32_t framePitchPixels = 0;
     if (decodeYuv)
     {
         // YUV raster decode path uses aligned width in pixels as pitch.
         framePitchPixels = alignedW;
-    }
-    else if (decodeUsesFallback)
-    {
-        framePitchPixels = fallbackPitchPixels ? fallbackPitchPixels : alignedW;
     }
     else
     {
@@ -254,9 +168,6 @@ extern "C" int vitavideo_submit_decode_unit(PDECODE_UNIT decodeUnit)
 
     picture.frame.pixelType = decodeYuv ? SCE_AVCDEC_PIXELFORMAT_YUV420_PACKED_RASTER : SCE_AVCDEC_PIXELFORMAT_RGBA8888;
 
-    const uint8_t* cpuPushPtr  = nullptr;
-    uint32_t cpuPushPitchBytes = 0;
-
     picture.frame.pPicture[0] = decodeTarget; // decode directly to the chosen buffer
     if (decodeYuv)
     {
@@ -269,6 +180,23 @@ extern "C" int vitavideo_submit_decode_unit(PDECODE_UNIT decodeUnit)
 
     if (decodeUnit->fullLength <= 0 || !decodeUnit->bufferList)
     {
+        video_stats_record_corruption(true);
+        return DR_NEED_IDR;
+    }
+
+    size_t rawLength = 0;
+    for (PLENTRY current = decodeUnit->bufferList; current; current = current->next)
+    {
+        if (!current->data || current->length <= 0 || static_cast<size_t>(current->length) > SIZE_MAX - rawLength)
+        {
+            video_stats_record_corruption(true);
+            return DR_NEED_IDR;
+        }
+        rawLength += static_cast<size_t>(current->length);
+    }
+    if (rawLength != static_cast<size_t>(decodeUnit->fullLength))
+    {
+        video_stats_record_corruption(true);
         return DR_NEED_IDR;
     }
 
@@ -277,7 +205,9 @@ extern "C" int vitavideo_submit_decode_unit(PDECODE_UNIT decodeUnit)
     {
         char* resizedBuffer = static_cast<char*>(realloc(decoder_buffer, requiredCapacity));
         if (!resizedBuffer)
+        {
             return DR_NEED_IDR;
+        }
         decoder_buffer      = resizedBuffer;
         decoder_buffer_size = requiredCapacity;
     }
@@ -329,6 +259,7 @@ extern "C" int vitavideo_submit_decode_unit(PDECODE_UNIT decodeUnit)
         }
         if (!appended)
         {
+            video_stats_record_corruption(length != static_cast<size_t>(decodeUnit->fullLength));
             VITA_DEBUG_LOG("[Video] AU assembly exceeded buffer capacity");
             return DR_NEED_IDR;
         }
@@ -343,20 +274,7 @@ extern "C" int vitavideo_submit_decode_unit(PDECODE_UNIT decodeUnit)
         VITA_DEBUG_LOG("[Video] AU size=%u fullLength=%u", au.es.size, decodeUnit->fullLength);
     }
 
-    int ret = -1;
-
-    // If we are already in fallback mode and we still do not have a block, try to assign with several types
-    // (Old direct fallback routes are built into useFallbackBuffer above)
-
-    // VITA_DEBUG_LOG("[Video][DECODE] call fmt=%s w=%u h=%u strideBytes=%u pitchPx=%u phys=%s tex=%p staging=%s",
-    //     decodeYuv ? "YUV420" : "RGBA",
-    //     picture.frame.frameWidth,
-    //     picture.frame.frameHeight,
-    //     strideBytes,
-    //     picture.frame.framePitch,
-    //     decoder_use_phys_fallback ? "yes" : "no",
-    //     texBack,
-    //     useLinearStaging ? "yes" : "no");
+    int ret            = -1;
     uint64_t start_dec = sceKernelGetSystemTimeWide();
     ret                = sceAvcdecDecode(decoder, &au, &array_picture);
     uint64_t end_dec   = sceKernelGetSystemTimeWide();
@@ -370,53 +288,28 @@ extern "C" int vitavideo_submit_decode_unit(PDECODE_UNIT decodeUnit)
         video_stats::increment(g_decode_count);
     }
 
-    // Map common errors for quick diagnosis
-    const char* errName = "OK";
-    switch ((uint32_t)ret)
-    {
-        case SCE_AVCDEC_ERROR_UNSUPPORT_IMAGE_SIZE:
-            errName = "UNSUPPORT_IMAGE_SIZE";
-            break;
-        case SCE_AVCDEC_ERROR_INVALID_COLOR_FORMAT:
-            errName = "INVALID_COLOR_FORMAT";
-            break;
-        case SCE_AVCDEC_ERROR_NOT_PHY_CONTINUOUS_MEMORY:
-            errName = "NOT_PHY_CONT_MEM";
-            break;
-        case SCE_AVCDEC_ERROR_INVALID_POINTER:
-            errName = "INVALID_POINTER";
-            break;
-    }
-    // VITA_DEBUG_LOG("[Video][DECODE] ret=0x%x (%s) outputs=%d", ret, errName, array_picture.numOfOutput);
     if (ret == SCE_AVCDEC_ERROR_UNSUPPORT_IMAGE_SIZE)
     {
+        video_stats_record_corruption(false);
         VITA_DEBUG_LOG("[Video][ERR] UNSUPPORT_IMAGE_SIZE w=%u h=%u pitch=%u -> DR_NEED_IDR", picture.frame.frameWidth, picture.frame.frameHeight, picture.frame.framePitch);
         return DR_NEED_IDR;
     }
 
     if (ret < 0 || vd_submit_counter < 4 || (vd_submit_counter % 240) == 0)
     {
-        VITA_DEBUG_LOG("[Video] dec ret=0x%x out=%d pitch=%u fb=%s physPtr=%p", ret, array_picture.numOfOutput, picture.frame.framePitch, decoder_use_phys_fallback ? "on" : "off", decoder_output_phys_ptr);
+        VITA_DEBUG_LOG("[Video] dec ret=0x%x out=%d pitch=%u", ret, array_picture.numOfOutput, picture.frame.framePitch);
     }
     if (ret < 0)
     {
+        video_stats_record_corruption(false);
         VITA_DEBUG_LOG("[Video] sceAvcdecDecode error: 0x%x (pf_mode=%d)", ret, decoder_output_mode);
         return DR_NEED_IDR;
     }
 
     if (array_picture.numOfOutput != 1)
     {
-        // If there is no output but we are in physical fallback and we have a block, make a tentative copy (best-effort)
-        // No output yet
         vd_submit_counter++;
         return DR_OK;
-    }
-
-    // Direct decode path: decoder writes directly to BACK texture.
-    if (!decodeYuv)
-    {
-        cpuPushPtr        = decodeTarget;
-        cpuPushPitchBytes = strideBytes;
     }
 
     static bool loggedFirstOut = false;
@@ -425,14 +318,6 @@ extern "C" int vitavideo_submit_decode_unit(PDECODE_UNIT decodeUnit)
         VITA_DEBUG_LOG("[Video] Primer frame output confirmado por decoder");
         loggedFirstOut = true;
     }
-    // Copy from staging to texture if we use staging
-    // Without staging: it is already in texture
-    last_call_had_output = true;
-
-    // (Already decoded directly into BACK texture)
-
-    int currentWrite = __atomic_load_n(&frame_write_idx, __ATOMIC_ACQUIRE);
-    __atomic_store_n(&frame_display_idx, currentWrite, __ATOMIC_RELEASE);
     int nextWrite = (currentWrite + 1) % 3;
     __atomic_store_n(&frame_write_idx, nextWrite, __ATOMIC_RELEASE);
 
@@ -442,7 +327,8 @@ extern "C" int vitavideo_submit_decode_unit(PDECODE_UNIT decodeUnit)
         VITA_DEBUG_LOG("[Video][DIAG] Latest frame %d published, next write %d", currentWrite, nextWrite);
     }
 
-    __atomic_store_n(&frame_publish_timestamp_us, (uint32_t)sceKernelGetProcessTimeLow(), __ATOMIC_RELEASE);
+    video_frame_publish(currentWrite, (uint32_t)decodeUnit->frameNumber,
+        (uint32_t)sceKernelGetProcessTimeLow());
 
     // Wake the render loop now instead of letting it sleep out its frame budget.
     vita_video_frame_published();

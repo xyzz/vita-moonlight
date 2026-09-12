@@ -55,21 +55,22 @@ extern "C" void vitavideo_stop();
 // Basic video pipeline stats (similar to simplified MoonlightSession stats)
 typedef struct
 {
-    uint32_t frames_decoded; // Frames decoded and presented (or ready)
-    uint32_t frames_presented; // Frames actually presented (may differ if dropping is enabled)
-    uint32_t frames_dropped_network; // Calculated by gaps in frameNumber
-    uint32_t frames_dropped_pacer; // Frames dropped to recover latency
-    uint32_t idr_count; // Number of IDR NALs
-    uint32_t p_slice_count; // Number of non-IDR slice type NALs
-    uint32_t current_fps; // FPS measured last window
-    uint32_t decoded_fps; // Decoding FPS measured last window
-    uint32_t target_fps; // Objective FPS (negotiated redrawRate)
-    uint64_t session_ms; // Time since first frame (ms)
-    uint32_t reassembly_time_ms; // Accumulated reassembly (if applicable)
-    uint32_t decode_time_ms; // Accumulated decode (estimated if it can be measured)
-    uint32_t last_frame_number; // Last seen frameNumber
-    uint32_t corruption_frames; // Frames discarded due to detecting invalid parameters/corruption
-    uint32_t corruption_fullLength; // Count of times fullLength was inconsistent
+    uint32_t frames_decoded;
+    uint32_t frames_presented;
+    uint32_t frames_repeated;
+    uint32_t frames_dropped_network;
+    uint32_t frames_dropped_pacer;
+    uint32_t idr_count;
+    uint32_t p_slice_count;
+    uint32_t current_fps;
+    uint32_t decoded_fps;
+    uint32_t target_fps;
+    uint64_t session_ms;
+    uint32_t reassembly_time_ms;
+    uint32_t decode_time_ms;
+    uint32_t last_frame_number;
+    uint32_t corruption_frames;
+    uint32_t corruption_fullLength;
 } VitaVideoStats;
 
 extern "C" void vitavideo_get_stats(VitaVideoStats* outStats);
@@ -81,12 +82,5 @@ extern "C" void vita_cleanup();
 extern "C" void vita_full_teardown();
 extern "C" int vitavideo_submit_decode_unit(PDECODE_UNIT decodeUnit);
 
-// Access to the current front texture.
-extern "C" struct GxmTexture* vitavideo_get_current_texture();
-
 // Scaling settings
 void vitavideo_update_scaling_settings(int width, int height);
-
-// Limelight callbacks.
-// Note: renamed to _vita_new to avoid collision with legacy version in library/moonlight-legacy
-extern DECODER_RENDERER_CALLBACKS decoder_callbacks_vita_new;

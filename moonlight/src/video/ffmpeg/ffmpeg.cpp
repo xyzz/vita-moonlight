@@ -781,12 +781,15 @@ static bool dr_texture_attach(dr_texture* tex, AVFrame* frame)
 
 static void reset_global_slots()
 {
-    std::lock_guard<std::mutex> slotLock(g_frame_slots_mutex);
-    frame_textures[0] = nullptr;
-    frame_textures[1] = nullptr;
-    frame_textures[2] = nullptr;
-    frame_display_idx = 0;
-    frame_write_idx   = 1;
+    {
+        std::lock_guard<std::mutex> slotLock(g_frame_slots_mutex);
+        frame_textures[0] = nullptr;
+        frame_textures[1] = nullptr;
+        frame_textures[2] = nullptr;
+        frame_display_idx = 0;
+        frame_write_idx   = 1;
+    }
+    video_frame_tracking_reset();
 }
 
 static uint32_t clamp_u32(uint64_t value)
@@ -929,6 +932,10 @@ static int ensure_sw_texture(FFmpegVideoContext* ctx, int width, int height, enu
         return 0;
     }
 
+    for (int i = 0; i < 3; ++i)
+    {
+        video_frame_wait_for_slot(i);
+    }
     for (int i = 0; i < 3; ++i)
     {
         if (ctx->sw_textures[i])
@@ -1170,6 +1177,7 @@ static bool publish_direct_frame(FFmpegVideoContext* ctx, AVFrame* frame)
         return false;
     }
 
+    video_frame_wait_for_slot(ctx->dr_spare_idx);
     dr_texture* texFront = reinterpret_cast<dr_texture*>(ctx->dr_textures[ctx->dr_front_idx]);
     dr_texture* texSpare = reinterpret_cast<dr_texture*>(ctx->dr_textures[ctx->dr_spare_idx]);
     if (!texSpare)
@@ -1244,6 +1252,7 @@ static bool publish_sw_frame(FFmpegVideoContext* ctx, AVFrame* frame)
         return false;
     }
 
+    video_frame_wait_for_slot(ctx->sw_write_idx);
     GxmTexture* writeTex = ctx->sw_textures[ctx->sw_write_idx];
     if (!writeTex)
     {
@@ -1617,7 +1626,7 @@ static bool publish_sw_frame(FFmpegVideoContext* ctx, AVFrame* frame)
 #endif
 }
 
-static bool publish_frame(FFmpegVideoContext* ctx, AVFrame* frame, uint64_t ptsUs)
+static bool publish_frame(FFmpegVideoContext* ctx, AVFrame* frame, uint64_t ptsUs, uint32_t frameNumber)
 {
     if (!ctx || !frame)
     {
@@ -1662,6 +1671,7 @@ static bool publish_frame(FFmpegVideoContext* ctx, AVFrame* frame, uint64_t ptsU
         return false;
     }
 
+    int active_idx           = 0;
     uint32_t slotsMtxStartUs = perf_now_us();
     {
         std::lock_guard<std::mutex> slotLock(g_frame_slots_mutex);
@@ -1689,7 +1699,6 @@ static bool publish_frame(FFmpegVideoContext* ctx, AVFrame* frame, uint64_t ptsU
         __atomic_store_n(&frame_textures[2], ctx->sw_textures[2], __ATOMIC_RELEASE);
 #endif
 
-        int active_idx = 0;
 #ifdef BOREALIS_USE_GXM
         if (ctx->using_direct_memory)
         {
@@ -1702,11 +1711,9 @@ static bool publish_frame(FFmpegVideoContext* ctx, AVFrame* frame, uint64_t ptsU
 #else
         active_idx = ctx->sw_last_present_idx;
 #endif
-
-        __atomic_store_n(&frame_display_idx, active_idx, __ATOMIC_RELEASE);
-        __atomic_store_n(&frame_publish_timestamp_us, perf_now_us(), __ATOMIC_RELEASE);
     }
     uint32_t slotsMtxUs = perf_now_us() - slotsMtxStartUs;
+    video_frame_publish(active_idx, frameNumber, perf_now_us());
 
     // Wake the render loop now instead of letting it sleep out its frame budget.
     vita_video_frame_published();
@@ -1737,6 +1744,14 @@ static void ffmpeg_release_locked(FFmpegVideoContext* ctx)
         return;
     }
     stop_perf_reporter();
+
+#ifdef BOREALIS_USE_GXM
+    for (int i = 0; i < 3; ++i)
+    {
+        video_frame_wait_for_slot(i);
+    }
+#endif
+    reset_global_slots();
 
 #ifdef BOREALIS_USE_GXM
     for (int i = 0; i < 3; ++i)
@@ -1785,7 +1800,6 @@ static void ffmpeg_release_locked(FFmpegVideoContext* ctx)
     ctx->using_direct_memory = false;
     ctx->initialized         = false;
     ctx->last_pts_us         = 0;
-    reset_global_slots();
 
     if (g_sps_ctx)
     {
@@ -1955,25 +1969,6 @@ extern "C"
         std::lock_guard<std::mutex> lock(g_ffmpeg_mutex);
         vita_log::info("[FFMPEG] setup %dx%d @ %dfps ctx=%p", width, height, redrawRate, context);
 
-        {
-            std::lock_guard<std::mutex> slotLock(g_frame_slots_mutex);
-            if (frame_textures[0])
-            {
-                gxm_texture_free(frame_textures[0]);
-                frame_textures[0] = nullptr;
-            }
-            if (frame_textures[1])
-            {
-                gxm_texture_free(frame_textures[1]);
-                frame_textures[1] = nullptr;
-            }
-            if (frame_textures[2])
-            {
-                gxm_texture_free(frame_textures[2]);
-                frame_textures[2] = nullptr;
-            }
-        }
-
         ffmpeg_release_locked(context);
         if (ffmpeg_video_init(context, width, height, redrawRate) < 0)
         {
@@ -1997,6 +1992,7 @@ extern "C"
         }
 
         memset(&g_stats, 0, sizeof(g_stats));
+        video_frame_tracking_reset();
         memset(&g_perf, 0, sizeof(g_perf));
         g_ffmpeg_last_input_callback_us = 0;
         g_ffmpeg_last_enqueue_us        = 0;
@@ -2175,6 +2171,14 @@ extern "C"
         if (!decodeUnit)
         {
             VITA_DEBUG_LOG("[FFMPEG] submit_decode_unit: null decodeUnit");
+            video_stats_record_corruption(true);
+            finalize_submit_metrics();
+            return DR_NEED_IDR;
+        }
+
+        video_stats_record_input_frame(decodeUnit);
+        if (video_decode_backlog_requires_refresh(decodeUnit))
+        {
             finalize_submit_metrics();
             return DR_NEED_IDR;
         }
@@ -2240,6 +2244,7 @@ extern "C"
                 {
                     av_frame_unref(frame);
                     g_perf.discarded_decoder_frames++;
+                    video_stats::increment(g_stats.frames_dropped_pacer);
                 }
                 av_frame_move_ref(frame, s_drain_frame);
                 drainReceived = true;
@@ -2268,7 +2273,7 @@ extern "C"
                         (long long)ptsDiff, (long long)(ptsDiff / 1000));
                 }
             }
-            publish_frame(context, frame, static_cast<uint64_t>(drainPts));
+            publish_frame(context, frame, static_cast<uint64_t>(drainPts), (uint32_t)decodeUnit->frameNumber);
             av_frame_unref(frame);
         }
         drainUs = perf_now_us() - drainStartUs;
@@ -2276,9 +2281,29 @@ extern "C"
         uint32_t copyStartUs = perf_now_us();
         if (decodeUnit->fullLength <= 0 || !decodeUnit->bufferList || decodeUnit->fullLength > INT_MAX - 256)
         {
+            video_stats_record_corruption(true);
             copyUs = perf_now_us() - copyStartUs;
             finalize_submit_metrics();
             return recover_decoder(context, "invalid decode unit", AVERROR_INVALIDDATA);
+        }
+        size_t rawLength = 0;
+        for (PLENTRY current = decodeUnit->bufferList; current; current = current->next)
+        {
+            if (!current->data || current->length <= 0 || static_cast<size_t>(current->length) > SIZE_MAX - rawLength)
+            {
+                video_stats_record_corruption(true);
+                copyUs = perf_now_us() - copyStartUs;
+                finalize_submit_metrics();
+                return recover_decoder(context, "invalid buffer chain", AVERROR_INVALIDDATA);
+            }
+            rawLength += static_cast<size_t>(current->length);
+        }
+        if (rawLength != static_cast<size_t>(decodeUnit->fullLength))
+        {
+            video_stats_record_corruption(true);
+            copyUs = perf_now_us() - copyStartUs;
+            finalize_submit_metrics();
+            return recover_decoder(context, "decode unit length mismatch", AVERROR_INVALIDDATA);
         }
         int packetRes = av_new_packet(pkt, decodeUnit->fullLength + 256);
         if (packetRes < 0)
@@ -2330,6 +2355,7 @@ extern "C"
             }
             if (!appended)
             {
+                video_stats_record_corruption(offset != static_cast<size_t>(decodeUnit->fullLength));
                 av_packet_unref(pkt);
                 copyUs = perf_now_us() - copyStartUs;
                 finalize_submit_metrics();
@@ -2385,6 +2411,7 @@ extern "C"
                 {
                     av_frame_unref(frame);
                     g_perf.discarded_decoder_frames++;
+                    video_stats::increment(g_stats.frames_dropped_pacer);
                 }
                 av_frame_move_ref(frame, s_recv_frame);
                 frameReceived = true;
@@ -2420,7 +2447,7 @@ extern "C"
                 }
             }
 
-            publish_frame(context, frame, static_cast<uint64_t>(framePts));
+            publish_frame(context, frame, static_cast<uint64_t>(framePts), (uint32_t)decodeUnit->frameNumber);
             video_stats::increment(g_stats.frames_decoded);
             g_perf.decoded_frames++;
             av_frame_unref(frame);
@@ -2442,8 +2469,8 @@ extern "C"
         callbacks.stop                       = ffmpeg_video_stop_callback;
         callbacks.cleanup                    = ffmpeg_video_cleanup_callback;
         callbacks.submitDecodeUnit           = ffmpeg_video_submit_decode_unit;
-        callbacks.capabilities               = CAPABILITY_DIRECT_SUBMIT | CAPABILITY_SLICES_PER_FRAME(2);
-        VITA_DEBUG_LOG("[FFMPEG] Decode submission uses the network thread");
+        callbacks.capabilities               = CAPABILITY_SLICES_PER_FRAME(2);
+        VITA_DEBUG_LOG("[FFMPEG] Decode submission uses the decoder thread");
         return callbacks;
     }
 

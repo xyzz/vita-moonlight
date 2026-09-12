@@ -4,6 +4,7 @@
 #include <borealis/core/application.hpp>
 
 #include "debug.hpp"
+#include "video/legacy/modules/vita_globals.hpp"
 
 extern "C" void ffmpeg_video_watchdog_tick(void);
 
@@ -16,8 +17,60 @@ bool s_active     = false;
 
 // A decode callback may race session teardown, so keep the semaphore alive.
 std::atomic<SceUID> s_frameSema { -1 };
+std::atomic<SceUID> s_watchdogThread { -1 };
+std::atomic<bool> s_watchdogActive { false };
 
 uint32_t s_frameBudgetUs = 0;
+
+int fence_watchdog_main(SceSize, void*)
+{
+    while (s_watchdogActive.load(std::memory_order_acquire))
+    {
+        video_frame_watchdog_tick();
+        sceKernelDelayThread(10000);
+    }
+    return 0;
+}
+
+void start_fence_watchdog()
+{
+    if (s_watchdogThread.load(std::memory_order_acquire) >= 0)
+        return;
+
+    SceUID thread = sceKernelCreateThread("video_fence_watch", fence_watchdog_main,
+        0x10000114, 0x4000, 0, 0, nullptr);
+    if (thread < 0)
+    {
+        vita_log::error("[FramePacer] fence watchdog creation failed: 0x%08X", thread);
+        return;
+    }
+
+    s_watchdogActive.store(true, std::memory_order_release);
+    s_watchdogThread.store(thread, std::memory_order_release);
+    int result = sceKernelStartThread(thread, 0, nullptr);
+    if (result < 0)
+    {
+        s_watchdogActive.store(false, std::memory_order_release);
+        s_watchdogThread.store(-1, std::memory_order_release);
+        sceKernelDeleteThread(thread);
+        vita_log::error("[FramePacer] fence watchdog start failed: 0x%08X", result);
+    }
+    else
+    {
+        vita_log::info("[FramePacer] fence watchdog active");
+    }
+}
+
+void stop_fence_watchdog()
+{
+    s_watchdogActive.store(false, std::memory_order_release);
+    SceUID thread = s_watchdogThread.exchange(-1, std::memory_order_acq_rel);
+    if (thread >= 0)
+    {
+        sceKernelWaitThreadEnd(thread, nullptr, nullptr);
+        sceKernelDeleteThread(thread);
+    }
+}
 
 void pace_callback()
 {
@@ -80,6 +133,7 @@ extern "C"
         s_runLoopSub = brls::Application::getRunLoopEvent()->subscribe(pace_callback);
         s_subscribed = true;
         s_active     = true;
+        start_fence_watchdog();
 
         vita_log::info("[FramePacer] active: frame-driven wakeup, target=%d fps (idle=%u us)",
             paceFps, s_frameBudgetUs * 2);
@@ -91,6 +145,7 @@ extern "C"
             return;
 
         s_active = false;
+        stop_fence_watchdog();
 
         if (s_subscribed)
         {

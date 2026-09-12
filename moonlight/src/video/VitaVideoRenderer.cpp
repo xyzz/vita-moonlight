@@ -17,19 +17,20 @@
 
 namespace
 {
-uint32_t s_presentWindowFrames = 0;
-uint64_t s_cachedStatsStart    = 0;
-uint32_t s_prevDecodedCount    = 0;
+uint32_t s_presentWindowFrames  = 0;
+uint32_t s_presentWindowRepeats = 0;
+uint64_t s_cachedStatsStart     = 0;
+uint32_t s_prevDecodedCount     = 0;
 
 bool is_yuv_gxm_format(uint32_t fmt)
 {
     return fmt == (uint32_t)SCE_GXM_TEXTURE_FORMAT_YUV420P3_CSC0 || fmt == (uint32_t)SCE_GXM_TEXTURE_FORMAT_YVU420P2_CSC0;
 }
 
-uint32_t s_e2e_sum_us = 0;
-uint32_t s_e2e_min_us = 999999;
-uint32_t s_e2e_max_us = 0;
-uint32_t s_e2e_count  = 0;
+uint32_t s_publish_to_render_sum_us = 0;
+uint32_t s_publish_to_render_min_us = 999999;
+uint32_t s_publish_to_render_max_us = 0;
+uint32_t s_publish_to_render_count  = 0;
 }
 
 VitaVideoRenderer& VitaVideoRenderer::instance()
@@ -128,11 +129,10 @@ void VitaVideoRenderer::drawNVG(NVGcontext* vg, float viewportW, float viewportH
     if (video_stats::load(g_stats.frames_decoded) == 0)
         return;
 
-    int displayIdx = __atomic_load_n(&frame_display_idx, __ATOMIC_ACQUIRE);
-
-    const GxmTexture* tex = frame_textures[displayIdx];
-    if (!tex)
+    VideoFrameSnapshot frame {};
+    if (!video_frame_acquire_for_render(&frame))
         return;
+    const GxmTexture* tex = frame.texture;
 
     SceGxmTexture gxmTexSnapshot = tex->gxm_tex;
     const SceGxmTexture* gxmTex  = &gxmTexSnapshot;
@@ -283,8 +283,7 @@ void VitaVideoRenderer::drawNVG(NVGcontext* vg, float viewportW, float viewportH
         nvgRestore(vg);
     }
 
-    video_stats::increment(g_stats.frames_presented);
-    onFramePresented(currentData);
+    onFramePresented(currentData, frame.generation, frame.publish_timestamp_us);
 }
 
 void VitaVideoRenderer::destroyImage(NVGcontext* vg)
@@ -312,24 +311,28 @@ extern "C" void ffmpeg_increment_presented_frames(void);
 extern "C" void ffmpeg_mark_direct_buffer_presented(const void* data);
 extern "C" void ffmpeg_video_watchdog_tick(void);
 
-void VitaVideoRenderer::onFramePresented(const void* textureData)
+void VitaVideoRenderer::onFramePresented(const void* textureData, uint32_t generation, uint32_t publishTimestampUs)
 {
-    // Count each published frame once across both presentation paths.
+    bool uniqueFrame = video_frame_mark_presented(generation);
+    if (uniqueFrame)
     {
-        static uint32_t s_last_measured_ts = 0;
-        uint32_t publishTimeUs             = __atomic_load_n(&frame_publish_timestamp_us, __ATOMIC_ACQUIRE);
-        if (publishTimeUs > 0 && publishTimeUs != s_last_measured_ts)
+        video_stats::increment(g_stats.frames_presented);
+        s_presentWindowFrames++;
+        if (publishTimestampUs > 0)
         {
-            s_last_measured_ts = publishTimeUs;
-            uint32_t nowUs     = sceKernelGetProcessTimeLow();
-            uint32_t diffUs    = nowUs - publishTimeUs;
-            s_e2e_sum_us += diffUs;
-            if (diffUs < s_e2e_min_us)
-                s_e2e_min_us = diffUs;
-            if (diffUs > s_e2e_max_us)
-                s_e2e_max_us = diffUs;
-            s_e2e_count++;
+            uint32_t diffUs = sceKernelGetProcessTimeLow() - publishTimestampUs;
+            s_publish_to_render_sum_us += diffUs;
+            if (diffUs < s_publish_to_render_min_us)
+                s_publish_to_render_min_us = diffUs;
+            if (diffUs > s_publish_to_render_max_us)
+                s_publish_to_render_max_us = diffUs;
+            s_publish_to_render_count++;
         }
+    }
+    else
+    {
+        video_stats::increment(g_stats.frames_repeated);
+        s_presentWindowRepeats++;
     }
 
     // Only process ffmpeg deferred releases when in ffmpeg mode.
@@ -350,9 +353,10 @@ void VitaVideoRenderer::onFramePresented(const void* textureData)
 
     if (stats_start_ms != 0 && stats_start_ms != s_cachedStatsStart)
     {
-        s_cachedStatsStart    = stats_start_ms;
-        s_presentWindowFrames = 0;
-        last_fps_window_ms    = stats_start_ms;
+        s_cachedStatsStart     = stats_start_ms;
+        s_presentWindowFrames  = 0;
+        s_presentWindowRepeats = 0;
+        last_fps_window_ms     = stats_start_ms;
         // Reset decoding window counter in sync with the present window for easier comparison
         s_prevDecodedCount = video_stats::load(g_stats.frames_decoded);
     }
@@ -361,8 +365,6 @@ void VitaVideoRenderer::onFramePresented(const void* textureData)
     {
         last_fps_window_ms = now;
     }
-
-    s_presentWindowFrames++;
 
     uint64_t elapsed = now - last_fps_window_ms;
     if (elapsed >= 1000)
@@ -408,20 +410,22 @@ void VitaVideoRenderer::onFramePresented(const void* textureData)
             }
         }
 
-        if (s_e2e_count > 0)
+        if (s_publish_to_render_count > 0)
         {
-            uint32_t e2eAvgUs = s_e2e_sum_us / s_e2e_count;
-            uint32_t e2eMinUs = s_e2e_min_us == 999999 ? 0 : s_e2e_min_us;
-            uint32_t e2eMaxUs = s_e2e_max_us;
-            VITA_DEBUG_LOG("[PERF][RENDER] End-to-End Latency (min/avg/max): %.2f/%.2f/%.2f ms (frames: %u)",
-                (float)e2eMinUs / 1000.0f, (float)e2eAvgUs / 1000.0f, (float)e2eMaxUs / 1000.0f, s_e2e_count);
-            s_e2e_sum_us = 0;
-            s_e2e_min_us = 999999;
-            s_e2e_max_us = 0;
-            s_e2e_count  = 0;
+            uint32_t latencyAvgUs = s_publish_to_render_sum_us / s_publish_to_render_count;
+            uint32_t latencyMinUs = s_publish_to_render_min_us == 999999 ? 0 : s_publish_to_render_min_us;
+            uint32_t latencyMaxUs = s_publish_to_render_max_us;
+            VITA_DEBUG_LOG("[PERF][RENDER] Publish-to-render (min/avg/max): %.2f/%.2f/%.2f ms (unique: %u repeats: %u)",
+                (float)latencyMinUs / 1000.0f, (float)latencyAvgUs / 1000.0f, (float)latencyMaxUs / 1000.0f,
+                s_publish_to_render_count, s_presentWindowRepeats);
+            s_publish_to_render_sum_us = 0;
+            s_publish_to_render_min_us = 999999;
+            s_publish_to_render_max_us = 0;
+            s_publish_to_render_count  = 0;
         }
 
-        last_fps_window_ms    = now;
-        s_presentWindowFrames = 0;
+        last_fps_window_ms     = now;
+        s_presentWindowFrames  = 0;
+        s_presentWindowRepeats = 0;
     }
 }

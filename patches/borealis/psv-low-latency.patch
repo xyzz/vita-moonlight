@@ -64,12 +64,13 @@ index 28a06ed63849d5f2f10d871960cbdb448b2ff68a..d442b231a44427c5e325c5aaa7548211
  #define MAX_PENDING_SWAPS (DISPLAY_BUFFER_COUNT - 1)
  
  #define DISPLAY_COLOR_FORMAT SCE_GXM_COLOR_FORMAT_A8B8G8R8
-@@ -224,6 +224,9 @@ void gxmClear(void);
+@@ -224,6 +224,10 @@ void gxmClear(void);
   */
  void gxmSwapInterval(int interval);
  
 +void gxmSetImmediatePresentation(int enabled);
 +void gxmSetCommonDialogVSync(int enabled);
++void gxmSetFragmentNotification(const SceGxmNotification *notification);
 +
  int gxmDialogUpdate(void);
  
@@ -81,12 +82,14 @@ index 28a06ed63849d5f2f10d871960cbdb448b2ff68a..d442b231a44427c5e325c5aaa7548211
  };
  
  struct clear_vertex {
-@@ -266,6 +271,8 @@ static struct gxm_internal {
+@@ -266,6 +272,10 @@ static struct gxm_internal {
      SceGxmContext *context;
      SceGxmShaderPatcher *shader_patcher;
      NVGXMinitOptions initOptions;
 +    int commonDialogVSync;
 +    int immediatePresentation;
++    SceGxmNotification fragmentNotification;
++    int fragmentNotificationPending;
  
      // clear shader
      NVGXMshaderProgram clearProg;
@@ -107,7 +110,19 @@ index 28a06ed63849d5f2f10d871960cbdb448b2ff68a..d442b231a44427c5e325c5aaa7548211
      }
  }
  
-@@ -1033,5 +1043,11 @@ void gxmSwapBuffer(void) {
+@@ -1022,7 +1032,10 @@ void gxmBeginFrameEx(NVGXMframebuffer *fb, unsigned int flags) {
+ }
+ 
+ void gxmEndFrame(void) {
+-    GXM_CHECK_VOID(sceGxmEndScene(gxm_internal.context, NULL, NULL));
++    const SceGxmNotification *fragmentNotification = gxm_internal.fragmentNotificationPending
++        ? &gxm_internal.fragmentNotification : NULL;
++    GXM_CHECK_VOID(sceGxmEndScene(gxm_internal.context, NULL, fragmentNotification));
++    gxm_internal.fragmentNotificationPending = 0;
+ }
+ 
+ void gxmSwapBuffer(void) {
+@@ -1033,5 +1048,11 @@ void gxmSwapBuffer(void) {
      struct display_queue_callback_data queue_cb_data;
      queue_cb_data.addr = fb->gxm_color_surfaces[fb->gxm_back_buffer_index].surface_addr;
 +    queue_cb_data.immediatePresentation = gxm_internal.immediatePresentation;
@@ -119,7 +134,7 @@ index 28a06ed63849d5f2f10d871960cbdb448b2ff68a..d442b231a44427c5e325c5aaa7548211
  
      GXM_CHECK_VOID(sceGxmDisplayQueueAddEntry(
              fb->gxm_color_surfaces[fb->gxm_front_buffer_index].sync_object,
-@@ -1045,6 +1061,14 @@ void gxmSwapInterval(int interval) {
+@@ -1045,6 +1066,23 @@ void gxmSwapInterval(int interval) {
      gxm_internal.initOptions.swapInterval = interval;
  }
  
@@ -129,6 +144,15 @@ index 28a06ed63849d5f2f10d871960cbdb448b2ff68a..d442b231a44427c5e325c5aaa7548211
 +
 +void gxmSetCommonDialogVSync(int enabled) {
 +    gxm_internal.commonDialogVSync = enabled;
++}
++
++void gxmSetFragmentNotification(const SceGxmNotification *notification) {
++    if (notification) {
++        gxm_internal.fragmentNotification = *notification;
++        gxm_internal.fragmentNotificationPending = 1;
++    } else {
++        gxm_internal.fragmentNotificationPending = 0;
++    }
 +}
 +
  int gxmDialogUpdate(void) {
@@ -206,16 +230,10 @@ diff --git a/library/lib/platforms/psv/psv_video.cpp b/library/lib/platforms/psv
 index 9352721f2a533ccd846378ca660b6ce7861b9de4..d3f798ec1824a885b2c97db647aa83fc88c48d42 100644
 --- a/library/lib/platforms/psv/psv_video.cpp
 +++ b/library/lib/platforms/psv/psv_video.cpp
-@@ -87,10 +87,28 @@ void PsvVideoContext::beginFrame() {
+@@ -87,10 +87,22 @@ void PsvVideoContext::beginFrame() {
  
  void PsvVideoContext::endFrame() {
      gxmEndFrame();
-+
-+    // Do not let the GPU queue frames ahead of a latency-sensitive stream.
-+    if (lowLatencyMode && window && window->context) {
-+        sceGxmFinish(window->context);
-+    }
-+
      gxmDialogUpdate();
      gxmSwapBuffer();
  }
@@ -235,7 +253,7 @@ index 9352721f2a533ccd846378ca660b6ce7861b9de4..d3f798ec1824a885b2c97db647aa83fc
  void PsvVideoContext::setSwapInterval(int interval) {
      VideoContext::swapInterval = interval;
      gxmSwapInterval(interval);
-@@ -109,4 +127,4 @@ NVGXMwindow* PsvVideoContext::getWindow()
+@@ -109,4 +121,4 @@ NVGXMwindow* PsvVideoContext::getWindow()
      return this->window;
  }
  

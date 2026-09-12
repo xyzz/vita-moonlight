@@ -14,9 +14,6 @@
 #include <borealis/core/application.hpp>
 
 #include "utils/vita_platform.hpp"
-#include "video/pixel_format/pixel_format.hpp"
-// External pixel processor
-extern PixelFormat::IPixelProcessor* g_pixelProcessor;
 
 // Define constants that may be missing
 #ifndef SCE_VIDEODEC_TYPE_HW_AVCDEC
@@ -48,22 +45,6 @@ extern "C" void vita_cleanup()
 
     // Do not release textures here to avoid GPU crashes if Borealis still uses them.
     // They will be freed in vita_init if the resolution changes.
-
-    // Pixel processor objects are not used in the decode hot path.
-    // Keep pointer null here to avoid virtual cleanup on potentially stale pointers.
-    g_pixelProcessor = nullptr;
-    if (decoder_output_phys_mapped && decoder_output_phys_ptr)
-    {
-        sceGxmUnmapMemory(decoder_output_phys_ptr);
-        decoder_output_phys_mapped = false;
-    }
-    if (decoder_output_phys_block >= 0)
-    {
-        sceKernelFreeMemBlock(decoder_output_phys_block);
-        decoder_output_phys_block = -1;
-        decoder_output_phys_ptr   = nullptr;
-        decoder_output_phys_size  = 0;
-    }
 
     // Destroy decoder instance before terminating library
     if (decoder)

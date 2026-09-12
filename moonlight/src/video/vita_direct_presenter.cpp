@@ -237,11 +237,10 @@ extern "C"
         if (video_stats::load(g_stats.frames_decoded) == 0)
             return -1;
 
-        int displayIdx = __atomic_load_n(&frame_display_idx, __ATOMIC_ACQUIRE);
-
-        const GxmTexture* tex = __atomic_load_n(&frame_textures[displayIdx], __ATOMIC_ACQUIRE);
-        if (!tex)
+        VideoFrameSnapshot frame {};
+        if (!video_frame_acquire_for_render(&frame))
             return -1;
+        const GxmTexture* tex = frame.texture;
 
         SceGxmTexture gxmTexSnapshot = tex->gxm_tex;
 
@@ -304,9 +303,9 @@ extern "C"
         sceGxmSetVertexStream(win->context, 0, s_vertices);
         sceGxmDraw(win->context, SCE_GXM_PRIMITIVE_TRIANGLE_STRIP, SCE_GXM_INDEX_FORMAT_U16, s_indices, 4);
 
-        video_stats::increment(g_stats.frames_presented);
         // FFmpeg releases deferred CDRAM buffers from the presentation side.
-        VitaVideoRenderer::instance().onFramePresented(sceGxmTextureGetData(&gxmTexSnapshot));
+        VitaVideoRenderer::instance().onFramePresented(
+            sceGxmTextureGetData(&gxmTexSnapshot), frame.generation, frame.publish_timestamp_us);
 
         return 0;
     }

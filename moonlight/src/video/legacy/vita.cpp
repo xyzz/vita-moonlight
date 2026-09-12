@@ -14,7 +14,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <memory> // std::unique_ptr, std::make_unique
 #include <memory>
 
 #include "ConfigManager.hpp"
@@ -24,15 +23,5 @@
 // Refactored modules
 #include "modules/vita_globals.hpp"
 // The .cpp files are compiled separately via CMake
-
-// Limelight callbacks.
-DECODER_RENDERER_CALLBACKS decoder_callbacks_vita_new = {
-    .setup            = vitavideo_setup,
-    .start            = vitavideo_start,
-    .stop             = vitavideo_stop,
-    .cleanup          = vita_cleanup,
-    .submitDecodeUnit = vitavideo_submit_decode_unit,
-    .capabilities     = CAPABILITY_DIRECT_SUBMIT | CAPABILITY_SLICES_PER_FRAME(2)
-};
 
 static_assert(sizeof(DECODER_RENDERER_CALLBACKS) == (sizeof(void*) * 5 + sizeof(int)), "Tamaño inesperado de DECODER_RENDERER_CALLBACKS (posible padding diferente)");

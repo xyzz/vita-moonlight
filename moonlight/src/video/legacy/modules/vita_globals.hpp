@@ -54,13 +54,6 @@ extern gs::SpsContext* g_sps_ctx;
 #include <stddef.h>
 extern int SCREEN_WIDTH;
 extern int SCREEN_HEIGHT;
-#define LINE_SIZE SCREEN_WIDTH
-#define FRAMEBUFFER_SIZE (2 * 1024 * 1024)
-#define FRAMEBUFFER_ALIGNMENT (256 * 1024)
-
-// Pure copy failure threshold
-#define PURE_COPY_FAILURE_THRESHOLD 3
-
 // Extern declarations
 extern VideoStatus video_status;
 extern uint32_t video_status_canary_pre;
@@ -75,66 +68,43 @@ extern SceAvcdecQueryDecoderInfo* decoder_info;
 extern SceVideodecQueryInitInfoHwAvcdec* init;
 
 extern GxmTexture* frame_textures[3];
-// The renderer reads the latest completed texture. The decoder rotates through
-// three write targets so a recently displayed texture is not reused immediately.
 extern int frame_display_idx;
 extern int frame_write_idx;
-#define FRAME_FRONT() (frame_textures[frame_display_idx])
-#define FRAME_BACK() (frame_textures[frame_write_idx])
 #ifdef __cplusplus
 extern std::mutex g_frame_slots_mutex;
 #endif
 
-// End-to-end latency: decoder writes timestamp when frame is published,
-// renderer reads it when frame is presented to measure pipeline delay
-extern uint32_t frame_publish_timestamp_us;
+struct VideoFrameSnapshot
+{
+    GxmTexture* texture;
+    uint32_t generation;
+    uint32_t publish_timestamp_us;
+    uint32_t frame_number;
+    int slot;
+};
+
+bool video_frame_acquire_for_render(VideoFrameSnapshot* snapshot);
+void video_frame_publish(int slot, uint32_t frameNumber, uint32_t publishTimestampUs);
+void video_frame_wait_for_slot(int slot);
+void video_frame_watchdog_tick();
+void video_frame_tracking_reset();
+bool video_frame_mark_presented(uint32_t generation);
+void video_stats_record_input_frame(const DECODE_UNIT* decodeUnit);
+void video_stats_record_corruption(bool invalidLength);
+bool video_decode_backlog_requires_refresh(const DECODE_UNIT* decodeUnit);
 
 extern image_scaling_settings image_scaling;
 
 extern std::atomic<bool> active_video_thread;
 
-// Legacy modes removed
-
-extern bool hevc_abort_flag;
-
-// Intermediate buffers (only used by experimental YUV mode). In direct RGBA mode they are not used.
-extern uint8_t* decoder_yuv_raw;
-extern uint8_t* decoder_yuv_buffer;
-extern size_t decoder_yuv_buffer_size;
-extern size_t decoder_yuv_total_alloc;
-// (RGBA and NVG staging removed: we draw directly on the texture)
-// Optional RGBA staging buffer for debugging (activated when decoder_output_mode==0 and we want to isolate overflow)
-extern uint8_t* decoder_linear_rgba;
-extern size_t decoder_linear_rgba_size;
-extern uint8_t* decoder_linear_rgba_guard;
-extern size_t decoder_linear_rgba_guard_size;
-extern size_t decoder_linear_rgba_total_alloc;
-extern uint32_t decoder_linear_rgba_pitch_pixels;
-extern uint32_t decoder_linear_rgba_height;
-extern int decoder_linear_rgba_memblock;
-extern bool decoder_linear_rgba_physically_backed;
-
 // Fullscreen presentation mode (stretches without preserving aspect)
 extern bool video_fullscreen_stretch;
 // low-latency removed: immediate route is standard
 
-// Physical buffer for direct decoder output (when the texture is not accepted)
-extern void* decoder_output_phys_ptr;
-extern size_t decoder_output_phys_size;
-extern int decoder_output_phys_block; // SceUID
-extern bool decoder_output_phys_mapped;
-
-// Decoder output strategy:
-// 0 = Direct RGBA (preferred, decodes to texture or physical RGBA buffer and copies)
-// 1 = YUV420 experimental planar (decodes to YUV buffer and converts CPU to RGBA)
+// Decoder output strategy: 0 = direct RGBA, 1 = YUV420 GPU CSC.
 extern int decoder_output_mode;
-extern bool decoder_tried_direct_texture;
-extern int decoder_src_width;
-extern int decoder_src_height;
 extern int decoder_width;
 extern int decoder_height;
-// Indicates if we are using fallback: decoder -> contiguous physical buffer -> memcpy to texture
-extern bool decoder_use_phys_fallback;
 
 extern VitaVideoStats g_stats;
 extern uint64_t stats_start_ms;
@@ -197,8 +167,6 @@ extern uint32_t g_decode_count;
 
 // Function declarations
 void vitavideo_update_scaling_settings(int width, int height);
-void yuv_write_canaries();
-bool yuv_check_canaries();
 uint64_t vita_monotonic_ms();
 int vitavideo_init_1080p_internal_api(int width, int height, SceVideodecQueryInitInfoHwAvcdec* init);
 

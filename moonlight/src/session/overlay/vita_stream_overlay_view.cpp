@@ -45,12 +45,11 @@ void VitaStreamOverlayView::draw(NVGcontext* vg, float x, float y, float width, 
 
     char statsBuf[512];
     int off = 0;
-    // current_fps now reflects presentedFPS in the most recent window calculated by renderer
-    off += snprintf(statsBuf + off, sizeof(statsBuf) - off, "FPS (presented/target): %u/%u\n", (unsigned)cached.current_fps, (unsigned)cached.target_fps);
-    // Add decoded vs presented ratio
-    off += snprintf(statsBuf + off, sizeof(statsBuf) - off, "Frames dec/pres: %u/%u\n", (unsigned)cached.frames_decoded, (unsigned)cached.frames_presented);
-    // Show decoding FPS calculated by the renderer
-    off += snprintf(statsBuf + off, sizeof(statsBuf) - off, "Decoded FPS: %u\n", (unsigned)cached.decoded_fps);
+    off += snprintf(statsBuf + off, sizeof(statsBuf) - off, "FPS U/D/T: %u/%u/%u\n",
+        (unsigned)cached.current_fps, (unsigned)cached.decoded_fps, (unsigned)cached.target_fps);
+    off += snprintf(statsBuf + off, sizeof(statsBuf) - off, "Frames decoded: %u\n", (unsigned)cached.frames_decoded);
+    off += snprintf(statsBuf + off, sizeof(statsBuf) - off, "Frames unique/repeat: %u/%u\n",
+        (unsigned)cached.frames_presented, (unsigned)cached.frames_repeated);
     if (cached.frames_decoded > 0)
     {
         unsigned avgDecodeMs = cached.decode_time_ms / cached.frames_decoded;

@@ -22,14 +22,11 @@
 
 extern "C"
 {
-#include "moonmic_internal.h"
+#include "moonmic_protocol.h"
 }
 
 namespace moonmic
 {
-
-static_assert(sizeof(moonmic_focus_request_t) == 32);
-static_assert(sizeof(moonmic_focus_response_t) == 20);
 
 MoonmicBridge::MoonmicBridge()
 {

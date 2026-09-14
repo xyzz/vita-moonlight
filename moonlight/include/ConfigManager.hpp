@@ -10,7 +10,7 @@
 #include <mutex>
 #include <string>
 
-#include "../../third_party/moonmic/moonmic.h"
+#include "../../third_party/moonmic/include/moonmic.h"
 #include "controller/input_types.hpp"
 #include "controller/special_inputs.hpp"
 #include "controller/touchscreen_modes.hpp"

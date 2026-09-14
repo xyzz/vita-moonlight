@@ -97,6 +97,8 @@ if (PLATFORM_PSV AND CMAKE_BUILD_TYPE STREQUAL "Debug")
     list(APPEND MAIN_SRC ${PSV_COMPAT_SRC})
 endif()
 
+
+
 set(PLATFORM_OPTION)
 if (WIN32)
     configure_file("${CMAKE_SOURCE_DIR}/moonlight/resource.rc.in" "${CMAKE_BINARY_DIR}/resource.rc")
@@ -108,6 +110,8 @@ elseif (PLATFORM_PSV)
     add_definitions(-D__vita__ -D__PSV__)
     add_definitions(-DUSE_MBEDTLS_CRYPTO)
 endif ()
+
+
 
 if(WIN32)
     include_directories(SYSTEM /usr/x86_64-w64-mingw32/include)
@@ -159,6 +163,7 @@ if (PLATFORM_PSV)
     target_compile_options(${PROJECT_NAME} PRIVATE -pthread)
 endif()
 
+
 if (WIN32)
     add_custom_target(${PROJECT_NAME}.data
             COMMAND "${CMAKE_COMMAND}" -E copy_directory ${PROJECT_RESOURCES} ${CMAKE_CURRENT_BINARY_DIR}/resources
@@ -201,6 +206,7 @@ elseif (PLATFORM_PSV)
     endif()
 endif ()
 
+
 target_include_directories(${PROJECT_NAME} PRIVATE moonlight ${APP_PLATFORM_INCLUDE} ${CMAKE_SOURCE_DIR}/third_party ${CMAKE_SOURCE_DIR}/third_party/moonlight-common-c/reedsolomon ${CMAKE_SOURCE_DIR}/third_party/moonlight-common-c/src)
 
 target_include_directories(${PROJECT_NAME} PRIVATE
@@ -211,6 +217,9 @@ target_include_directories(${PROJECT_NAME} PRIVATE
 )
 target_compile_options(${PROJECT_NAME} PRIVATE -ffunction-sections -fdata-sections ${APP_PLATFORM_OPTION})
 target_link_libraries(${PROJECT_NAME} PRIVATE borealis ${APP_PLATFORM_LIB} inih mdnsniff gamestream moonmic moonbeam)
+
+
+
 
 if(PLATFORM_PSV)
     # The sysroot curl package uses OpenSSL, while the application crypto
@@ -296,6 +305,7 @@ if(PLATFORM_PSV)
         target_link_libraries(${PROJECT_NAME} PRIVATE ${FFMPEG_LIBS})
     endif()
 endif()
+
 
 if(WIN32)
     target_link_directories(${PROJECT_NAME} PRIVATE /usr/x86_64-w64-mingw32/lib)

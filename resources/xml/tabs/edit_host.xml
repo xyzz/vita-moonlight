@@ -3,6 +3,7 @@
         <brls:Box axis="column" padding="32">
             <brls:Label text="Edit Host" fontSize="20" marginBottom="16" />
             <brls:InputCell id="ip_field" title="IP Address" marginBottom="8" />
+            <brls:InputNumericCell id="port_field" title="Port" marginBottom="8" />
             <brls:InputCell id="name_field" title="Host Name" marginBottom="8" />
             <brls:Button id="save_button" text="Save Changes" marginBottom="24" />
         </brls:Box>

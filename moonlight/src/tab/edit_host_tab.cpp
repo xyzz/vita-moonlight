@@ -16,8 +16,21 @@ EditHostTab::EditHostTab(const HostInfo& hostToEdit)
 
     if (this->ipField)
     {
-        this->ipField->init(brls::getStr("host_dialog/edit_host_ip_hint"), originalHost.ip, [](std::string) { }, "", "", 22);
+        this->ipField->init(brls::getStr("host_dialog/edit_host_ip_hint"), originalHost.ip, [this](const std::string& input)
+            {
+            if (input.empty())
+                return;
+            std::string address;
+            int port = DEFAULT_GAMESTREAM_HTTP_PORT;
+            if (!parseHostEndpoint(input, address, port))
+            {
+                brls::Application::notify(brls::getStr("host_dialog/edit_host_ip_invalid_error"));
+                return;
+            }
+            this->openPortKeyboard(); }, "", "", 15, brls::KEYBOARD_USE_EXTENDED_NUMBER);
     }
+    if (this->portField)
+        this->portField->init(brls::getStr("host_dialog/edit_host_port"), originalHost.port, [](long) { }, brls::getStr("host_dialog/edit_host_port_hint"), 5);
     if (this->nameField)
     {
         this->nameField->init(brls::getStr("host_dialog/edit_host_name_hint"), originalHost.name, [](std::string) { }, "", "", 50);
@@ -44,14 +57,30 @@ brls::View* EditHostTab::create(const HostInfo& hostToEdit)
 
 void EditHostTab::saveChanges()
 {
-    std::string newIp   = this->ipField ? this->ipField->getValue() : "";
+    std::string ipInput = this->ipField ? this->ipField->getValue() : "";
     std::string newName = this->nameField ? this->nameField->getValue() : "";
 
-    if (newIp.empty())
+    if (ipInput.empty())
     {
         brls::Application::notify(brls::getStr("host_dialog/edit_host_ip_empty_error"));
         return;
     }
+
+    std::string newIp;
+    int ignoredPort = DEFAULT_GAMESTREAM_HTTP_PORT;
+    if (!parseHostEndpoint(ipInput, newIp, ignoredPort))
+    {
+        brls::Application::notify(brls::getStr("host_dialog/edit_host_ip_invalid_error"));
+        return;
+    }
+
+    const long portInput = this->portField ? this->portField->getValue() : DEFAULT_GAMESTREAM_HTTP_PORT;
+    if (portInput < 1 || portInput > 65535)
+    {
+        brls::Application::notify(brls::getStr("host_dialog/edit_host_port_invalid_error"));
+        return;
+    }
+    const int newPort = static_cast<int>(portInput);
 
     if (newName.empty())
     {
@@ -69,6 +98,7 @@ void EditHostTab::saveChanges()
             HostInfo newHost = originalHost;
             newHost.name     = newName;
             newHost.ip       = newIp;
+            newHost.port     = newPort;
             newHost.safeId   = makeSafeHostId(newName);
             if (HostStorage::addHost(newHost))
             {
@@ -86,10 +116,9 @@ void EditHostTab::saveChanges()
             brls::Application::notify(brls::getStr("host_dialog/edit_host_failure"));
         }
     }
-    else if (newIp != originalHost.ip)
+    else if (newIp != originalHost.ip || newPort != originalHost.port)
     {
-        // Only IP changed
-        if (HostStorage::updateHostIp(targetName, newIp))
+        if (HostStorage::updateHostEndpoint(targetName, newIp, newPort))
         {
             brls::Application::notify(brls::getStr("host_dialog/edit_host_success"));
             // Refresh hosts list globally so UI cache updates
@@ -112,4 +141,23 @@ void EditHostTab::saveChanges()
     // saved changes immediately. Use brls::sync to ensure this runs on the UI thread.
     brls::sync([]()
         { HostsTab::requestGlobalRefresh(); });
+}
+
+void EditHostTab::openPortKeyboard()
+{
+    brls::sync([this]()
+        {
+        if (!this->portField)
+            return;
+        brls::Application::getImeManager()->openForNumber([this](long port)
+            {
+            if (!this->portField)
+                return;
+            if (port < 1 || port > 65535)
+            {
+                brls::Application::notify(brls::getStr("host_dialog/edit_host_port_invalid_error"));
+                return;
+            }
+            this->portField->setValue(port); },
+            brls::getStr("host_dialog/edit_host_port"), brls::getStr("host_dialog/edit_host_port_hint"), 5, std::to_string(this->portField->getValue())); });
 }

@@ -3,6 +3,7 @@
         <brls:Box axis="column" padding="32">
             <brls:Label text="@i18n/moonlight/settings/add_host_desc" fontSize="20" marginBottom="16" />
             <brls:InputCell id="ip_field" title="@i18n/moonlight/settings/ip" marginBottom="8" />
+            <brls:InputNumericCell id="port_field" title="@i18n/moonlight/settings/add_host_port" marginBottom="8" />
             <brls:InputCell id="name_field" title="@i18n/moonlight/settings/add_host_manual" marginBottom="8" />
             <brls:SelectorCell id="prefer_external_selector" title="@i18n/moonlight/settings/add_host_connection_type" marginBottom="16" />
             <brls:Button id="add_button" text="@i18n/moonlight/settings/add_host" marginBottom="24" />

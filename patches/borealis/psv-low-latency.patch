@@ -226,6 +226,31 @@ index a45103da2747e71b2367e4ad59fab26e3c073849..49990a65897bd20e22055c64e09b98af
  VoidEvent* Application::getRunLoopEvent()
  {
      return &Application::runLoopEvent;
+diff --git a/library/include/borealis/core/ime.hpp b/library/include/borealis/core/ime.hpp
+--- a/library/include/borealis/core/ime.hpp
++++ b/library/include/borealis/core/ime.hpp
+@@ -34,6 +34,7 @@ enum KeyboardKeyDisableBitmask
+     KEYBOARD_DISABLE_NUMBERS      = 1 << 5,
+     KEYBOARD_DISABLE_DOWNLOADCODE = 1 << 6,
+     KEYBOARD_DISABLE_USERNAME     = 1 << 7,
++    KEYBOARD_USE_EXTENDED_NUMBER  = 1 << 8,
+ };
+ 
+ class ImeManager
+diff --git a/library/lib/platforms/psv/psv_ime.cpp b/library/lib/platforms/psv/psv_ime.cpp
+--- a/library/lib/platforms/psv/psv_ime.cpp
++++ b/library/lib/platforms/psv/psv_ime.cpp
+@@ -201,7 +201,9 @@ bool PsvImeManager::openForText(std::function<void(std::string)> f, std::string
+ {
+     bool ret;
+     auto ime = new PsvImeView();
+-    ime->setTextFieldType(SCE_IME_TYPE_DEFAULT);
++    ime->setTextFieldType((kbdDisableBitmask & KeyboardKeyDisableBitmask::KEYBOARD_USE_EXTENDED_NUMBER)
++            ? SCE_IME_TYPE_EXTENDED_NUMBER
++            : SCE_IME_TYPE_DEFAULT);
+     ime->setCallback(f);
+     ime->setHeaderText(headerText);
+     ime->setInitialText(initialText);
 diff --git a/library/lib/platforms/psv/psv_video.cpp b/library/lib/platforms/psv/psv_video.cpp
 index 9352721f2a533ccd846378ca660b6ce7861b9de4..d3f798ec1824a885b2c97db647aa83fc88c48d42 100644
 --- a/library/lib/platforms/psv/psv_video.cpp

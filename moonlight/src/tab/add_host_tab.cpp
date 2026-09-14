@@ -68,8 +68,21 @@ AddHostTab::AddHostTab()
     if (this->ipField)
     {
         std::string placeholder = brls::getStr("moonlight/settings/add_host_ip_placeholder");
-        this->ipField->init(brls::getStr("moonlight/settings/ip"), "", [](std::string) { }, placeholder, "", 22);
+        this->ipField->init(brls::getStr("moonlight/settings/ip"), "", [this](const std::string& input)
+            {
+            if (input.empty())
+                return;
+            std::string address;
+            int port = DEFAULT_GAMESTREAM_HTTP_PORT;
+            if (!parseHostEndpoint(input, address, port))
+            {
+                brls::Application::notify(brls::getStr("moonlight/settings/add_host_invalid_address"));
+                return;
+            }
+            this->openPortKeyboard(); }, placeholder, brls::getStr("moonlight/settings/add_host_ip_hint"), 15, brls::KEYBOARD_USE_EXTENDED_NUMBER);
     }
+    if (this->portField)
+        this->portField->init(brls::getStr("moonlight/settings/add_host_port"), DEFAULT_GAMESTREAM_HTTP_PORT, [](long) { }, brls::getStr("moonlight/settings/add_host_port_hint"), 5);
     if (this->nameField)
         this->nameField->init(brls::getStr("moonlight/settings/add_host_manual"), "", [](std::string) { }, brls::getStr("moonlight/settings/add_host_name_placeholder"), "", 50);
 
@@ -86,11 +99,34 @@ AddHostTab::AddHostTab()
             [](int) { });
     }
 
-    if (this->addButton && this->ipField && this->nameField && this->preferExternalSelector)
+    if (this->addButton && this->ipField && this->portField && this->nameField && this->preferExternalSelector)
     {
         this->addButton->registerClickAction([this](brls::View*)
             {
             vita_log::info("[AddHostTab][MANUAL] Emparejamiento manual iniciado");
+            std::string ipInput = this->ipField->getValue();
+            std::string name    = this->nameField->getValue();
+            if (ipInput.empty() || name.empty())
+            {
+                brls::Application::notify(brls::getStr("moonlight/settings/add_host_missing_fields"));
+                return true;
+            }
+
+            std::string address;
+            int ignoredPort = DEFAULT_GAMESTREAM_HTTP_PORT;
+            if (!parseHostEndpoint(ipInput, address, ignoredPort))
+            {
+                brls::Application::notify(brls::getStr("moonlight/settings/add_host_invalid_address"));
+                return true;
+            }
+            const long portInput = this->portField->getValue();
+            if (portInput < 1 || portInput > 65535)
+            {
+                brls::Application::notify(brls::getStr("moonlight/settings/add_host_invalid_port"));
+                return true;
+            }
+            const int port = static_cast<int>(portInput);
+
 #if defined(__PSV__)
             AddHostTab* expected = this;
             if (AddHostTab::activeInstance.compare_exchange_strong(expected, nullptr,
@@ -103,13 +139,6 @@ AddHostTab::AddHostTab()
                 return true;
             }
 #endif
-            std::string ipInput = this->ipField->getValue();
-            std::string name    = this->nameField->getValue();
-            if (ipInput.empty() || name.empty())
-            {
-                brls::Application::notify(brls::getStr("moonlight/settings/add_host_missing_fields"));
-                return true;
-            }
 
             this->pairingInProgress = true;
             this->inputsUnblockedByPin.store(false);
@@ -123,7 +152,8 @@ AddHostTab::AddHostTab()
 
             auto token = this->aliveToken;
             HostInfo host;
-            host.ip     = ipInput;
+            host.ip     = address;
+            host.port   = port;
             host.name   = name;
             host.safeId = makeSafeHostId(name);
 
@@ -157,6 +187,7 @@ AddHostTab::AddHostTab()
                             message.replace(marker, 7, name);
                         brls::Application::notify(message);
                         this->ipField->setValue("");
+                        this->portField->setValue(DEFAULT_GAMESTREAM_HTTP_PORT);
                         this->nameField->setValue("");
                         this->preferExternalSelector->setSelection(0);
                         this->startDeviceDiscovery();
@@ -176,6 +207,26 @@ AddHostTab::AddHostTab()
     }
 
     this->startDeviceDiscovery();
+}
+
+void AddHostTab::openPortKeyboard()
+{
+    auto token = this->aliveToken;
+    brls::sync([this, token]()
+        {
+        if (!token->load(std::memory_order_acquire) || !this->portField)
+            return;
+        brls::Application::getImeManager()->openForNumber([this, token](long port)
+            {
+            if (!token->load(std::memory_order_acquire) || !this->portField)
+                return;
+            if (port < 1 || port > 65535)
+            {
+                brls::Application::notify(brls::getStr("moonlight/settings/add_host_invalid_port"));
+                return;
+            }
+            this->portField->setValue(port); },
+            brls::getStr("moonlight/settings/add_host_port"), brls::getStr("moonlight/settings/add_host_port_hint"), 5, std::to_string(this->portField->getValue())); });
 }
 #if defined(_WIN32)
 extern "C" void AddHostTab::winHostFoundCb(int idx, const char* host, const char* pcname, const char* ip, int port)

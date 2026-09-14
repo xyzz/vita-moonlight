@@ -166,6 +166,7 @@ static void XMLCALL _xml_write_data_string(void* userData, const XML_Char* s, in
     }
 }
 
+
 int xml_search(const Data& data, const std::string node, int* result) {
     std::string text;
     auto res = xml_search(data, node, &text);

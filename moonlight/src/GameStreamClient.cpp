@@ -81,7 +81,8 @@ bool GameStreamClient::connect(const HostInfo& host)
         vita_log::error("[GameStreamClient] Dirección vacía en connect(host)");
         return false;
     }
-    std::string addr = host.ip;
+    std::string addr     = host.ip;
+    std::string endpoint = formatHostEndpoint(host.ip, host.port);
     if (m_server_data.count(addr) > 0)
     {
         vita_log::info("[GameStreamClient] Ya conectado a %s", addr.c_str());
@@ -97,7 +98,7 @@ bool GameStreamClient::connect(const HostInfo& host)
     if (keyDir.empty())
         keyDir = candidates.front();
     vita_log::info("[GameStreamClient] keyDir elegido para '%s' => '%s' (safeId base='%s')", addr.c_str(), keyDir.c_str(), safe.c_str());
-    int status = gs_init(&serverData, addr, keyDir);
+    int status = gs_init(&serverData, endpoint, keyDir);
     if (status != GS_OK)
     {
         vita_log::error("[GameStreamClient] Error al inicializar servidor: %d", status);
@@ -334,9 +335,10 @@ bool GameStreamClient::unpair(const std::string& address)
 bool GameStreamClient::beginPairing(const HostInfo& host, std::function<void(bool)> onFinished, std::function<void(const std::string&)> onPinReady)
 {
     std::lock_guard<std::recursive_mutex> lock(m_mutex);
-    HostInfo localHost = host;
-    localHost.safeId   = makeSafeHostId(localHost.safeId.empty() ? (localHost.name.empty() ? localHost.ip : localHost.name) : localHost.safeId);
-    std::string addr   = localHost.ip;
+    HostInfo localHost   = host;
+    localHost.safeId     = makeSafeHostId(localHost.safeId.empty() ? (localHost.name.empty() ? localHost.ip : localHost.name) : localHost.safeId);
+    std::string addr     = localHost.ip;
+    std::string endpoint = formatHostEndpoint(localHost.ip, localHost.port);
     if (addr.empty())
     {
         vita_log::error("[GameStreamClient] beginPairing: host ip vacío");
@@ -358,7 +360,7 @@ bool GameStreamClient::beginPairing(const HostInfo& host, std::function<void(boo
             {
                 SERVER_DATA serverData {};
                 vita_log::info("[Pairing][fast-path] Comprobando emparejamiento con keyDir='%s'", keyDir.c_str());
-                int initResult = gs_init(&serverData, localHost.ip, keyDir);
+                int initResult = gs_init(&serverData, endpoint, keyDir);
                 if (initResult == GS_OK && serverData.paired)
                 {
                     m_server_data[localHost.ip] = serverData;
@@ -436,7 +438,7 @@ bool GameStreamClient::beginPairing(const HostInfo& host, std::function<void(boo
                 vita_log::warning("[Pairing] No se pudo limpiar cache de certificados para keyDir='%s'", keyDir.c_str());
             }
 
-            int initResult = gs_init(&serverData, addr, keyDir);
+            int initResult = gs_init(&serverData, endpoint, keyDir);
             if (initResult != GS_OK)
             {
                 vita_log::error("[Pairing] gs_init fallo %d", initResult);

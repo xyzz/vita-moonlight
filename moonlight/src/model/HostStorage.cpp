@@ -15,6 +15,7 @@
 #include <iostream>
 #include <mutex>
 #include <string>
+#include <utility>
 
 #include "ConfigManager.hpp"
 
@@ -24,6 +25,53 @@ namespace
 {
 
 std::recursive_mutex hostStorageMutex;
+
+std::string trim(const std::string& value)
+{
+    const size_t first = value.find_first_not_of(" \t\r\n");
+    if (first == std::string::npos)
+        return {};
+    const size_t last = value.find_last_not_of(" \t\r\n");
+    return value.substr(first, last - first + 1);
+}
+
+bool parseDecimal(const std::string& value, int maximum, int& result)
+{
+    if (value.empty())
+        return false;
+
+    int parsed = 0;
+    for (char character : value)
+    {
+        if (character < '0' || character > '9')
+            return false;
+        const int digit = character - '0';
+        if (parsed > (maximum - digit) / 10)
+            return false;
+        parsed = parsed * 10 + digit;
+    }
+    result = parsed;
+    return true;
+}
+
+bool isIpv4Address(const std::string& address)
+{
+    size_t start = 0;
+    for (int octet = 0; octet < 4; ++octet)
+    {
+        const size_t separator = address.find('.', start);
+        const bool lastOctet   = octet == 3;
+        if ((separator == std::string::npos) != lastOctet)
+            return false;
+
+        const size_t end = lastOctet ? address.size() : separator;
+        int value        = 0;
+        if (end == start || end - start > 3 || !parseDecimal(address.substr(start, end - start), 255, value))
+            return false;
+        start = end + 1;
+    }
+    return true;
+}
 
 int parsePort(const std::string& value, int fallback)
 {
@@ -38,6 +86,40 @@ int parsePort(const std::string& value, int fallback)
     }
 }
 
+}
+
+bool parseHostEndpoint(const std::string& input, std::string& address, int& port)
+{
+    const std::string endpoint = trim(input);
+    if (endpoint.empty())
+        return false;
+
+    std::string parsedAddress = endpoint;
+    int parsedPort            = DEFAULT_GAMESTREAM_HTTP_PORT;
+    const size_t separator    = endpoint.find(':');
+    if (separator != std::string::npos)
+    {
+        if (separator == 0 || separator != endpoint.rfind(':'))
+            return false;
+        parsedAddress              = endpoint.substr(0, separator);
+        const std::string portText = endpoint.substr(separator + 1);
+        if (!parseDecimal(portText, 65535, parsedPort) || parsedPort == 0)
+            return false;
+    }
+
+    if (!isIpv4Address(parsedAddress))
+        return false;
+
+    address = std::move(parsedAddress);
+    port    = parsedPort;
+    return true;
+}
+
+std::string formatHostEndpoint(const std::string& address, int port)
+{
+    if (port <= 0 || port == DEFAULT_GAMESTREAM_HTTP_PORT || address.find(':') != std::string::npos)
+        return address;
+    return address + ":" + std::to_string(port);
 }
 
 std::string makeSafeHostId(const std::string& raw)
@@ -174,7 +256,18 @@ std::vector<HostInfo> HostStorage::loadHosts()
             if (line.find("internal=") == 0)
             {
                 std::string v = line.substr(strlen("internal="));
-                host.ip       = sanitize_display(v);
+                std::string endpointAddress;
+                int endpointPort = host.port;
+                v                = sanitize_display(v);
+                if (parseHostEndpoint(v, endpointAddress, endpointPort))
+                {
+                    host.ip   = std::move(endpointAddress);
+                    host.port = endpointPort;
+                }
+                else
+                {
+                    host.ip = std::move(v);
+                }
             }
             else if (line.find("mac=") == 0)
             {
@@ -264,10 +357,10 @@ bool HostStorage::removeHost(const std::string& name)
     return fs::remove_all(keyDirStr) > 0;
 }
 
-bool HostStorage::updateHostIp(const std::string& name, const std::string& newIp)
+bool HostStorage::updateHostEndpoint(const std::string& name, const std::string& newIp, int newPort)
 {
     std::lock_guard<std::recursive_mutex> lock(hostStorageMutex);
-    if (newIp.empty())
+    if (newIp.empty() || newPort < 1 || newPort > 65535)
         return false;
 
     auto hostOpt = HostStorage::findHost(name);
@@ -276,6 +369,7 @@ bool HostStorage::updateHostIp(const std::string& name, const std::string& newIp
 
     HostInfo host = *hostOpt;
     host.ip       = newIp;
+    host.port     = newPort;
 
     ConfigManager config;
     config.load();

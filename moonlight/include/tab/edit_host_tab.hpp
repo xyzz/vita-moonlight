@@ -14,8 +14,11 @@ class EditHostTab : public brls::Box
     void saveChanges();
 
   private:
+    void openPortKeyboard();
+
     HostInfo originalHost;
     BRLS_BIND(brls::InputCell, ipField, "ip_field");
+    BRLS_BIND(brls::InputNumericCell, portField, "port_field");
     BRLS_BIND(brls::InputCell, nameField, "name_field");
     BRLS_BIND(brls::Button, saveButton, "save_button");
 };

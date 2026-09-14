@@ -25,6 +25,7 @@ class AddHostTab : public brls::Box
     static void winHostFoundCb(int idx, const char* host, const char* pcname, const char* ip, int port);
 #endif
     BRLS_BIND(brls::InputCell, ipField, "ip_field");
+    BRLS_BIND(brls::InputNumericCell, portField, "port_field");
     BRLS_BIND(brls::InputCell, nameField, "name_field");
     BRLS_BIND(brls::SelectorCell, preferExternalSelector, "prefer_external_selector");
     BRLS_BIND(brls::Button, addButton, "add_button");
@@ -35,4 +36,7 @@ class AddHostTab : public brls::Box
 
     std::shared_ptr<std::atomic<bool>> aliveToken = std::make_shared<std::atomic<bool>>(true);
     std::vector<std::pair<std::string, std::string>> discoveredHosts;
+
+  private:
+    void openPortKeyboard();
 };

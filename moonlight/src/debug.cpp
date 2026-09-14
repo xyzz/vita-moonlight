@@ -25,7 +25,7 @@ static std::atomic<bool> g_debug_log_enabled { false };
 namespace
 {
 
-constexpr size_t LOG_QUEUE_CAPACITY      = 64;
+constexpr size_t LOG_QUEUE_CAPACITY      = 256;
 constexpr size_t LOG_MESSAGE_SIZE        = 1026;
 constexpr int BACKGROUND_THREAD_PRIORITY = 0x10000114;
 

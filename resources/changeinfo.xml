@@ -3,8 +3,6 @@
 <changes app_ver="01.00"><![CDATA[
 ## 1.0.0<br>
 <br>
-### Added<br>
-<br>
 - Replaced the legacy interface with Borealis.<br>
 - Added FFmpeg-vita hardware decoding and direct GXM presentation.<br>
 - Added 480p through 768p stream modes, automatic bitrate and in-stream display controls.<br>
@@ -12,22 +10,14 @@
 - Added legacy and modern virtual keyboards with selectable layouts.<br>
 - Added Moonmic microphone forwarding, diagnostics and host monitor resolution control.<br>
 - Added Japanese, Brazilian Portuguese and Traditional Chinese translations.<br>
-<br>
-### Fixed<br>
-<br>
 - Resynchronize stale decoder output instead of accumulating playback delay.<br>
 - Handle variable-size Opus frames and restore local audio playback.<br>
 - Keep active touch zones separate from mouse and tablet input.<br>
 - Migrate absolute mouse settings from earlier releases.<br>
 - Reconnect the stream and restore controller state after application resume.<br>
-<br>
-### Build<br>
-<br>
 - Use the same build scripts on Linux, WSL and Windows/MSYS2.<br>
 - Install VitaSDK packages and the pinned FFmpeg-vita fork with `scripts/prepare/install_all.sh`.<br>
-- Apply the Borealis Vita patch during CMake configuration.<br>
-<br>
-Full Changelog: `0.13.2...1.0.0`
+- Apply the Borealis Vita patch during CMake configuration.
 ]]></changes>
 <changes app_ver="00.13"><![CDATA[
 ## 0.13.2<br>

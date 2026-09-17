@@ -100,7 +100,7 @@ class ChangelogTests(unittest.TestCase):
         self.assertEqual(internal["Input"], ("Simplify shortcuts",))
 
     @mock.patch("release.commit_records")
-    def test_changelog_uses_plain_sections(self, records):
+    def test_changelog_uses_plain_list(self, records):
         records.return_value = [
             ("build: update VitaSDK package", ""),
             ("refactor(video): share frame state", ""),
@@ -108,11 +108,15 @@ class ChangelogTests(unittest.TestCase):
             ("feat(stream): add 480p", ""),
         ]
         changelog = release.changelog_section("1.1.0", "1.0.0")
-        self.assertIn("### Added\n\n- Add 480p", changelog)
-        self.assertIn("### Fixed\n\n- Preserve uppercase text", changelog)
-        self.assertIn("### Changed\n\n- Share frame state", changelog)
-        self.assertIn("### Build/Internal\n\n- Update VitaSDK package", changelog)
-        self.assertNotIn("✨", changelog)
+        self.assertEqual(
+            changelog,
+            "## 1.1.0\n\n"
+            "- Add 480p\n"
+            "- Preserve uppercase text\n"
+            "- Share frame state\n"
+            "- Update VitaSDK package\n\n",
+        )
+        self.assertNotIn("Full Changelog", changelog)
 
     def test_changeinfo_groups_patch_releases(self):
         changelog = "## 1.0.1\n\n- Fix A\n\n## 1.0.0\n\n- Add B\n"

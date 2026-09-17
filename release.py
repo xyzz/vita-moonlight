@@ -229,40 +229,12 @@ def release_note_groups(records, version):
 
 
 def changelog_section(version, previous_tag):
-    groups = {
-        "added": [],
-        "fixed": [],
-        "changed": [],
-        "build": [],
-    }
-    for subject, _ in reversed(commit_records(previous_tag)):
-        match = CONVENTIONAL_RE.match(subject)
-        commit_type = match.group("type").lower() if match else ""
-        entry = readable_title(subject)
-        if commit_type == "feat":
-            groups["added"].append(entry)
-        elif commit_type == "fix":
-            groups["fixed"].append(entry)
-        elif commit_type in {"perf", "refactor"}:
-            groups["changed"].append(entry)
-        else:
-            groups["build"].append(entry)
-
     lines = [f"## {version}", ""]
-    headings = (
-        ("added", "### Added"),
-        ("fixed", "### Fixed"),
-        ("changed", "### Changed"),
-        ("build", "### Build/Internal"),
+    lines.extend(
+        f"- {readable_title(subject)}"
+        for subject, _ in reversed(commit_records(previous_tag))
     )
-    for key, heading in headings:
-        if not groups[key]:
-            continue
-        lines.extend([heading, ""])
-        lines.extend(f"- {entry}" for entry in groups[key])
-        lines.append("")
-    if previous_tag:
-        lines.extend([f"Full Changelog: `{previous_tag}...{version}`", ""])
+    lines.append("")
     return "\n".join(lines) + "\n"
 
 
@@ -385,7 +357,6 @@ def release_notes(version):
     )
     if not match:
         raise ValueError(f"CHANGELOG.md has no {version} section")
-
     previous_tag = previous_release_tag(version)
     target_ref = (
         version
@@ -453,7 +424,7 @@ def main():
     verify_parser = subparsers.add_parser("verify", help="verify release files")
     verify_parser.add_argument("version")
 
-    notes_parser = subparsers.add_parser("notes", help="print GitHub release notes")
+    notes_parser = subparsers.add_parser("notes", help="print release notes")
     notes_parser.add_argument("version")
 
     subparsers.add_parser("latest", help="print the latest stable release tag")

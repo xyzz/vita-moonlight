@@ -1,32 +1,63 @@
-# Contribution Guide
+# Contributing
 
-## Got a Question or Problem?
-Please take a look at the [wiki](https://github.com/irtimmer/moonlight-embedded/wiki) to see if answers your questions about the usage of Moonlight Embedded.
+Moonlight Vita targets PS Vita and PSTV. Keep changes focused on the Vita client and
+follow the existing code style and project structure.
 
-If you still have questions about Moonlight Embedded, please use one of the different fora discussing Moonlight Embedded.
+## Development
 
-[XDA](http://forum.xda-developers.com/showthread.php?t=2505510) Moonlight in General
-[Raspberry Pi Forum](http://www.raspberrypi.org/forums/viewtopic.php?f=78&t=65878) Moonlight Embedded for Raspberry Pi
-[SolidRun Community](http://www.solid-run.com/community/viewtopic.php?f=13&t=1489&p=11173) Moonlight Embedded for Cubox-i and Hummingboard
-[ODROID Forum](http://forum.odroid.com/viewtopic.php?f=91&t=15456) Moonlight Embedded on ODROID
+Clone the primary repository with its submodules:
 
-## Found an Issue?
-If you think you found a bug in Moonlight Embedded you can submit a issue. But please ensure first you have checked the following or otherwise we will mark the issue as invalid:
-- [ ] It's a bug in Moonlight Embedded and not in NVidia Geforce Experience or Steam as we otherwise can't fix them
-- [ ] It's not a misconfiguration of your own setup. Like firewall misconfiguration.
-- [ ] Their is no other bug report with the same issue. Check also the closed issues in case your bug is already solved in master.
+```bash
+git clone --recurse-submodules https://github.com/xyzz/vita-moonlight.git
+cd vita-moonlight
+git submodule update --init --recursive
+```
 
-Also provide as much information as possible about your setup and how to produce the issue so their are higher chances we can reproduce the issue and fix it. Even better you can submit a Pull Request
-with a fix.
+See [README.md](README.md) for the supported Linux, WSL and Windows/MSYS2 setup.
+Do not commit build directories, local logs, device addresses or other
+machine-specific files.
 
-## Feature request
-There are not much developers working on Moonlight Embedded. So it currently doesn't make much sense to use the issue tracker to submit feature request. Please try to implement it yourself and submit a pull request or discuss it on one of the fora to see if someone else is able to implement it.
+## Commits
 
-## Submitting a Pull Request
-Have you created a cool new feature or fixed a few bugs you can submit a pull request. But before your request is merged you have to check the following.
-- [ ] Your branch is based on a recent commit and can be merge cleanly
-- [ ] Your code uses the same code style as the rest of the code
-- [ ] Your history is cleanup and you provide one or multiple commits
-- [ ] Your commits only changes the necessery lines and not accidently changes whitespace or add or remove empty lines.
+Use Conventional Commits for new work:
 
-If these guide lines are not met we maybe won't merge your pull request or take some to cleanup your pull request before merging. Depending on how bad we wan't your code.
+```text
+type(scope): description
+```
+
+The scope is optional. The project uses `feat`, `fix`, `perf`, `refactor`,
+`build`, `ci`, `docs`, `test`, `chore` and `revert`. Common scopes
+include `video`, `audio`, `input`, `network`, `session`, `hosts`, `ui`,
+`config`, `vita`, `release`, `deps` and `moonmic`.
+
+Keep one coherent technical change per commit. Tests and documentation that are
+required to complete the same change should stay with it. Use `!` or a
+`BREAKING CHANGE:` trailer only for an actual incompatible change.
+
+The release helper uses commit subjects to select SemVer bumps: breaking changes
+produce a major bump, `feat` produces a minor bump, and other changes produce a
+patch bump. Do not change `CHANGELOG.md` or `resources/changeinfo.xml` for
+normal development; release preparation keeps them synchronized.
+
+## Validation
+
+Run the checks that apply to the change. A normal release build is:
+
+```bash
+./makepsv --gxm --release --no-deploy
+```
+
+Changes to release automation should also pass:
+
+```bash
+python3 -m unittest discover -s tests
+```
+
+When hardware behavior changes, test on the relevant PS Vita or PSTV model and
+include the host software and stream/decoder path used.
+
+## Pull requests
+
+Explain what changed and why, keep unrelated changes out of the same pull
+request, and list the commands and hardware used for validation. Avoid
+whitespace-only edits, generated build output and unrelated submodule updates.

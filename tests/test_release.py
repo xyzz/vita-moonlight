@@ -102,7 +102,7 @@ class ChangelogTests(unittest.TestCase):
     @mock.patch("release.commit_records")
     def test_changelog_uses_plain_list(self, records):
         records.return_value = [
-            ("build: update VitaSDK package", ""),
+            ("build: update VitaSDK package.", ""),
             ("refactor(video): share frame state", ""),
             ("fix(input): preserve uppercase text", ""),
             ("feat(stream): add 480p", ""),

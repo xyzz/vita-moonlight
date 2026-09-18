@@ -171,7 +171,7 @@ def readable_title(subject):
     match = CONVENTIONAL_RE.match(subject)
     if not match:
         return subject
-    title = match.group("title").strip()
+    title = match.group("title").strip().rstrip(".")
     if title:
         title = title[0].upper() + title[1:]
     return title

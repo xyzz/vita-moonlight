@@ -11,7 +11,7 @@
     "components": {
         "buttons_header": "Botones",
         "button_primary": "Botón primario",
-        "button_highlight": "  Botón destacado",
+        "button_highlight": "*  Botón destacado",
         "button_wrapping": "Botón por defecto con texto largo",
         "button_bordered": "Botón con borde",
         "button_borderless": "Botón sin borde",

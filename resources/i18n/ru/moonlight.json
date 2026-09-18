@@ -11,7 +11,7 @@
   "components": {
     "buttons_header": "Кнопки",
     "button_primary": "Главная Кнопка",
-    "button_highlight": " Кнопка освещения",
+    "button_highlight": "* Кнопка освещения",
     "button_wrapping": "Кнопка по умолчанию с текстом обертки",
     "button_bordered": "Ограниченная кнопка",
     "button_borderless": "Безграничная кнопка",

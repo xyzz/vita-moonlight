@@ -11,7 +11,7 @@
     "components": {
         "buttons_header": "ボタン",
         "button_primary": "プライマリボタン",
-        "button_highlight": "の特長 ハイライトボタン",
+        "button_highlight": "*の特長 ハイライトボタン",
         "button_wrapping": "テキストをラップするデフォルトボタン",
         "button_bordered": "注文ボタン",
         "button_borderless": "ボーダーレスボタン",

@@ -167,4 +167,6 @@ and the maintainers of
 The interface uses [Borealis](https://github.com/xfangfang/borealis), created and
 maintained by Natinusala, xfangfang, XITRIX and its contributors. The toolchain
 and platform libraries are provided by the [VitaSDK](https://vitasdk.org/)
-community.
+community. The bundled UI font is a subset of
+[Noto Sans CJK](https://github.com/notofonts/noto-cjk), distributed under the
+SIL Open Font License 1.1.

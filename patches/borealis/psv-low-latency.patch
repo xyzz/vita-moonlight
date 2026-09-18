@@ -278,10 +278,86 @@ index 9352721f2a533ccd846378ca660b6ce7861b9de4..d3f798ec1824a885b2c97db647aa83fc
  void PsvVideoContext::setSwapInterval(int interval) {
      VideoContext::swapInterval = interval;
      gxmSwapInterval(interval);
-@@ -109,4 +121,4 @@ NVGXMwindow* PsvVideoContext::getWindow()
-     return this->window;
+
+diff --git a/library/lib/views/hint.cpp b/library/lib/views/hint.cpp
+--- a/library/lib/views/hint.cpp
++++ b/library/lib/views/hint.cpp
+@@ -87,39 +87,39 @@
+     switch (button)
+     {
+         case BUTTON_A:
+-            return "\uE0E0";
++            return "\u00D7";
+         case BUTTON_B:
+-            return "\uE0E1";
++            return "\u25CB";
+         case BUTTON_X:
+-            return "\uE0E2";
++            return "\u25A1";
+         case BUTTON_Y:
+-            return "\uE0E3";
++            return "\u25B3";
+         case BUTTON_LSB:
+-            return "\uE104";
++            return "L3";
+         case BUTTON_RSB:
+-            return "\uE105";
++            return "R3";
+         case BUTTON_LT:
+-            return "\uE0E6";
++            return "L2";
+         case BUTTON_RT:
+-            return "\uE0E7";
++            return "R2";
+         case BUTTON_LB:
+-            return "\uE0E4";
++            return "L";
+         case BUTTON_RB:
+-            return "\uE0E5";
++            return "R";
+         case BUTTON_START:
+-            return "\uE0EF";
++            return "START";
+         case BUTTON_BACK:
+-            return "\uE0F0";
++            return "SELECT";
+         case BUTTON_LEFT:
+-            return "\uE0ED";
++            return "\u2190";
+         case BUTTON_UP:
+-            return "\uE0EB";
++            return "\u2191";
+         case BUTTON_RIGHT:
+-            return "\uE0EE";
++            return "\u2192";
+         case BUTTON_DOWN:
+-            return "\uE0EC";
++            return "\u2193";
+         default:
+-            return "\uE152";
++            return "?";
+     }
  }
  
--}
-\ No newline at end of file
-+}
+diff --git a/library/lib/platforms/desktop/desktop_font.cpp b/library/lib/platforms/desktop/desktop_font.cpp
+--- a/library/lib/platforms/desktop/desktop_font.cpp
++++ b/library/lib/platforms/desktop/desktop_font.cpp
+@@ -143,6 +143,9 @@
+         nvgAddFallbackFontId(vg, Application::getFont(FONT_REGULAR), Application::getFont(FONT_EMOJI));
+     }
+ 
++    // Vita uses standard Unicode controller prompts and does not require the
++    // proprietary Switch symbols font.
++#if !defined(__PSV__)
+     // bottom bar icons
+     if (loadFont(FONT_SWITCH_ICONS, USER_ICON_PATH))
+     {
+@@ -164,6 +167,8 @@
+         }
+     }
+ 
++#endif
++
+     // Material icons
+     if (this->loadMaterialFromResources())
+     {

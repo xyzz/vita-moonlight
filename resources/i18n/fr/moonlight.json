@@ -11,7 +11,7 @@
   "components": {
     "buttons_header": "Boutons",
     "button_primary": "Bouton primaire",
-    "button_highlight": " Bouton surligneur",
+    "button_highlight": "* Bouton surligneur",
     "button_wrapping": "Bouton par défaut avec texte d'emballage",
     "button_bordered": "Bouton bordé",
     "button_borderless": "Bouton sans bordure",

@@ -11,7 +11,7 @@
     "components": {
         "buttons_header": "Botões",
         "button_primary": "Botão primário",
-        "button_highlight": " Botão de realce",
+        "button_highlight": "* Botão de realce",
         "button_wrapping": "Botão padrão com texto de embrulho",
         "button_bordered": "Botão Contornado",
         "button_borderless": "Botão sem bordas",

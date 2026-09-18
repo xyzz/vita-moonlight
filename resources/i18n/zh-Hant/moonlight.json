@@ -11,7 +11,7 @@
     "components": {
         "buttons_header": "按鈕",
         "button_primary": "主按鈕",
-        "button_highlight": "  Highlight button",
+        "button_highlight": "*  Highlight button",
         "button_wrapping": "帶有文本的默認按鈕",
         "button_bordered": "邊框按鈕",
         "button_borderless": "無邊框按鈕",

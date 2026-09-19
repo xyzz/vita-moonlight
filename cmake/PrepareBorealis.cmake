@@ -26,7 +26,7 @@ function(prepare_borealis output_var)
     endif()
 
     execute_process(
-        COMMAND "${GIT_EXECUTABLE}" -C "${PREPARE_BOREALIS_SOURCE}" status --porcelain -- library
+        COMMAND "${GIT_EXECUTABLE}" -C "${PREPARE_BOREALIS_SOURCE}" status --porcelain --ignore-submodules=dirty -- library
         RESULT_VARIABLE git_status_result
         OUTPUT_VARIABLE git_status
         ERROR_VARIABLE git_status_error

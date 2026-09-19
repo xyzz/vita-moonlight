@@ -39,6 +39,10 @@ produce a major bump, `feat` produces a minor bump, and other changes produce a
 patch bump. Do not change `CHANGELOG.md` or `resources/changeinfo.xml` for
 normal development; release preparation keeps them synchronized.
 
+Pull request titles must follow the same Conventional Commit format. This keeps
+the release history valid when GitHub uses the pull request title as the squash
+commit subject.
+
 ## Validation
 
 Run the checks that apply to the change. A normal release build is:

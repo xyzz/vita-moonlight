@@ -24,6 +24,21 @@ class VersionTests(unittest.TestCase):
             "major",
         )
 
+    def test_automatic_bump_rejects_non_conventional_subjects(self):
+        for subject in ("Update pairing", "change: update pairing"):
+            with self.subTest(subject=subject):
+                with self.assertRaisesRegex(ValueError, "Conventional Commit"):
+                    release.automatic_bump([(subject, "")])
+
+    def test_validate_release_records_accepts_supported_types(self):
+        release.validate_release_records(
+            [
+                ("fix(audio): retry playback", ""),
+                ("docs: clarify setup", ""),
+                ("feat(ui)!: replace navigation", ""),
+            ]
+        )
+
     def test_bump_version(self):
         self.assertEqual(release.bump_version((1, 2, 3), "patch"), (1, 2, 4))
         self.assertEqual(release.bump_version((1, 2, 3), "minor"), (1, 3, 0))

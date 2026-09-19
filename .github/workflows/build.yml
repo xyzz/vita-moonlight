@@ -1,0 +1,53 @@
+name: Build PSVita
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vita-build-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      VITASDK: ${{ github.workspace }}/vitasdk
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7.0.1
+        with:
+          submodules: recursive
+
+      - name: Test release helper
+        run: python3 -m unittest discover -s tests
+
+      - name: Install host tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential cmake ninja-build git curl wget unzip \
+            libarchive-tools pkg-config fakeroot patch python3 bzip2 xz-utils
+
+      - name: Install VitaSDK
+        run: |
+          set -euo pipefail
+          git clone --depth 1 https://github.com/vitasdk/vdpm.git "$RUNNER_TEMP/vdpm"
+          "$RUNNER_TEMP/vdpm/bootstrap-vitasdk.sh" --install-dir "$VITASDK"
+          echo "$VITASDK/bin" >> "$GITHUB_PATH"
+
+      - name: Install project dependencies
+        run: ./scripts/prepare/install_all.sh
+
+      - name: Build release VPK
+        run: ./makepsv --gxm --release --clean --no-deploy
+
+      - name: Upload VPK
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: moonlight-vita-pr-${{ github.event.pull_request.number || github.run_id }}
+          path: cmake-build-psv-linux-gxm/moonlight.vpk
+          if-no-files-found: error

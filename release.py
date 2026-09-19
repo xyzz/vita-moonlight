@@ -18,6 +18,18 @@ VERSION_RE = re.compile(r"^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$")
 CONVENTIONAL_RE = re.compile(
     r"^(?P<type>[A-Za-z]+)(?:\((?P<scope>[^)]+)\))?(?P<breaking>!)?:\s*(?P<title>.+)$"
 )
+VALID_COMMIT_TYPES = {
+    "feat",
+    "fix",
+    "perf",
+    "refactor",
+    "build",
+    "ci",
+    "docs",
+    "test",
+    "chore",
+    "revert",
+}
 LIVEAREA_PATHS = (
     Path("psv/sce_sys/livearea/contents/template.xml"),
     Path("sce_sys/livearea/contents/template.xml"),
@@ -103,15 +115,31 @@ def commit_records(previous_tag, target_ref="HEAD"):
     return records
 
 
+def validate_release_records(records):
+    invalid_subjects = []
+    for subject, _ in records:
+        match = CONVENTIONAL_RE.fullmatch(subject)
+        if not match or match.group("type").lower() not in VALID_COMMIT_TYPES:
+            invalid_subjects.append(subject)
+    if invalid_subjects:
+        joined = ", ".join(repr(subject) for subject in invalid_subjects)
+        raise ValueError(
+            "release commits must use Conventional Commit subjects; "
+            f"invalid: {joined}"
+        )
+
+
 def automatic_bump(records):
+    validate_release_records(records)
+
     for subject, body in records:
-        match = CONVENTIONAL_RE.match(subject)
+        match = CONVENTIONAL_RE.fullmatch(subject)
         if (match and match.group("breaking")) or re.search(
             r"^BREAKING[ -]CHANGE:\s*", body, re.MULTILINE
         ):
             return "major"
     if any(
-        (match := CONVENTIONAL_RE.match(subject))
+        (match := CONVENTIONAL_RE.fullmatch(subject))
         and match.group("type").lower() == "feat"
         for subject, _ in records
     ):
@@ -145,6 +173,7 @@ def next_version(requested, bump):
     if not records:
         raise ValueError(f"no commits found after {current_tag}")
 
+    validate_release_records(records)
     selected_bump = automatic_bump(records) if bump == "auto" else bump
     return bump_version(current, selected_bump)
 

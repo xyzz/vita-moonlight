@@ -34,6 +34,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
+      release_commit: ${{ steps.commit.outputs.sha }}
     steps:
       - name: Checkout default branch
         uses: actions/checkout@v7.0.1
@@ -81,10 +82,11 @@ jobs:
             python3 release.py notes "$version"
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Commit release files
+      - name: Create verified release commit
+        id: commit
         env:
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
-          ACTOR_ID: ${{ github.actor_id }}
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN || github.token }}
           VERSION: ${{ steps.version.outputs.version }}
         run: |
           set -euo pipefail
@@ -96,31 +98,109 @@ jobs:
             sce_sys/livearea/contents/template.xml
           )
 
-          if git diff --quiet -- "${release_files[@]}"; then
-            echo "Release files already describe $VERSION"
-            exit 0
+          declare -A allowed
+          for path in "${release_files[@]}"; do
+            allowed["$path"]=1
+          done
+          while IFS= read -r path; do
+            if [[ -n "$path" && -z "${allowed[$path]+x}" ]]; then
+              echo "Unexpected release preparation change: $path" >&2
+              exit 1
+            fi
+          done < <(git diff --name-only)
+
+          expected_head="$(git rev-parse HEAD)"
+          mapfile -t changed_files < <(git diff --name-only -- "${release_files[@]}")
+
+          request="$RUNNER_TEMP/create-release-commit.json"
+          python3 - "$GITHUB_REPOSITORY" "$DEFAULT_BRANCH" "$expected_head" "$VERSION" "$request" "${changed_files[@]}" <<'PY'
+          import base64
+          import json
+          import sys
+          from pathlib import Path
+
+          repository, branch, expected_head, version, output, *paths = sys.argv[1:]
+          additions = [
+              {
+                  "path": path,
+                  "contents": base64.b64encode(Path(path).read_bytes()).decode("ascii"),
+              }
+              for path in paths
+          ]
+          query = """
+          mutation($input: CreateCommitOnBranchInput!) {
+            createCommitOnBranch(input: $input) {
+              commit {
+                oid
+                url
+                signature {
+                  isValid
+                  state
+                  wasSignedByGitHub
+                  signer { login }
+                }
+              }
+            }
+          }
+          """
+          mutation_input = {
+              "branch": {
+                  "repositoryNameWithOwner": repository,
+                  "branchName": branch,
+              },
+              "expectedHeadOid": expected_head,
+              "message": {
+                  "headline": f"chore(release): prepare {version}",
+              },
+          }
+          if additions:
+              mutation_input["fileChanges"] = {"additions": additions}
+          payload = {
+              "query": query,
+              "variables": {"input": mutation_input},
+          }
+          Path(output).write_text(json.dumps(payload), encoding="utf-8")
+          PY
+
+          result="$(gh api graphql --input "$request")"
+          read -r commit_sha signed_by_github signature_valid < <(
+            python3 -c '
+          import json
+          import sys
+          data = json.load(sys.stdin)
+          commit = ((data.get("data") or {}).get("createCommitOnBranch") or {}).get("commit") or {}
+          signature = commit.get("signature") or {}
+          print(
+              commit.get("oid", ""),
+              str(bool(signature.get("wasSignedByGitHub"))).lower(),
+              str(bool(signature.get("isValid"))).lower(),
+          )
+          ' <<<"$result"
+          )
+
+          if [[ -z "$commit_sha" || "$signed_by_github" != "true" || "$signature_valid" != "true" ]]; then
+            echo "GitHub did not return a valid signed release commit" >&2
+            python3 -m json.tool <<<"$result" >&2
+            exit 1
           fi
 
-          git config user.name "$GITHUB_ACTOR"
-          git config user.email "${ACTOR_ID}+${GITHUB_ACTOR}@users.noreply.github.com"
-          git add -- "${release_files[@]}"
-          git commit -m "chore(release): prepare $VERSION"
-          git push origin "HEAD:$DEFAULT_BRANCH"
+          echo "sha=$commit_sha" >> "$GITHUB_OUTPUT"
+          echo "Created GitHub-verified release commit $commit_sha"
 
       - name: Create release tag
         env:
-          ACTOR_ID: ${{ github.actor_id }}
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN || github.token }}
+          RELEASE_COMMIT: ${{ steps.commit.outputs.sha }}
           VERSION: ${{ steps.version.outputs.version }}
         run: |
           set -euo pipefail
-          if git rev-parse --verify --quiet "refs/tags/$VERSION"; then
+          if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$VERSION" >/dev/null 2>&1; then
             echo "Tag $VERSION already exists" >&2
             exit 1
           fi
-          git config user.name "$GITHUB_ACTOR"
-          git config user.email "${ACTOR_ID}+${GITHUB_ACTOR}@users.noreply.github.com"
-          git tag -a "$VERSION" -m "Moonlight Vita $VERSION"
-          git push origin "refs/tags/$VERSION"
+          gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" \
+            -f ref="refs/tags/$VERSION" \
+            -f sha="$RELEASE_COMMIT" >/dev/null
 
   publish:
     name: Build and publish
@@ -129,6 +209,7 @@ jobs:
     env:
       VITASDK: ${{ github.workspace }}/vitasdk
       GH_TOKEN: ${{ secrets.RELEASE_TOKEN || github.token }}
+      RELEASE_COMMIT: ${{ needs.prepare.outputs.release_commit }}
       VERSION: ${{ needs.prepare.outputs.version }}
     steps:
       - name: Checkout repository
@@ -152,6 +233,16 @@ jobs:
           fi
           if ! git rev-parse --verify --quiet "refs/tags/$VERSION"; then
             echo "Release tag $VERSION does not exist" >&2
+            exit 1
+          fi
+          tag_commit="$(git rev-parse "$VERSION^{commit}")"
+          if [[ "$tag_commit" != "$RELEASE_COMMIT" ]]; then
+            echo "Tag $VERSION points to $tag_commit, expected $RELEASE_COMMIT" >&2
+            exit 1
+          fi
+          verified="$(gh api "repos/$GITHUB_REPOSITORY/commits/$RELEASE_COMMIT" --jq '.commit.verification.verified')"
+          if [[ "$verified" != "true" ]]; then
+            echo "Release commit $RELEASE_COMMIT is not verified by GitHub" >&2
             exit 1
           fi
           if ! git merge-base --is-ancestor "$VERSION" "origin/$DEFAULT_BRANCH"; then

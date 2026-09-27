@@ -173,36 +173,89 @@ if (WIN32)
     endif ()
 elseif (PLATFORM_PSV)
     set(VITA_MKSFOEX_FLAGS "${VITA_MKSFOEX_FLAGS} -d ATTRIBUTE2=12") # max heap size mode
+
+    include(ExternalProject)
+
+    set(LEGACY_BUILD_DIR "${CMAKE_CURRENT_BINARY_DIR}/legacy-client")
+    ExternalProject_Add(legacy-client
+        SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/legacy"
+        BINARY_DIR "${LEGACY_BUILD_DIR}"
+        CMAKE_ARGS
+            "-DCMAKE_TOOLCHAIN_FILE=$ENV{VITASDK}/share/vita.toolchain.cmake"
+            "-DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}"
+            "-DCMAKE_POLICY_VERSION_MINIMUM=3.5"
+            "-DUSE_DIR_UMA0=OFF"
+        BUILD_COMMAND ${CMAKE_COMMAND} --build <BINARY_DIR> --target moonlight.velf --parallel
+        BUILD_ALWAYS 1
+        INSTALL_COMMAND ""
+        BUILD_BYPRODUCTS "${LEGACY_BUILD_DIR}/moonlight.velf"
+    )
+
+    set(LEGACY_SELF "${CMAKE_CURRENT_BINARY_DIR}/legacy.self")
+    add_custom_target(legacy-self ALL
+        COMMAND vita-make-fself -a 0x2800000000000001 -at 0x0E -c
+            "${LEGACY_BUILD_DIR}/moonlight.velf" "${LEGACY_SELF}"
+        DEPENDS legacy-client
+        BYPRODUCTS "${LEGACY_SELF}"
+        COMMENT "Creating legacy.self"
+        VERBATIM
+    )
+
     add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}.velf
         COMMAND vita-elf-create ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME} ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}.velf
         DEPENDS ${PROJECT_NAME}
         COMMENT "Creating ${PROJECT_NAME}.velf"
     )
-    add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}.self
-        COMMAND vita-make-fself -a 0x2800000000000001 -at 0x0E -c ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}.velf ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}.self
+    set(BOREALIS_SELF "${CMAKE_CURRENT_BINARY_DIR}/borealis.self")
+    add_custom_command(OUTPUT "${BOREALIS_SELF}"
+        COMMAND vita-make-fself -a 0x2800000000000001 -at 0x0E -c ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}.velf "${BOREALIS_SELF}"
         DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}.velf
-        COMMENT "Creating ${PROJECT_NAME}.self"
+        COMMENT "Creating borealis.self"
     )
-    add_custom_target(${PROJECT_NAME}_self_target ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}.self)
+    add_custom_target(${PROJECT_NAME}_self_target ALL DEPENDS "${BOREALIS_SELF}")
+
+    add_executable(moonlight-launcher launcher/main.c)
+    target_link_libraries(moonlight-launcher PRIVATE -lSceAppMgr_stub)
+    set(LAUNCHER_VELF "${CMAKE_CURRENT_BINARY_DIR}/moonlight-launcher.velf")
+    set(LAUNCHER_SELF "${CMAKE_CURRENT_BINARY_DIR}/moonlight-launcher.self")
+    add_custom_command(OUTPUT "${LAUNCHER_VELF}"
+        COMMAND vita-elf-create $<TARGET_FILE:moonlight-launcher> "${LAUNCHER_VELF}"
+        DEPENDS moonlight-launcher
+        COMMENT "Creating moonlight-launcher.velf"
+        VERBATIM
+    )
+    add_custom_command(OUTPUT "${LAUNCHER_SELF}"
+        COMMAND vita-make-fself -a 0x2800000000000001 -at 0x0E -c "${LAUNCHER_VELF}" "${LAUNCHER_SELF}"
+        DEPENDS "${LAUNCHER_VELF}"
+        COMMENT "Creating moonlight-launcher.self"
+        VERBATIM
+    )
+    add_custom_target(moonlight-launcher-self ALL DEPENDS "${LAUNCHER_SELF}")
+
     set(PSV_ASSETS_FILES ${CMAKE_SOURCE_DIR}/psv/sce_sys sce_sys)
     if (NOT USE_LIBROMFS)
         list(APPEND PSV_ASSETS_FILES ${CMAKE_SOURCE_DIR}/resources resources)
     endif ()
+    list(APPEND PSV_ASSETS_FILES
+        "${CMAKE_SOURCE_DIR}/assets/nerdfont.ttf" assets/nerdfont.ttf
+        "${BOREALIS_SELF}" borealis.self
+        "${LEGACY_SELF}" legacy.self
+    )
     if (NOT USE_GXM)
         list(APPEND PSV_ASSETS_FILES ${CMAKE_SOURCE_DIR}/psv/module/ module)
     endif ()
     if (USE_VITA_SHARK)
         list(APPEND PSV_ASSETS_FILES "${CMAKE_BINARY_DIR}/vendor/SceShaccCg" module)
     endif ()
-    vita_create_vpk(${PROJECT_NAME}.vpk ${TITLE_ID} ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}.self
+    vita_create_vpk(${PROJECT_NAME}.vpk ${TITLE_ID} "${LAUNCHER_SELF}"
             VERSION ${PSN_VERSION}
             NAME ${TITLE}
             FILE ${PSV_ASSETS_FILES}
     )
     if(TARGET ${PROJECT_NAME}.vpk-vpk)
-        add_dependencies(${PROJECT_NAME}.vpk-vpk ${PROJECT_NAME}_self_target)
+        add_dependencies(${PROJECT_NAME}.vpk-vpk ${PROJECT_NAME}_self_target moonlight-launcher-self legacy-self)
     else()
-        add_dependencies(${PROJECT_NAME}.vpk ${PROJECT_NAME}_self_target)
+        add_dependencies(${PROJECT_NAME}.vpk ${PROJECT_NAME}_self_target moonlight-launcher-self legacy-self)
     endif()
 endif ()
 

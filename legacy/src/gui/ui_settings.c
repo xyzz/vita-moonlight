@@ -2,6 +2,7 @@
 
 #include "guilib.h"
 #include "ime.h"
+#include "ui_keyboard.h"
 
 #include "../config.h"
 #include "../input/vita.h"
@@ -18,6 +19,7 @@
 #include <sys/types.h>
 
 #include <psp2/ctrl.h>
+#include <psp2/appmgr.h>
 #include <psp2/rtc.h>
 #include <psp2/touch.h>
 #include <psp2/videodec.h>
@@ -434,6 +436,7 @@ enum {
   SETTINGS_DISABLE_POWERSAVE,
   SETTINGS_JP_LAYOUT,
   SETTINGS_SHOW_FPS,
+  SETTINGS_FRONTEND,
   SETTINGS_LOCAL_AUDIO,
   SETTINGS_ENABLE_FRAME_PACER,
   SETTINGS_CENTER_REGION_ONLY,
@@ -467,6 +470,7 @@ enum {
   SETTINGS_VIEW_DISABLE_POWERSAVE,
   SETTINGS_VIEW_JP_LAYOUT,
   SETTINGS_VIEW_SHOW_FPS,
+  SETTINGS_VIEW_FRONTEND,
   SETTINGS_VIEW_LOCAL_AUDIO,
   SETTINGS_VIEW_ENABLE_FRAME_PACER,
   SETTINGS_VIEW_CENTER_REGION_ONLY,
@@ -537,6 +541,31 @@ static int settings_loop(int id, void *context, const input_data *input) {
     return 0;
   }
   switch (id) {
+    case SETTINGS_FRONTEND: {
+      if ((input->buttons & config.btn_confirm) == 0 || input->buttons & SCE_CTRL_HOLD) {
+        break;
+      }
+
+      if (!display_confirm("Switch to Borealis interface?")) {
+        break;
+      }
+
+      ui_settings_save_config();
+      FILE *frontend = fopen("ux0:data/moonlight/interface.conf", "w");
+      if (!frontend) {
+        display_error("Could not save interface selection");
+        break;
+      }
+      fprintf(frontend, "borealis\n");
+      fclose(frontend);
+
+      flash_message("Switching to Borealis...");
+      int result = sceAppMgrLoadExec("app0:eboot.bin", NULL, NULL);
+      if (result < 0) {
+        display_error("Could not switch interface (0x%08X)", result);
+      }
+      break;
+    }
     case SETTINGS_SWAP_SHOULDER_BUTTONS: {
       if ((input->buttons & config.btn_confirm) == 0 || input->buttons & SCE_CTRL_HOLD) {
         break;
@@ -997,7 +1026,7 @@ static int settings_back(void *context) {
 // Eliminado: hotkeys_menu y referencias, ya que los atajos ahora son fijos
 
 int ui_settings_menu() {
-  menu_entry menu[32];
+  menu_entry menu[48];
   int idx = 0;
 #define MENU_CATEGORY(NAME) \
   do { \
@@ -1030,6 +1059,7 @@ int ui_settings_menu() {
   MENU_ENTRY(SETTINGS_LOCAL_AUDIO, SETTINGS_VIEW_LOCAL_AUDIO, "Enable local audio", "");
 
   MENU_CATEGORY("System");
+  MENU_ENTRY(SETTINGS_FRONTEND, SETTINGS_VIEW_FRONTEND, "Interface", "");
   MENU_ENTRY(SETTINGS_SAVE_DEBUG_LOG, SETTINGS_VIEW_SAVE_DEBUG_LOG, "Enable debug log", "");
   MENU_ENTRY(SETTINGS_DISABLE_POWERSAVE, SETTINGS_VIEW_DISABLE_POWERSAVE, "Disable power save", "");
   MENU_ENTRY(SETTINGS_JP_LAYOUT, SETTINGS_VIEW_JP_LAYOUT, "Swap X & O for Moonlight", "");
@@ -1079,6 +1109,7 @@ int ui_settings_menu() {
   // Swap shoulder buttons
   swap_shoulder_buttons = config.swap_shoulder_buttons;
   strcpy(menu[SETTINGS_VIEW_IDX[SETTINGS_VIEW_SWAP_SHOULDER_BUTTONS]].subname, swap_shoulder_buttons ? "yes" : "no");
+  strcpy(menu[SETTINGS_VIEW_IDX[SETTINGS_VIEW_FRONTEND]].subname, "Legacy");
   // Touchscreen mode
   static const char* mode_names[] = {"Off", "DS4 Touchpad", "Mouse Absolute", "Tablet (Sunshine)"};
   strcpy(menu[SETTINGS_VIEW_IDX[SETTINGS_VIEW_TOUCH_MODE_SELECT]].subname, mode_names[config.touchscreen_mode]);

@@ -25,6 +25,7 @@
 #include <utility>
 
 #include "ConfigManager.hpp"
+#include "FrontendMode.hpp"
 #include "controller/ControllerInput.hpp"
 #include "session/session_main.hpp"
 #include "session/stream_config.hpp"
@@ -98,6 +99,25 @@ SettingsTab::SettingsTab()
     VideoSettings videoSettings      = config.getVideoSettings();
 
     moonlight::settings::applyBackground(this, videoSettings.settings_background_opacity);
+
+#if defined(__PSV__)
+    std::vector<std::string> frontendModes = { "Legacy", "Borealis" };
+    frontendSelector->init(
+        brls::getStr("moonlight/settings_tab/frontend_title"), frontendModes, 1,
+        [](int selected)
+        {
+            if (selected != 0)
+                return;
+
+            brls::Application::notify("Switching to Legacy...");
+            brls::delay(250, []()
+                {
+                    if (!moonlight::restartWithFrontend(moonlight::FrontendMode::Legacy))
+                        brls::Application::notify("Could not switch interface"); });
+        });
+#else
+    frontendSelector->setVisibility(brls::Visibility::GONE);
+#endif
 
     settingsOpacitySlider->init(
         brls::getStr("moonlight/settings_tab/settings_background_opacity"),

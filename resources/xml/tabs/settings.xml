@@ -152,6 +152,10 @@
             <!-- SYSTEM -->
             <brls:Header title="@i18n/moonlight/settings_tab/system_header"/>
 
+            <brls:SelectorCell
+                id="frontendSelector"
+                title="@i18n/moonlight/settings_tab/frontend_title"/>
+
             <brls:BooleanCell
                 id="keepAwakeToggle"
                 title="@i18n/moonlight/settings_tab/keep_awake_while_streaming"/>

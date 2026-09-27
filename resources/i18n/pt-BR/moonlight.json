@@ -76,10 +76,11 @@
         "header": "Configuração da transmissão",
         "controls_header": "Controlos",
         "system_header": "Sistema",
+        "frontend_title": "Interface",
         "render_mode": {
             "title": "Modo de renderização",
-            "legacy_option": "Legado (SceVideodec)",
-            "modern_option": "Moderno (FFmpeg)",
+            "legacy_option": "SceVideodec",
+            "modern_option": "FFmpeg-vita",
             "legacy_name": "Legado",
             "modern_name": "Moderno",
             "unknown_name": "Desconhecido",

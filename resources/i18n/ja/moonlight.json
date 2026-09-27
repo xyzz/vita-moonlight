@@ -76,10 +76,11 @@
         "header": "ストリーミング設定",
         "controls_header": "コントロール",
         "system_header": "システム",
+        "frontend_title": "インターフェース",
         "render_mode": {
             "title": "レンダリングモード",
-            "legacy_option": "レガシー(SceVideodec)",
-            "modern_option": "モダン (FFmpeg)",
+            "legacy_option": "SceVideodec",
+            "modern_option": "FFmpeg-vita",
             "legacy_name": "レガシー",
             "modern_name": "モダン",
             "unknown_name": "不明",

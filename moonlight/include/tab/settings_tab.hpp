@@ -36,6 +36,7 @@ class SettingsTab : public brls::Box
     BRLS_BIND(brls::SliderCell, settingsOpacitySlider, "settingsOpacitySlider");
     BRLS_BIND(brls::BooleanCell, keepAwakeToggle, "keepAwakeToggle");
     BRLS_BIND(brls::SelectorCell, languageSelector, "languageSelector");
+    BRLS_BIND(brls::SelectorCell, frontendSelector, "frontendSelector");
 
     BRLS_BIND(brls::SelectorCell, renderModeSelector, "renderModeSelector");
     BRLS_BIND(brls::SelectorCell, streamResolutionSelector, "streamResolutionSelector");

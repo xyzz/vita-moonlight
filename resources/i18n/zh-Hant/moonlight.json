@@ -76,10 +76,11 @@
         "header": "串流設置",
         "controls_header": "控件",
         "system_header": "系統",
+        "frontend_title": "介面",
         "render_mode": {
             "title": "繪圖模式",
-            "legacy_option": "傳統 (SceVideodec)",
-            "modern_option": "現代 (FFmpeg)",
+            "legacy_option": "SceVideodec",
+            "modern_option": "FFmpeg-vita",
             "legacy_name": "傳統",
             "modern_name": "現代",
             "unknown_name": "未知",

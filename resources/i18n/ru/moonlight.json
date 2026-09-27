@@ -76,10 +76,11 @@
     "header": "Потоковые настройки",
     "controls_header": "Управление",
     "system_header": "Система",
+    "frontend_title": "Интерфейс",
     "render_mode": {
       "title": "Режим Рендера",
-      "legacy_option": "Классический (SceVideodec)",
-      "modern_option": "Современный (FFmpeg)",
+      "legacy_option": "SceVideodec",
+      "modern_option": "FFmpeg-vita",
       "legacy_name": "Классический",
       "modern_name": "современный",
       "unknown_name": "неизвестный",

@@ -165,6 +165,12 @@ int main(int argc, char* argv[]) {
   // Ya no se guarda config antes de inicializar todos los valores
   config_parse(argc, argv, &config);
 
+  // Hosts and pairing credentials are shared with the Borealis frontend.
+  // An older moonlight.conf may still point key_dir at the legacy root, so
+  // restore the directory selected above and persist the migrated value.
+  strcpy(config.key_dir, out_key_dir);
+  config_save(config_path, &config);
+
   // Restaurar estado de Absolute Touch al iniciar
   touchabsolute_enable(config.touchscreen_mode == 2);
 

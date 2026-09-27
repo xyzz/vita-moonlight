@@ -34,7 +34,7 @@ add_definitions(-DVERSION_MAJOR=${VERSION_MAJOR})
 add_definitions(-DVERSION_MINOR=${VERSION_MINOR})
 add_definitions(-DVERSION_PATCH=${VERSION_PATCH})
 
-set(CMAKE_C_FLAGS "-Wl,-q -g -std=c99 -D__vita__")
+set(CMAKE_C_FLAGS "-Wl,-q -g -std=c99 -D_GNU_SOURCE -D__vita__")
 
 
 
@@ -147,6 +147,7 @@ add_executable(${PROJECT_NAME}.elf
 target_link_libraries(${PROJECT_NAME}.elf
 	-lexpat
 	-lcurl
+	-lzstd
 	moonlight-common-c
 	enet
 	h264bitstream

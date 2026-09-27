@@ -10,6 +10,7 @@
 #include <psp2/ctrl.h>
 #include <stdbool.h>
 #include <string.h>
+#include <stdlib.h>
 
 static bool absolute_mouse_enabled = false;
 static int last_abs_x = -1, last_abs_y = -1;

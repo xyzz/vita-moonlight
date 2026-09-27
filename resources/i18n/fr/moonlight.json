@@ -76,10 +76,11 @@
     "header": "Paramètres de streaming",
     "controls_header": "Contrôles",
     "system_header": "Système",
+    "frontend_title": "Interface",
     "render_mode": {
       "title": "Mode rendu",
-      "legacy_option": "Classique (SceVideodec)",
-      "modern_option": "Moderne (FFmpeg)",
+      "legacy_option": "SceVideodec",
+      "modern_option": "FFmpeg-vita",
       "legacy_name": "Classique",
       "modern_name": "Moderne",
       "unknown_name": "Inconnu",

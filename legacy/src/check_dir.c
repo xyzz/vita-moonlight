@@ -53,7 +53,14 @@ void check_and_create_moonlight_dir(char* out_path, char* out_key_dir) {
     }
     FILE* test_log = NULL;
     if (success_idx >= 0) {
-        snprintf(out_key_dir, MOONLIGHT_PATH_MAX, "%s/", test_paths[success_idx]);
+        char devices_path[MOONLIGHT_PATH_MAX];
+        snprintf(devices_path, sizeof(devices_path), "%s/devices", test_paths[success_idx]);
+        int devices_result = sceIoMkdir(devices_path, 0777);
+        if (devices_result >= 0 || devices_result == 0x80010011) {
+            snprintf(out_key_dir, MOONLIGHT_PATH_MAX, "%s/", devices_path);
+        } else {
+            snprintf(out_key_dir, MOONLIGHT_PATH_MAX, "%s/", test_paths[success_idx]);
+        }
         out_key_dir[MOONLIGHT_PATH_MAX-1] = '\0';
         snprintf(out_path, MOONLIGHT_PATH_MAX, "%s/moonlight.conf", test_paths[success_idx]);
         out_path[MOONLIGHT_PATH_MAX-1] = '\0';

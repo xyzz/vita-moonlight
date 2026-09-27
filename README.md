@@ -12,7 +12,7 @@ Embedded. It streams games and applications from a Sunshine-compatible host.
 - Host discovery, pairing and Wake-on-LAN
 - Touchscreen, rear touchpad, motion and configurable shortcuts
 - Optional microphone forwarding through Moonmic
-- Borealis interface with controller and touch navigation
+- Selectable Legacy and Borealis frontends
 
 ## Requirements
 

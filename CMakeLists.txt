@@ -184,6 +184,9 @@ elseif (PLATFORM_PSV)
             "-DCMAKE_TOOLCHAIN_FILE=$ENV{VITASDK}/share/vita.toolchain.cmake"
             "-DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}"
             "-DCMAKE_POLICY_VERSION_MINIMUM=3.5"
+            "-DMODERN_VERSION_MAJOR=${VERSION_MAJOR}"
+            "-DMODERN_VERSION_MINOR=${VERSION_MINOR}"
+            "-DMODERN_VERSION_PATCH=${VERSION_ALTER}"
             "-DUSE_DIR_UMA0=OFF"
         BUILD_COMMAND ${CMAKE_COMMAND} --build <BINARY_DIR> --target moonlight.velf --parallel
         BUILD_ALWAYS 1

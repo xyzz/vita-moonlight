@@ -546,7 +546,15 @@ static int settings_loop(int id, void *context, const input_data *input) {
         break;
       }
 
-      if (!display_confirm("Switch to Borealis interface?")) {
+      char frontend_prompt[256];
+      snprintf(
+          frontend_prompt,
+          sizeof(frontend_prompt),
+          "Switch to Moonlight v%d.%d.%d (Borealis)?",
+          MODERN_VERSION_MAJOR,
+          MODERN_VERSION_MINOR,
+          MODERN_VERSION_PATCH);
+      if (!display_confirm(frontend_prompt)) {
         break;
       }
 

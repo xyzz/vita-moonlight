@@ -27,6 +27,7 @@
 
 #include <psp2/kernel/threadmgr.h>
 #include <psp2/ctrl.h>
+#include <psp2/appmgr.h>
 
 extern SceNetInitParam net_param;
 
@@ -551,12 +552,90 @@ int global_loop(int cursor, void *ctx, const input_data *input) {
   return 0;
 }
 
+#define FRONTEND_CONFIG_PATH "ux0:data/moonlight/interface.conf"
+
+static bool frontend_config_exists() {
+  FILE *file = fopen(FRONTEND_CONFIG_PATH, "r");
+  if (!file) {
+    return false;
+  }
+  fclose(file);
+  return true;
+}
+
+static bool save_frontend_selection(const char *frontend) {
+  FILE *file = fopen(FRONTEND_CONFIG_PATH, "w");
+  if (!file) {
+    return false;
+  }
+  int written = fprintf(file, "%s\n", frontend);
+  int closed = fclose(file);
+  return written > 0 && closed == 0;
+}
+
+static void show_first_run_frontend_welcome() {
+  if (frontend_config_exists()) {
+    return;
+  }
+
+  char welcome[1024];
+  snprintf(
+      welcome,
+      sizeof(welcome),
+      "Welcome to Moonlight Vita!\n\n"
+      "Moonlight Legacy v%d.%d.%d keeps the classic interface and behavior.\n"
+      "Moonlight v%d.%d.%d uses the new Borealis interface and newer features.\n\n"
+      "Would you like to try the new interface now?\n"
+      "You can return to Legacy anytime from Settings > Interface.",
+      VERSION_MAJOR,
+      VERSION_MINOR,
+      VERSION_PATCH,
+      MODERN_VERSION_MAJOR,
+      MODERN_VERSION_MINOR,
+      MODERN_VERSION_PATCH);
+
+  if (display_confirm(welcome)) {
+    if (!save_frontend_selection("borealis")) {
+      display_error("Could not save interface selection");
+      return;
+    }
+
+    int result = sceAppMgrLoadExec("app0:eboot.bin", NULL, NULL);
+    if (result < 0) {
+      save_frontend_selection("legacy");
+      display_error("Could not switch interface (0x%08X)", result);
+    }
+    return;
+  }
+
+  if (!save_frontend_selection("legacy")) {
+    display_error("Could not save interface selection");
+    return;
+  }
+
+  char later[512];
+  snprintf(
+      later,
+      sizeof(later),
+      "Moonlight Legacy v%d.%d.%d will remain active.\n\n"
+      "If you want to try Moonlight v%d.%d.%d later, open Settings > Interface.\n"
+      "You can switch between Legacy and Borealis whenever you want.",
+      VERSION_MAJOR,
+      VERSION_MINOR,
+      VERSION_PATCH,
+      MODERN_VERSION_MAJOR,
+      MODERN_VERSION_MINOR,
+      MODERN_VERSION_PATCH);
+  display_alert(later, NULL, 1, NULL, NULL);
+}
+
 void gui_init() {
   guilib_init(&global_loop, NULL);
 }
 
 void gui_loop() {
   gui_init();
+  show_first_run_frontend_welcome();
 
   while (ui_main_menu() == 2);
 

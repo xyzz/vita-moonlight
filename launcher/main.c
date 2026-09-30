@@ -201,7 +201,8 @@ int main(void)
     if (!read_frontend(frontend, sizeof(frontend)))
     {
         snprintf(frontend, sizeof(frontend), "%s", FRONTEND_LEGACY);
-        write_frontend(frontend);
+        if (path_exists(FRONTEND_CONFIG_PATH))
+            write_frontend(frontend);
     }
 
     const int result = launch_frontend(frontend);

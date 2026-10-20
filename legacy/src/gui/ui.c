@@ -583,10 +583,10 @@ static void show_first_run_frontend_welcome() {
       welcome,
       sizeof(welcome),
       "Welcome to Moonlight Vita!\n\n"
-      "Moonlight Legacy v%d.%d.%d keeps the classic interface and behavior.\n"
-      "Moonlight v%d.%d.%d uses the new Borealis interface and newer features.\n\n"
-      "Would you like to try the new interface now?\n"
-      "You can return to Legacy anytime from Settings > Interface.",
+      "Moonlight Legacy v%d.%d.%d: classic interface.\n"
+      "Moonlight v%d.%d.%d: new Borealis interface.\n\n"
+      "Would you like to try Borealis now?\n"
+      "Switch anytime from Settings > Interface.",
       VERSION_MAJOR,
       VERSION_MINOR,
       VERSION_PATCH,
@@ -594,7 +594,7 @@ static void show_first_run_frontend_welcome() {
       MODERN_VERSION_MINOR,
       MODERN_VERSION_PATCH);
 
-  if (display_confirm(welcome)) {
+  if (display_confirm_sized(welcome, 760, 350)) {
     if (!save_frontend_selection("borealis")) {
       display_error("Could not save interface selection");
       return;
@@ -617,9 +617,9 @@ static void show_first_run_frontend_welcome() {
   snprintf(
       later,
       sizeof(later),
-      "Moonlight Legacy v%d.%d.%d will remain active.\n\n"
-      "If you want to try Moonlight v%d.%d.%d later, open Settings > Interface.\n"
-      "You can switch between Legacy and Borealis whenever you want.",
+      "Moonlight Legacy v%d.%d.%d stays active.\n\n"
+      "To try Moonlight v%d.%d.%d later:\n"
+      "Settings > Interface.",
       VERSION_MAJOR,
       VERSION_MINOR,
       VERSION_PATCH,

@@ -521,9 +521,10 @@ void guilib_init(gui_loop_callback global_loop_cb, gui_draw_callback global_draw
   gui_global_loop_callback = global_loop_cb;
 }
 
-int display_confirm(const char* message) {
-    char* buttons[] = {"X: Yes", "O: No"};
-    menu_geom geom = make_geom_centered(400, 200);
+int display_confirm_sized(const char* message, int width, int height) {
+    // draw_alert adds the configured button icons.
+    char* buttons[] = {"Yes", "No"};
+    menu_geom geom = make_geom_centered(width, height);
     while (1) {
         ui_start();
         draw_alert((char*)message, geom, buttons, 2);
@@ -539,4 +540,8 @@ int display_confirm(const char* message) {
         }
         ui_end();
     }
+}
+
+int display_confirm(const char* message) {
+    return display_confirm_sized(message, 400, 200);
 }

@@ -22,12 +22,15 @@ for arg in "$@"; do
         --debug|debug) BUILD_TYPE="Debug"; NONINTERACTIVE=1 ;;
         --release|release) BUILD_TYPE="Release"; NONINTERACTIVE=1 ;;
         --clean|clean) DO_CLEAN=1; NONINTERACTIVE=1 ;;
+        --deploy|deploy) DO_DEPLOY=1; NONINTERACTIVE=1 ;;
         --no-deploy|nodeploy) DO_DEPLOY=0; NONINTERACTIVE=1 ;;
         -h|--help)
             cat <<'EOF'
-Usage: ./makepsv [--gxm|--gl] [--debug|--release] [--clean] [--no-deploy]
+Usage: ./makepsv [--gxm|--gl] [--debug|--release] [--clean] [--deploy|--no-deploy]
 
 Without arguments, an interactive menu is shown.
+With arguments, the build is noninteractive and uploads the VPK by default.
+Use --no-deploy for build-only runs (especially CI); --deploy makes upload explicit.
 Linux, WSL and Windows/MSYS2 are supported by the same script.
 EOF
             exit 0
@@ -158,8 +161,11 @@ if [ "$NONINTERACTIVE" -eq 0 ]; then
     echo "3. Exit"
     read -r -p "Select [1-3]: " action
     case "$action" in
-        1) deploy_to_vita ;;
+        1) deploy_to_vita || exit 6 ;;
         2) vita_open_dir "$BUILD_DIR" ;;
         *) : ;;
     esac
+else
+    echo "[+] Noninteractive deployment enabled; use --no-deploy for build-only runs."
+    deploy_to_vita || exit 6
 fi

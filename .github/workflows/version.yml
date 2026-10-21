@@ -277,6 +277,9 @@ jobs:
       - name: Build release VPK
         run: ./makepsv --gxm --release --clean --no-deploy
 
+      - name: Smoke-test packaged launcher and frontends
+        run: python3 scripts/check_vpk.py cmake-build-psv-linux-gxm/moonlight.vpk
+
       - name: Prepare release asset and notes
         run: |
           set -euo pipefail

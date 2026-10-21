@@ -93,6 +93,8 @@ jobs:
           release_files=(
             CMakeLists.txt
             CHANGELOG.md
+            legacy/CMakeLists.txt
+            legacy/CHANGELOG.md
             psv/sce_sys/livearea/contents/template.xml
             resources/changeinfo.xml
             sce_sys/livearea/contents/template.xml

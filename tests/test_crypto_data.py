@@ -35,6 +35,7 @@ class CryptoDataTests(unittest.TestCase):
 #include <cassert>
 #include <cstdio>
 #include <cstring>
+#include <limits>
 
 int main()
 {
@@ -43,6 +44,24 @@ int main()
     assert(decoded.size() == 4);
     assert(decoded.bytes()[0] == 0x01 && decoded.bytes()[1] == 0x23);
     assert(decoded.bytes()[2] == 0xab && decoded.bytes()[3] == 0xff);
+
+    Data middle = decoded.subdata(1, 2);
+    assert(middle.size() == 2 && middle.bytes()[0] == 0x23 && middle.bytes()[1] == 0xab);
+    assert(decoded.subdata(5, 1).is_empty());
+    assert(decoded.subdata(3, 2).is_empty());
+    assert(decoded.subdata(1, std::numeric_limits<size_t>::max()).is_empty());
+    assert(decoded.subdata(4, 0).is_empty());
+    assert(Data().subdata(0, 1).is_empty());
+
+    Data empty;
+    Data emptyCopy(empty);
+    assert(emptyCopy.is_empty());
+    Data assigned(decoded);
+    assigned = empty;
+    assert(assigned.is_empty());
+    assigned = decoded;
+    assert(assigned.size() == decoded.size());
+    assert(std::memcmp(assigned.bytes(), decoded.bytes(), decoded.size()) == 0);
 
     const char odd[] = "abc";
     const char bad[] = "aX";
@@ -67,9 +86,9 @@ int main()
     assert(std::remove("roundtrip.bin") == 0);
     assert(Data::read_from_file("roundtrip.bin").is_empty());
 
-    FILE* empty = std::fopen("empty.bin", "wb");
-    assert(empty != nullptr);
-    std::fclose(empty);
+    FILE* emptyFile = std::fopen("empty.bin", "wb");
+    assert(emptyFile != nullptr);
+    std::fclose(emptyFile);
     assert(Data::read_from_file("empty.bin").is_empty());
     assert(std::remove("empty.bin") == 0);
 }

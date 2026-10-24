@@ -41,11 +41,13 @@ Data::~Data()
 
 Data Data::subdata(size_t start, size_t size)
 {
-    if (start + size > m_size)
+    if (start > m_size || size > m_size - start)
     {
-        vita_log::error("Data: Invalid data length...");
-        exit(-1);
+        vita_log::error("Data: Invalid subdata range");
+        return Data();
     }
+    if (size == 0)
+        return Data();
     return Data(&m_bytes[start], size);
 }
 
@@ -71,7 +73,8 @@ Data::Data(const Data& that)
     }
 
     m_bytes = (unsigned char*)malloc(that.size() + 1);
-    memcpy(m_bytes, that.m_bytes, that.m_size);
+    if (that.m_size > 0)
+        memcpy(m_bytes, that.m_bytes, that.m_size);
     m_bytes[that.m_size] = '\0';
     m_size               = that.m_size;
 }
@@ -86,7 +89,8 @@ Data& Data::operator=(const Data& that)
         }
 
         m_bytes = (unsigned char*)malloc(that.m_size + 1);
-        memcpy(m_bytes, that.m_bytes, that.m_size);
+        if (that.m_size > 0)
+            memcpy(m_bytes, that.m_bytes, that.m_size);
         m_bytes[that.m_size] = '\0';
         m_size               = that.m_size;
     }

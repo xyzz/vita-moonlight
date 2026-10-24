@@ -4,6 +4,11 @@
 
 #include <borealis.hpp>
 #include <cstdlib>
+#ifdef __vita__
+#include <psp2/kernel/rng.h>
+#else
+#include <random>
+#endif
 
 #include "debug.hpp"
 
@@ -90,46 +95,70 @@ Data& Data::operator=(const Data& that)
 
 Data Data::random_bytes(size_t size)
 {
-    unsigned char* bytes = (unsigned char*)malloc(sizeof(char) * size);
+    if (size == 0)
+        return Data();
 
-#ifndef _WIN32
-    srand(time(NULL));
-#endif
-
-    for (int i = 0; i < size; i++)
+    Data result(size);
+#ifdef __vita__
+    for (size_t offset = 0; offset < size;)
     {
-        bytes[i] = rand() % 255;
+        size_t count = size - offset;
+        if (count > 64)
+            count = 64;
+        if (sceKernelGetRandomNumber(result.m_bytes + offset, count) < 0)
+            return Data();
+        offset += count;
     }
-
-    Data random_data(size);
-    memcpy(random_data.m_bytes, bytes, size);
-    free(bytes);
-    return random_data;
+#else
+    std::random_device random;
+    for (size_t i = 0; i < size; ++i)
+        result.m_bytes[i] = static_cast<unsigned char>(random());
+#endif
+    return result;
 }
 
 Data Data::read_from_file(std::string path)
 {
-    FILE* f = fopen(path.c_str(), "r");
-    if (f)
+    FILE* f = fopen(path.c_str(), "rb");
+    if (!f)
+        return Data();
+
+    if (fseek(f, 0, SEEK_END) != 0)
     {
-        fseek(f, 0, SEEK_END);
-        int size = (int)ftell(f);
-        fseek(f, 0, SEEK_SET);
-
-        char* buffer = (char*)malloc(size);
-        fread(buffer, 1, size, f);
-
-        Data data(buffer, size);
-        free(buffer);
         fclose(f);
-        return data;
+        return Data();
     }
-    return Data();
+
+    long length = ftell(f);
+    if (length <= 0 || fseek(f, 0, SEEK_SET) != 0)
+    {
+        fclose(f);
+        return Data();
+    }
+
+    char* buffer = (char*)malloc((size_t)length);
+    if (!buffer)
+    {
+        fclose(f);
+        return Data();
+    }
+
+    size_t bytesRead = fread(buffer, 1, (size_t)length, f);
+    fclose(f);
+    if (bytesRead != (size_t)length)
+    {
+        free(buffer);
+        return Data();
+    }
+
+    Data data(buffer, bytesRead);
+    free(buffer);
+    return data;
 }
 
 void Data::write_to_file(std::string path)
 {
-    FILE* f = fopen(path.c_str(), "w");
+    FILE* f = fopen(path.c_str(), "wb");
     if (f)
     {
         fwrite(m_bytes, m_size, 1, f);
@@ -143,19 +172,30 @@ void Data::write_to_file(std::string path)
 
 Data Data::hex_to_bytes() const
 {
-    Data data(m_size / 2);
-    char byte_chars[3] = { '\0', '\0', '\0' };
-    unsigned long whole_byte;
+    if (m_size == 0 || (m_size & 1) != 0)
+        return Data();
 
-    int i = 0, counter = 0;
-    while (i < m_size)
+    auto hex_digit = [](unsigned char c) -> int
     {
-        byte_chars[0]           = m_bytes[i++];
-        byte_chars[1]           = m_bytes[i++];
-        whole_byte              = strtoul(byte_chars, NULL, 16);
-        data.m_bytes[counter++] = whole_byte;
+        if (c >= '0' && c <= '9')
+            return c - '0';
+        if (c >= 'a' && c <= 'f')
+            return c - 'a' + 10;
+        if (c >= 'A' && c <= 'F')
+            return c - 'A' + 10;
+        return -1;
+    };
+
+    Data result(m_size / 2);
+    for (size_t i = 0; i < m_size; i += 2)
+    {
+        int high = hex_digit(m_bytes[i]);
+        int low  = hex_digit(m_bytes[i + 1]);
+        if (high < 0 || low < 0)
+            return Data();
+        result.m_bytes[i / 2] = static_cast<unsigned char>((high << 4) | low);
     }
-    return data;
+    return result;
 }
 
 Data Data::hex() const

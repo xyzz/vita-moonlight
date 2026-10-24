@@ -330,7 +330,7 @@ static int gs_pair_validate(Data& data, std::string* result)
     *result = "";
 
     int ret = GS_OK;
-    if ((ret = xml_status(data) != GS_OK))
+    if ((ret = xml_status(data)) != GS_OK)
     {
         return ret;
     }
@@ -376,7 +376,12 @@ int gs_pair(PSERVER_DATA server, char* pin)
         server->serverMajorVersion);
     vita_log::info("Client: Start pairing stage #1");
 
-    Data salt       = Data::random_bytes(16);
+    Data salt = Data::random_bytes(16);
+    if (salt.size() != 16)
+    {
+        gs_set_error("Could not generate pairing salt");
+        return GS_FAILED;
+    }
     Data salted_pin = salt.append(pin ? Data(pin, strlen(pin)) : Data());
     snprintf(url, sizeof(url),
         "http://%s:%u/"
@@ -392,7 +397,7 @@ int gs_pair(PSERVER_DATA server, char* pin)
         return gs_pair_cleanup(ret, server, &result);
     }
 
-    if ((ret = gs_pair_validate(data, &result) != GS_OK))
+    if ((ret = gs_pair_validate(data, &result)) != GS_OK)
     {
         return gs_pair_cleanup(ret, server, &result);
     }
@@ -404,7 +409,13 @@ int gs_pair(PSERVER_DATA server, char* pin)
 
     vita_log::info("Client: Start pairing stage #2");
 
-    Data plainCert = result.empty() ? Data() : Data((char*)result.c_str(), result.size());
+    Data plainCert  = result.empty() ? Data() : Data((char*)result.c_str(), result.size());
+    Data serverCert = plainCert.hex_to_bytes();
+    if (serverCert.is_empty())
+    {
+        gs_set_error("Invalid server certificate");
+        return gs_pair_cleanup(GS_INVALID, server, &result);
+    }
     Data aesKey;
 
     // Gen 7 servers use SHA256 to get the key
@@ -420,7 +431,12 @@ int gs_pair(PSERVER_DATA server, char* pin)
         hashLength = 20;
     }
 
-    Data randomChallenge    = Data::random_bytes(16);
+    Data randomChallenge = Data::random_bytes(16);
+    if (randomChallenge.size() != 16)
+    {
+        gs_set_error("Could not generate pairing challenge");
+        return gs_pair_cleanup(GS_FAILED, server, &result);
+    }
     Data encryptedChallenge = CryptoManager::aes_encrypt(randomChallenge, aesKey);
 
     snprintf(
@@ -437,7 +453,7 @@ int gs_pair(PSERVER_DATA server, char* pin)
         return gs_pair_cleanup(ret, server, &result);
     }
 
-    if ((ret = gs_pair_validate(data, &result) != GS_OK))
+    if ((ret = gs_pair_validate(data, &result)) != GS_OK)
     {
         return gs_pair_cleanup(ret, server, &result);
     }
@@ -450,12 +466,35 @@ int gs_pair(PSERVER_DATA server, char* pin)
 
     vita_log::info("Client: Start pairing stage #3");
 
-    Data encServerChallengeResp = result.empty() ? Data() : Data((char*)result.c_str(), result.size()).hex_to_bytes();
-    Data decServerChallengeResp = CryptoManager::aes_decrypt(encServerChallengeResp, aesKey);
-    Data serverResponse         = decServerChallengeResp.subdata(0, hashLength);
-    Data serverChallenge        = decServerChallengeResp.subdata(hashLength, 16);
+    if (result.size() % 2 != 0)
+    {
+        gs_set_error("Invalid server challenge length");
+        return gs_pair_cleanup(GS_INVALID, server, &result);
+    }
 
-    Data clientSecret           = Data::random_bytes(16);
+    Data encServerChallengeResp = result.empty() ? Data() : Data((char*)result.c_str(), result.size()).hex_to_bytes();
+    if (encServerChallengeResp.is_empty() || encServerChallengeResp.size() % 16 != 0)
+    {
+        gs_set_error("Invalid encrypted server challenge");
+        return gs_pair_cleanup(GS_INVALID, server, &result);
+    }
+
+    Data decServerChallengeResp = CryptoManager::aes_decrypt(encServerChallengeResp, aesKey);
+    if (decServerChallengeResp.size() < (size_t)hashLength + 16)
+    {
+        gs_set_error("Server challenge is too short");
+        return gs_pair_cleanup(GS_INVALID, server, &result);
+    }
+
+    Data serverResponse  = decServerChallengeResp.subdata(0, hashLength);
+    Data serverChallenge = decServerChallengeResp.subdata(hashLength, 16);
+
+    Data clientSecret = Data::random_bytes(16);
+    if (clientSecret.size() != 16)
+    {
+        gs_set_error("Could not generate pairing secret");
+        return gs_pair_cleanup(GS_FAILED, server, &result);
+    }
     Data challengeRespHashInput = serverChallenge
                                       .append(CryptoManager::signature(CryptoManager::cert_data()))
                                       .append(clientSecret);
@@ -486,7 +525,7 @@ int gs_pair(PSERVER_DATA server, char* pin)
         return gs_pair_cleanup(ret, server, &result);
     }
 
-    if ((ret = gs_pair_validate(data, &result) != GS_OK))
+    if ((ret = gs_pair_validate(data, &result)) != GS_OK)
     {
         return gs_pair_cleanup(ret, server, &result);
     }
@@ -499,12 +538,23 @@ int gs_pair(PSERVER_DATA server, char* pin)
 
     vita_log::info("Client: Start pairing stage #4");
 
-    Data serverSecretResp = result.empty() ? Data() : Data((char*)result.c_str(), result.size()).hex_to_bytes();
-    Data serverSecret     = serverSecretResp.subdata(0, 16);
-    Data serverSignature  = serverSecretResp.subdata(16, 256);
+    if (result.size() != (16 + 256) * 2)
+    {
+        gs_set_error("Invalid server pairing secret length");
+        return gs_pair_cleanup(GS_INVALID, server, &result);
+    }
+
+    Data serverSecretResp = Data((char*)result.c_str(), result.size()).hex_to_bytes();
+    if (serverSecretResp.size() != 16 + 256)
+    {
+        gs_set_error("Invalid server pairing secret");
+        return gs_pair_cleanup(GS_INVALID, server, &result);
+    }
+    Data serverSecret    = serverSecretResp.subdata(0, 16);
+    Data serverSignature = serverSecretResp.subdata(16, 256);
 
     if (!CryptoManager::verify_signature(serverSecret, serverSignature,
-            plainCert.hex_to_bytes()))
+            serverCert))
     {
         gs_set_error("MITM attack detected");
         ret = GS_FAILED;
@@ -512,7 +562,7 @@ int gs_pair(PSERVER_DATA server, char* pin)
     }
 
     Data serverChallengeRespHashInput = randomChallenge
-                                            .append(CryptoManager::signature(plainCert.hex_to_bytes()))
+                                            .append(CryptoManager::signature(serverCert))
                                             .append(serverSecret);
     Data serverChallengeRespHash;
 
@@ -541,7 +591,7 @@ int gs_pair(PSERVER_DATA server, char* pin)
         return gs_pair_cleanup(ret, server, &result);
     }
 
-    if ((ret = gs_pair_validate(data, &result) != GS_OK))
+    if ((ret = gs_pair_validate(data, &result)) != GS_OK)
     {
         return gs_pair_cleanup(ret, server, &result);
     }
@@ -558,7 +608,7 @@ int gs_pair(PSERVER_DATA server, char* pin)
         return gs_pair_cleanup(ret, server, &result);
     }
 
-    if ((ret = gs_pair_validate(data, &result) != GS_OK))
+    if ((ret = gs_pair_validate(data, &result)) != GS_OK)
     {
         return gs_pair_cleanup(ret, server, &result);
     }
@@ -699,8 +749,13 @@ int gs_start_app(PSERVER_DATA server, STREAM_CONFIGURATION* config, int appId,
         return GS_NOT_SUPPORTED_4K;
     }
 
-    Data rand = Data::random_bytes(16);
-    memcpy(config->remoteInputAesKey, rand.bytes(), 16);
+    Data randomKey = Data::random_bytes(16);
+    if (randomKey.size() != 16)
+    {
+        gs_set_error("Could not generate stream encryption key");
+        return GS_FAILED;
+    }
+    memcpy(config->remoteInputAesKey, randomKey.bytes(), 16);
     char url[4096];
     int rikeyid = 0;
 
@@ -725,7 +780,7 @@ int gs_start_app(PSERVER_DATA server, STREAM_CONFIGURATION* config, int appId,
             "sops=%d&rikey=%s&rikeyid=%d&localAudioPlayMode=%d&"
             "surroundAudioInfo=%d&remoteControllersBitmap=%d&gcmap=%d",
             server->serverInfo.address, server->httpsPort, unique_id.c_str(), appId,
-            config->width, config->height, fps, sops, rand.hex().bytes(),
+            config->width, config->height, fps, sops, randomKey.hex().bytes(),
             rikeyid, localaudio, (mask << 16) + channelCounnt,
             gamepad_mask, gamepad_mask);
 
@@ -757,7 +812,7 @@ int gs_start_app(PSERVER_DATA server, STREAM_CONFIGURATION* config, int appId,
         snprintf(url, sizeof(url),
             "https://%s:%u/resume?uniqueid=%s&rikey=%s&rikeyid=%d&localAudioPlayMode=%d%s",
             server->serverInfo.address, server->httpsPort, unique_id.c_str(),
-            rand.hex().bytes(), rikeyid, localaudio, LiGetLaunchUrlQueryParameters());
+            randomKey.hex().bytes(), rikeyid, localaudio, LiGetLaunchUrlQueryParameters());
     }
 
     if ((ret = http_request(url, &data, HTTPRequestTimeoutLong)) == GS_OK)
@@ -769,7 +824,7 @@ int gs_start_app(PSERVER_DATA server, STREAM_CONFIGURATION* config, int appId,
         goto exit;
     }
 
-    if ((ret = xml_status(data) != GS_OK))
+    if ((ret = xml_status(data)) != GS_OK)
     {
         goto exit;
     }
@@ -812,7 +867,7 @@ int gs_quit_app(PSERVER_DATA server)
     if ((ret = http_request(url, &data, HTTPRequestTimeoutMedium)) != GS_OK)
         goto exit;
 
-    if ((ret = xml_status(data) != GS_OK))
+    if ((ret = xml_status(data)) != GS_OK)
     {
         goto exit;
     }

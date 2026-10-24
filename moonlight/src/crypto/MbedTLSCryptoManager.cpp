@@ -164,8 +164,26 @@ Data MbedTLSCryptoManager::signature(Data cert)
 bool MbedTLSCryptoManager::verify_signature(Data data, Data signature,
     Data cert)
 {
-    // Signature verification is not implemented by the Vita backend.
-    return true;
+    if (data.is_empty() || signature.is_empty() || cert.is_empty())
+        return false;
+
+    mbedtls_x509_crt x509;
+    mbedtls_x509_crt_init(&x509);
+
+    bool valid = false;
+    if (mbedtls_x509_crt_parse(&x509, cert.bytes(), cert.size() + 1) == 0)
+    {
+        unsigned char hash[32];
+        if (mbedtls_sha256(data.bytes(), data.size(), hash, 0) == 0)
+        {
+            valid = mbedtls_pk_verify(&x509.pk, MBEDTLS_MD_SHA256, hash, sizeof(hash),
+                        signature.bytes(), signature.size())
+                == 0;
+        }
+    }
+
+    mbedtls_x509_crt_free(&x509);
+    return valid;
 }
 
 Data MbedTLSCryptoManager::sign_data(Data data, Data key)

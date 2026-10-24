@@ -16,6 +16,8 @@ on:
       - "launcher/**"
       - "legacy/src/**"
       - "legacy/libgamestream/**"
+      - "third_party/gamestream/client.cpp"
+      - "third_party/gamestream/xml.cpp"
   pull_request:
     paths:
       - .clang-format
@@ -31,6 +33,8 @@ on:
       - "launcher/**"
       - "legacy/src/**"
       - "legacy/libgamestream/**"
+      - "third_party/gamestream/client.cpp"
+      - "third_party/gamestream/xml.cpp"
 
 permissions:
   contents: read
@@ -56,7 +60,7 @@ jobs:
 
       - name: Check formatting
         run: |
-          find moonlight/src moonlight/include launcher legacy/src legacy/libgamestream -type f \
+          find moonlight/src moonlight/include launcher legacy/src legacy/libgamestream third_party/gamestream/client.cpp third_party/gamestream/xml.cpp -type f \
             \( -name '*.c' -o -name '*.cc' -o -name '*.cpp' -o -name '*.cxx' \
                -o -name '*.h' -o -name '*.hh' -o -name '*.hpp' -o -name '*.hxx' \) \
             -print0 | xargs -0 clang-format \

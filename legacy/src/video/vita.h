@@ -22,9 +22,9 @@
 // and the smallest resolution is 64
 // Full supported resolution list can be found at:
 // https://github.com/MakiseKurisu/vita-sceVideodecInitLibrary-test/
-#define ROUND_NEAREST_16(x)                     (round(((double) (x)) / 16) * 16)
-#define VITA_DECODER_RESOLUTION_LOWER_BOUND(x)  ((x) < 64 ? 64 : (x))
-#define VITA_DECODER_RESOLUTION(x)              (VITA_DECODER_RESOLUTION_LOWER_BOUND(ROUND_NEAREST_16(x)))
+#define ROUND_NEAREST_16(x) (round(((double)(x)) / 16) * 16)
+#define VITA_DECODER_RESOLUTION_LOWER_BOUND(x) ((x) < 64 ? 64 : (x))
+#define VITA_DECODER_RESOLUTION(x) (VITA_DECODER_RESOLUTION_LOWER_BOUND(ROUND_NEAREST_16(x)))
 
 void vitavideo_start();
 void vitavideo_stop();

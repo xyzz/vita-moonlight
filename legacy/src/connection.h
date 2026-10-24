@@ -17,8 +17,8 @@
  * along with Moonlight; if not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <stdbool.h>
 #include <Limelight.h>
+#include <stdbool.h>
 
 //.DISCONNECTED <-.
 //      |         |
@@ -34,12 +34,13 @@
 //     v |        |
 //  MINIMISED  ---'
 
-enum {
-  LI_DISCONNECTED,
-  LI_READY,
-  LI_PAIRED,
-  LI_CONNECTED,
-  LI_MINIMIZED
+enum
+{
+    LI_DISCONNECTED,
+    LI_READY,
+    LI_PAIRED,
+    LI_CONNECTED,
+    LI_MINIMIZED
 };
 
 extern CONNECTION_LISTENER_CALLBACKS connection_callbacks;

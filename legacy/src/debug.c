@@ -17,68 +17,78 @@
  * along with Moonlight; if not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "debug.h"
+
+#include <psp2/rtc.h>
+#include <stdarg.h>
 #include <stdbool.h>
 #include <stdio.h>
-#include <stdarg.h>
-#include <psp2/rtc.h>
 #include <stdlib.h>
+
 #include "../src/gui/mdns_log.h"
-#include "debug.h"
 #include "config.h"
 
 pthread_mutex_t print_mutex;
 
-bool vita_debug_init() {
-  if (pthread_mutex_init(&print_mutex, NULL) != 0) {
-    return false;
-  }
-  return true;
+bool vita_debug_init()
+{
+    if (pthread_mutex_init(&print_mutex, NULL) != 0)
+    {
+        return false;
+    }
+    return true;
 }
 
-void vita_debug_log(const char *s, ...) {
-  if (!config.save_debug_log) {
-    return;
-  }
-
-  pthread_mutex_lock(&print_mutex);
-
-  char* buffer = malloc(8192);
-  if (!buffer) {
-    pthread_mutex_unlock(&print_mutex);
-    return;
-  }
-
-  SceDateTime time;
-  sceRtcGetCurrentClock(&time, 0);
-
-  snprintf(buffer, 26, "%04d%02d%02d %02d:%02d:%02d.%06d ",
-           time.year, time.month, time.day,
-           time.hour, time.minute, time.second,
-           time.microsecond);
-
-  va_list va;
-  va_start(va, s);
-  int len = vsnprintf(&buffer[25], 8000, s, va);
-  va_end(va);
-
-  if (config.log_file) {
-    fprintf(config.log_file, "%s", buffer);
-    if (buffer[len + 24] != '\n') {
-        fprintf(config.log_file, "\n");
+void vita_debug_log(const char* s, ...)
+{
+    if (!config.save_debug_log)
+    {
+        return;
     }
-    fflush(config.log_file);
-  } else {
-    // Si no se pudo abrir el log, mostrar por pantalla
-    printf("[Moonlight] No se pudo abrir el archivo de log. Mensaje: %s\n", &buffer[25]);
-  }
+
+    pthread_mutex_lock(&print_mutex);
+
+    char* buffer = malloc(8192);
+    if (!buffer)
+    {
+        pthread_mutex_unlock(&print_mutex);
+        return;
+    }
+
+    SceDateTime time;
+    sceRtcGetCurrentClock(&time, 0);
+
+    snprintf(buffer, 26, "%04d%02d%02d %02d:%02d:%02d.%06d ",
+        time.year, time.month, time.day,
+        time.hour, time.minute, time.second,
+        time.microsecond);
+
+    va_list va;
+    va_start(va, s);
+    int len = vsnprintf(&buffer[25], 8000, s, va);
+    va_end(va);
+
+    if (config.log_file)
+    {
+        fprintf(config.log_file, "%s", buffer);
+        if (buffer[len + 24] != '\n')
+        {
+            fprintf(config.log_file, "\n");
+        }
+        fflush(config.log_file);
+    }
+    else
+    {
+        // Si no se pudo abrir el log, mostrar por pantalla
+        printf("[Moonlight] No se pudo abrir el archivo de log. Mensaje: %s\n", &buffer[25]);
+    }
 
 #ifdef __vita__
-  // También imprimir por mdns_log (sceClibPrintf)
-  mdns_log("%s", &buffer[25]);
+    // También imprimir por mdns_log (sceClibPrintf)
+    mdns_log("%s", &buffer[25]);
 #endif
 
-  free(buffer);
+    free(buffer);
 
-  pthread_mutex_unlock(&print_mutex);
+    pthread_mutex_unlock(&print_mutex);
 }
-

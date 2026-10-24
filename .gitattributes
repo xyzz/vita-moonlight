@@ -5,3 +5,13 @@ VITABUILD text eol=lf
 /scripts/prepare/install_psv2 text eol=lf
 /scripts/msys2/fakeroot text eol=lf
 /patches/borealis/*.patch -whitespace
+
+# Keep project-owned Legacy and launcher sources consistently normalized.
+/launcher/*.c text eol=lf
+/launcher/*.h text eol=lf
+/legacy/src/*.c text eol=lf
+/legacy/src/*.h text eol=lf
+/legacy/src/**/*.c text eol=lf
+/legacy/src/**/*.h text eol=lf
+/legacy/libgamestream/*.c text eol=lf
+/legacy/libgamestream/*.h text eol=lf

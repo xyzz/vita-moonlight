@@ -18,13 +18,14 @@
 
 #pragma once
 
-#include <openssl/x509v3.h>
 #include <openssl/pkcs12.h>
+#include <openssl/x509v3.h>
 
-typedef struct _CERT_KEY_PAIR {
-    X509 *x509;
-    EVP_PKEY *pkey;
-    PKCS12 *p12;
+typedef struct _CERT_KEY_PAIR
+{
+    X509* x509;
+    EVP_PKEY* pkey;
+    PKCS12* p12;
 } CERT_KEY_PAIR, *PCERT_KEY_PAIR;
 
 CERT_KEY_PAIR mkcert_generate();

@@ -4,14 +4,16 @@
 #include <wchar.h>
 
 // Estructura para el mapeo carácter → VK + shift
-struct CharVKMap {
+struct CharVKMap
+{
     wchar_t ch;
     int vk;
     int needs_shift;
 };
 
 // Enumeración de layouts soportados
-typedef enum {
+typedef enum
+{
     KB_LAYOUT_EN_US = 0,
     KB_LAYOUT_ES_ES,
     KB_LAYOUT_ES_LATAM,

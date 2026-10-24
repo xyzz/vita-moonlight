@@ -11,7 +11,7 @@ void psvDebugScreenInit();
 void psvDebugScreenClear(int bg_color);
 
 // printf to the screen
-void psvDebugScreenPrintf(const char *format, ...);
+void psvDebugScreenPrintf(const char* format, ...);
 
 // set foreground (text) color
 Color psvDebugScreenSetFgColor(Color color);
@@ -19,18 +19,19 @@ Color psvDebugScreenSetFgColor(Color color);
 // set background color
 Color psvDebugScreenSetBgColor(Color color);
 
-void *psvDebugScreenGetVram();
+void* psvDebugScreenGetVram();
 int psvDebugScreenGetX();
 int psvDebugScreenGetY();
 
-enum {
-	COLOR_CYAN = 0xFFFFFF00,
-	COLOR_WHITE = 0xFFFFFFFF,
-	COLOR_BLACK = 0xFF000000,
-	COLOR_RED = 0xFF0000FF,
-	COLOR_YELLOW = 0xFF00FFFF,
-	COLOR_GREY = 0xFF808080,
-	COLOR_GREEN = 0xFF00FF00,
+enum
+{
+    COLOR_CYAN   = 0xFFFFFF00,
+    COLOR_WHITE  = 0xFFFFFFFF,
+    COLOR_BLACK  = 0xFF000000,
+    COLOR_RED    = 0xFF0000FF,
+    COLOR_YELLOW = 0xFF00FFFF,
+    COLOR_GREY   = 0xFF808080,
+    COLOR_GREEN  = 0xFF00FF00,
 };
 
 #define printf psvDebugScreenPrintf

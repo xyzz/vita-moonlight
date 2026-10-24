@@ -19,34 +19,34 @@
 
 #pragma once
 
-#include "xml.h"
-
 #include <Limelight.h>
-
 #include <stdbool.h>
+
+#include "xml.h"
 
 #define MIN_SUPPORTED_GFE_VERSION 3
 #define MAX_SUPPORTED_GFE_VERSION 7
 
-typedef struct _SERVER_DATA {
-  char* gpuType;
-  bool paired;
-  bool unsupported;
-  bool isNvidiaSoftware;
-  int currentGame;
-  int serverMajorVersion;
-  char* gsVersion;
-  PDISPLAY_MODE modes;
-  SERVER_INFORMATION serverInfo;
-  char mac[18];
-  unsigned short httpPort;
-  unsigned short httpsPort;
+typedef struct _SERVER_DATA
+{
+    char* gpuType;
+    bool paired;
+    bool unsupported;
+    bool isNvidiaSoftware;
+    int currentGame;
+    int serverMajorVersion;
+    char* gsVersion;
+    PDISPLAY_MODE modes;
+    SERVER_INFORMATION serverInfo;
+    char mac[18];
+    unsigned short httpPort;
+    unsigned short httpsPort;
 } SERVER_DATA, *PSERVER_DATA;
 
-int gs_init(PSERVER_DATA server, char* address, unsigned short httpPort, const char *keyDirectory, int logLevel, bool unsupported);
+int gs_init(PSERVER_DATA server, char* address, unsigned short httpPort, const char* keyDirectory, int logLevel, bool unsupported);
 int gs_start_app(PSERVER_DATA server, PSTREAM_CONFIGURATION config, int appId, bool sops, bool localaudio, int gamepad_mask);
-int gs_applist(PSERVER_DATA server, PAPP_LIST *app_list);
+int gs_applist(PSERVER_DATA server, PAPP_LIST* app_list);
 int gs_unpair(PSERVER_DATA server);
 int gs_pair(PSERVER_DATA server, char* pin);
 int gs_quit_app(PSERVER_DATA server);
-int gs_get_server_mac(PSERVER_DATA server, char *mac, unsigned int size);
+int gs_get_server_mac(PSERVER_DATA server, char* mac, unsigned int size);

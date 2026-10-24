@@ -15,29 +15,29 @@
 
 #include "mkcert.h"
 
-#include <stdio.h>
-#include <stdlib.h>
-
+#include <openssl/conf.h>
 #include <openssl/crypto.h>
 #include <openssl/pem.h>
-#include <openssl/conf.h>
 #include <openssl/pkcs12.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 #ifndef OPENSSL_NO_ENGINE
 #include <openssl/engine.h>
 #endif
 
-static const int NUM_BITS = 2048;
-static const int SERIAL = 0;
+static const int NUM_BITS  = 2048;
+static const int SERIAL    = 0;
 static const int NUM_YEARS = 10;
 
-int mkcert(X509 **x509p, EVP_PKEY **pkeyp, int bits, int serial, int years);
+int mkcert(X509** x509p, EVP_PKEY** pkeyp, int bits, int serial, int years);
 
-CERT_KEY_PAIR mkcert_generate() {
-    BIO *bio_err;
-    X509 *x509 = NULL;
-    EVP_PKEY *pkey = NULL;
-    PKCS12 *p12 = NULL;
+CERT_KEY_PAIR mkcert_generate()
+{
+    BIO* bio_err;
+    X509* x509     = NULL;
+    EVP_PKEY* pkey = NULL;
+    PKCS12* p12    = NULL;
 
     bio_err = BIO_new_fp(stderr, BIO_NOCLOSE);
 
@@ -55,21 +55,23 @@ CERT_KEY_PAIR mkcert_generate() {
 
     BIO_free(bio_err);
 
-    return (CERT_KEY_PAIR) {x509, pkey, p12};
+    return (CERT_KEY_PAIR) { x509, pkey, p12 };
 }
 
-void mkcert_free(CERT_KEY_PAIR certKeyPair) {
+void mkcert_free(CERT_KEY_PAIR certKeyPair)
+{
     X509_free(certKeyPair.x509);
     EVP_PKEY_free(certKeyPair.pkey);
     PKCS12_free(certKeyPair.p12);
 }
 
-void mkcert_save(const char* certFile, const char* p12File, const char* keyPairFile, CERT_KEY_PAIR certKeyPair) {
-    FILE* certFilePtr = fopen(certFile, "w");
+void mkcert_save(const char* certFile, const char* p12File, const char* keyPairFile, CERT_KEY_PAIR certKeyPair)
+{
+    FILE* certFilePtr    = fopen(certFile, "w");
     FILE* keyPairFilePtr = fopen(keyPairFile, "w");
-    FILE* p12FilePtr = fopen(p12File, "wb");
+    FILE* p12FilePtr     = fopen(p12File, "wb");
 
-    //TODO: error check
+    // TODO: error check
     PEM_write_PrivateKey(keyPairFilePtr, certKeyPair.pkey, NULL, NULL, 0, NULL, NULL);
     PEM_write_X509(certFilePtr, certKeyPair.x509);
     i2d_PKCS12_fp(p12FilePtr, certKeyPair.p12);
@@ -79,13 +81,15 @@ void mkcert_save(const char* certFile, const char* p12File, const char* keyPairF
     fclose(keyPairFilePtr);
 }
 
-int mkcert(X509 **x509p, EVP_PKEY **pkeyp, int bits, int serial, int years) {
+int mkcert(X509** x509p, EVP_PKEY** pkeyp, int bits, int serial, int years)
+{
     EVP_PKEY_CTX* ctx = EVP_PKEY_CTX_new_id(EVP_PKEY_RSA, NULL);
     EVP_PKEY_keygen_init(ctx);
     EVP_PKEY_CTX_set_rsa_keygen_bits(ctx, bits);
 
     // pk must be initialized on input
-    EVP_PKEY *pk = NULL;;
+    EVP_PKEY* pk = NULL;
+    ;
     EVP_PKEY_keygen(ctx, &pk);
 
     EVP_PKEY_CTX_free(ctx);
@@ -98,7 +102,7 @@ int mkcert(X509 **x509p, EVP_PKEY **pkeyp, int bits, int serial, int years) {
     X509_gmtime_adj(X509_get_notAfter(cert), 60 * 60 * 24 * 365 * years);
 #else
     ASN1_TIME* before = ASN1_STRING_dup(X509_get0_notBefore(cert));
-    ASN1_TIME* after = ASN1_STRING_dup(X509_get0_notAfter(cert));
+    ASN1_TIME* after  = ASN1_STRING_dup(X509_get0_notAfter(cert));
 
     X509_gmtime_adj(before, 0);
     X509_gmtime_adj(after, 60 * 60 * 24 * 365 * years);
@@ -113,17 +117,18 @@ int mkcert(X509 **x509p, EVP_PKEY **pkeyp, int bits, int serial, int years) {
     X509_set_pubkey(cert, pk);
 
     X509_NAME* name = X509_get_subject_name(cert);
-    X509_NAME_add_entry_by_txt(name,"CN", MBSTRING_ASC, (unsigned char*)"NVIDIA GameStream Client", -1, -1, 0);
+    X509_NAME_add_entry_by_txt(name, "CN", MBSTRING_ASC, (unsigned char*)"NVIDIA GameStream Client", -1, -1, 0);
     X509_set_issuer_name(cert, name);
 
-    if (!X509_sign(cert, pk, EVP_sha256())) {
+    if (!X509_sign(cert, pk, EVP_sha256()))
+    {
         goto err;
     }
 
     *x509p = cert;
     *pkeyp = pk;
 
-    return(1);
+    return (1);
 err:
-    return(0);
+    return (0);
 }

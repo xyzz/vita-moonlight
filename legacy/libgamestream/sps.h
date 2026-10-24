@@ -19,7 +19,7 @@
 
 #include <Limelight.h>
 
-#define GS_SPS_BITSTREAM_FIXUP  0x01
+#define GS_SPS_BITSTREAM_FIXUP 0x01
 #define GS_SPS_REMOVE_VST_FIXUP 0x02
 #define GS_SPS_REMOVE_CLI_FIXUP 0x04
 

@@ -20,44 +20,52 @@
 #define _GNU_SOURCE
 
 #include "platform.h"
-#include "audio.h"
 
 #include <string.h>
 #include <unistd.h>
 
+#include "audio.h"
 
-typedef bool(*ImxInit)();
+typedef bool (*ImxInit)();
 
-enum platform platform_check(char* name) {
-  if (strcmp(name, "vita") == 0)
-    return VITA;
-  return 0;
+enum platform platform_check(char* name)
+{
+    if (strcmp(name, "vita") == 0)
+        return VITA;
+    return 0;
 }
 
-DECODER_RENDERER_CALLBACKS* platform_get_video(enum platform system) {
-  return &decoder_callbacks_vita;
+DECODER_RENDERER_CALLBACKS* platform_get_video(enum platform system)
+{
+    return &decoder_callbacks_vita;
 }
 
-AUDIO_RENDERER_CALLBACKS* platform_get_audio(enum platform system) {
-  return &audio_callbacks_vita;
+AUDIO_RENDERER_CALLBACKS* platform_get_audio(enum platform system)
+{
+    return &audio_callbacks_vita;
 }
 
-bool platform_supports_hevc(enum platform system) {
-  return false;
+bool platform_supports_hevc(enum platform system)
+{
+    return false;
 }
 
-uid_t getuid(void) {
-  return 1;
+uid_t getuid(void)
+{
+    return 1;
 }
 
-uid_t geteuid(void) {
-  return 1;
+uid_t geteuid(void)
+{
+    return 1;
 }
 
-uid_t getgid(void) {
-  return 1;
+uid_t getgid(void)
+{
+    return 1;
 }
 
-uid_t getegid(void) {
-  return 1;
+uid_t getegid(void)
+{
+    return 1;
 }

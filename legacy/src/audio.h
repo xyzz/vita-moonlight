@@ -17,9 +17,8 @@
  * along with Moonlight; if not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <stdbool.h>
-
 #include <Limelight.h>
+#include <stdbool.h>
 
 extern const char* audio_device;
 

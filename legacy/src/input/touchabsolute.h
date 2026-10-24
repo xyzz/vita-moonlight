@@ -4,13 +4,11 @@
 #ifndef TOUCHABSOLUTE_H
 #define TOUCHABSOLUTE_H
 
-
 // Forward declarations para evitar dependencias cruzadas
 typedef struct TouchData TouchData;
 typedef struct SceRtcTick SceRtcTick;
 
 #include <stdbool.h>
-
 
 void touchabsolute_enable(bool enable);
 bool touchabsolute_is_enabled();

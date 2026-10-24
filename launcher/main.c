@@ -2,7 +2,6 @@
 #include <psp2/io/dirent.h>
 #include <psp2/io/fcntl.h>
 #include <psp2/io/stat.h>
-
 #include <stdio.h>
 #include <string.h>
 
@@ -13,27 +12,27 @@
 #define FRONTEND_LEGACY "legacy"
 #define FRONTEND_BOREALIS "borealis"
 
-static int path_exists(const char *path)
+static int path_exists(const char* path)
 {
     SceIoStat stat;
     memset(&stat, 0, sizeof(stat));
     return sceIoGetstat(path, &stat) >= 0;
 }
 
-static int is_directory(const char *path)
+static int is_directory(const char* path)
 {
     SceIoStat stat;
     memset(&stat, 0, sizeof(stat));
     return sceIoGetstat(path, &stat) >= 0 && SCE_S_ISDIR(stat.st_mode);
 }
 
-static void ensure_directory(const char *path)
+static void ensure_directory(const char* path)
 {
     if (!is_directory(path))
         sceIoMkdir(path, 0777);
 }
 
-static int copy_file_if_missing(const char *source, const char *destination)
+static int copy_file_if_missing(const char* source, const char* destination)
 {
     if (path_exists(destination))
         return 0;
@@ -146,14 +145,14 @@ static void migrate_legacy_hosts(void)
     sceIoDclose(root);
 }
 
-static int read_frontend(char *frontend, size_t size)
+static int read_frontend(char* frontend, size_t size)
 {
-    FILE *file = fopen(FRONTEND_CONFIG_PATH, "r");
+    FILE* file = fopen(FRONTEND_CONFIG_PATH, "r");
     if (!file)
         return 0;
 
-    char line[32] = {0};
-    const int ok = fgets(line, sizeof(line), file) != NULL;
+    char line[32] = { 0 };
+    const int ok  = fgets(line, sizeof(line), file) != NULL;
     fclose(file);
     if (!ok)
         return 0;
@@ -166,23 +165,23 @@ static int read_frontend(char *frontend, size_t size)
     return 1;
 }
 
-static void write_frontend(const char *frontend)
+static void write_frontend(const char* frontend)
 {
-    FILE *file = fopen(FRONTEND_CONFIG_PATH, "w");
+    FILE* file = fopen(FRONTEND_CONFIG_PATH, "w");
     if (!file)
         return;
     fprintf(file, "%s\n", frontend);
     fclose(file);
 }
 
-static int launch_frontend(const char *frontend)
+static int launch_frontend(const char* frontend)
 {
-    const char *preferred = !strcmp(frontend, FRONTEND_BOREALIS)
+    const char* preferred = !strcmp(frontend, FRONTEND_BOREALIS)
         ? "app0:borealis.self"
         : "app0:legacy.self";
-    const char *fallback = !strcmp(frontend, FRONTEND_BOREALIS)
-        ? "app0:legacy.self"
-        : "app0:borealis.self";
+    const char* fallback  = !strcmp(frontend, FRONTEND_BOREALIS)
+         ? "app0:legacy.self"
+         : "app0:borealis.self";
 
     int result = sceAppMgrLoadExec(preferred, NULL, NULL);
     if (result < 0)
@@ -197,7 +196,7 @@ int main(void)
 {
     migrate_legacy_hosts();
 
-    char frontend[16] = {0};
+    char frontend[16] = { 0 };
     if (!read_frontend(frontend, sizeof(frontend)))
     {
         snprintf(frontend, sizeof(frontend), "%s", FRONTEND_LEGACY);
@@ -206,7 +205,7 @@ int main(void)
     }
 
     const int result = launch_frontend(frontend);
-    FILE *log = fopen(MOONLIGHT_DATA_DIR "/launcher.log", "w");
+    FILE* log        = fopen(MOONLIGHT_DATA_DIR "/launcher.log", "w");
     if (log)
     {
         fprintf(log, "Unable to launch Moonlight frontend: 0x%08X\n", result);

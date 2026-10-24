@@ -12,7 +12,8 @@
 #define HOTKEY_MENU_MAX 16 // Máximo número de hotkeys en el menú
 
 // Funciones especiales disponibles (índices de settings_special_names)
-typedef enum {
+typedef enum
+{
     HOTKEY_FUNC_NONE = 0,
     HOTKEY_FUNC_PAUSE_STREAM,
     HOTKEY_FUNC_OPEN_KEYBOARD,
@@ -23,7 +24,8 @@ typedef enum {
 typedef void (*hotkey_func_cb)(void);
 
 // Estructura de un hotkey
-typedef struct {
+typedef struct
+{
     SceCtrlButtons buttons[HOTKEY_MAX_BUTTONS]; // combinación de botones
     int num_buttons;
     hotkey_func_t function; // función asignada
@@ -32,7 +34,7 @@ typedef struct {
 // Configuración global de hotkeys
 extern hotkey_t g_hotkeys[MAX_HOTKEYS];
 extern int g_hotkey_count;
-extern char *settings_special_names[];
+extern char* settings_special_names[];
 
 void hotkey_init_defaults();
 void hotkey_load_config();

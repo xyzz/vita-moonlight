@@ -23,13 +23,15 @@ Use a test installation; back up configuration and host pairing files first.
 
 - [ ] Find a Sunshine host on the local network and pair a fresh test host.
 - [ ] Connect to a previously paired host, exit, and reconnect; test host unavailable/timeout handling.
+- [ ] Attempt to start a stream while the host is unavailable. The failed attempt should return to the menu without leaving a stale active-session state; then reconnect and stream normally.
 - [ ] Stream H.264 at 480p and 720p (or modes supported by the tested Vita/host),
       checking image orientation, frame pacing and absence of sustained drift.
+- [ ] Test automatic bitrate at 960x544 and 1280x720, then select a fixed bitrate and verify that the host receives the expected settings.
 - [ ] Confirm game audio works, remains in sync and survives pause/reconnect.
 - [ ] Confirm face buttons, D-pad, sticks, shoulders and configurable shortcuts.
 - [ ] Confirm front touch and rear touch as configured; on PSTV mark touch-specific cases N/A.
 - [ ] Open and use the virtual keyboard or text input, then return to streaming.
-- [ ] Suspend/resume the Vita during streaming and verify recovery of video, audio and controller state.
+- [ ] Suspend/resume the Vita during streaming and verify recovery of video, audio and controller state. Repeat with the host disconnected during suspension.
 - [ ] Briefly interrupt Wi-Fi or stop Sunshine, then verify a controlled error and successful reconnect.
 - [ ] Exit streaming to the app menu and close the app without freezing.
 
@@ -46,4 +48,4 @@ For each failure, record the interface (Legacy or Borealis), exact reproduction 
 resolution/FPS, host and Vita logs, and a screenshot/video if relevant.
 Do not treat a passing VPK packaging check as proof that these manual cases passed.
 
-No GitHub publication or release creation is part of this checklist.
+Keep these results with the release review; packaging and CI checks alone do not establish hardware compatibility.

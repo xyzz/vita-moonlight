@@ -79,10 +79,6 @@ bool VitaSession::start()
         return true;
     m_start_attempted  = true;
     m_cleanup_complete = false;
-    {
-        std::lock_guard<std::mutex> activeLock(s_active_mutex);
-        s_active = shared_from_this();
-    }
     connection::setTelemetryAvailable(false);
     STREAM_CONFIGURATION prev {};
     bool havePrev = GameStreamClient::instance().lastStreamConfig(m_address, prev);
@@ -114,7 +110,13 @@ bool VitaSession::start()
     if (!VideoManager::instance()->initialize())
     {
         vita_log::error("[VitaSession] Fallo al inicializar VideoManager");
+        m_start_attempted  = false;
+        m_cleanup_complete = true;
         return false;
+    }
+    {
+        std::lock_guard<std::mutex> activeLock(s_active_mutex);
+        s_active = shared_from_this();
     }
     vita_log::info("[VitaSession] Decodificador inicializado: %s", VideoManager::instance()->getRenderMode().c_str());
     LiInitializeVideoCallbacks(&m_video_callbacks);

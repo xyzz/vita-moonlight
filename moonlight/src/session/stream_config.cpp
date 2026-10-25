@@ -112,9 +112,21 @@ std::size_t bitrateIndex(int bitrate, std::size_t fallback)
 
 int calculateAutoBitrate(int width, int height, int fps)
 {
-    const long long pixelsPerSecond = static_cast<long long>(width) * height * fps;
+    if (width <= 0 || height <= 0 || fps <= 0)
+        return MIN_AUTO_BITRATE;
+
+    // Limit the pixel count before multiplication to avoid overflow on bad settings.
+    constexpr long long MAX_PIXELS_PER_SECOND = static_cast<long long>(MAX_AUTO_BITRATE) * BPP_DENOMINATOR * 1000 / BPP_NUMERATOR;
+    if (static_cast<long long>(width) > MAX_PIXELS_PER_SECOND / height)
+        return MAX_AUTO_BITRATE;
+
+    const long long pixelsPerFrame = static_cast<long long>(width) * height;
+    if (pixelsPerFrame > MAX_PIXELS_PER_SECOND / fps)
+        return MAX_AUTO_BITRATE;
+
+    const long long pixelsPerSecond = pixelsPerFrame * fps;
     const int bitrate               = static_cast<int>(pixelsPerSecond * BPP_NUMERATOR / (BPP_DENOMINATOR * 1000));
-    return std::max(MIN_AUTO_BITRATE, std::min(MAX_AUTO_BITRATE, bitrate));
+    return std::max(MIN_AUTO_BITRATE, bitrate);
 }
 
 STREAM_CONFIGURATION buildConfiguration(const StreamConfiguration& settings)

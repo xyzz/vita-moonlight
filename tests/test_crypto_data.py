@@ -62,6 +62,21 @@ int main()
     assigned = decoded;
     assert(assigned.size() == decoded.size());
     assert(std::memcmp(assigned.bytes(), decoded.bytes(), decoded.size()) == 0);
+    assigned = assigned;
+    assert(assigned.size() == decoded.size());
+
+    Data encoded = decoded.hex();
+    assert(encoded.size() == 8);
+    assert(std::memcmp(encoded.bytes(), "0123ABFF", 8) == 0);
+    Data combined = decoded.append(decoded);
+    assert(combined.size() == 8);
+    assert(std::memcmp(combined.bytes(), decoded.bytes(), 4) == 0);
+    assert(std::memcmp(combined.bytes() + 4, decoded.bytes(), 4) == 0);
+    assert(decoded.append(Data()).size() == 4);
+    assert(Data().append(decoded).size() == 4);
+    assert(Data().append(Data()).is_empty());
+    assert(Data(std::numeric_limits<size_t>::max()).is_empty());
+    assert(Data(decoded.bytes(), std::numeric_limits<size_t>::max()).is_empty());
 
     const char odd[] = "abc";
     const char bad[] = "aX";

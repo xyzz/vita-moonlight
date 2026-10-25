@@ -431,6 +431,12 @@ int gs_pair(PSERVER_DATA server, char* pin)
         hashLength = 20;
     }
 
+    if (aesKey.size() != 16)
+    {
+        gs_set_error("Could not derive pairing encryption key");
+        return gs_pair_cleanup(GS_FAILED, server, &result);
+    }
+
     Data randomChallenge = Data::random_bytes(16);
     if (randomChallenge.size() != 16)
     {
@@ -438,6 +444,11 @@ int gs_pair(PSERVER_DATA server, char* pin)
         return gs_pair_cleanup(GS_FAILED, server, &result);
     }
     Data encryptedChallenge = CryptoManager::aes_encrypt(randomChallenge, aesKey);
+    if (encryptedChallenge.size() != 16)
+    {
+        gs_set_error("Could not encrypt pairing challenge");
+        return gs_pair_cleanup(GS_FAILED, server, &result);
+    }
 
     snprintf(
         url, sizeof(url),
@@ -495,9 +506,18 @@ int gs_pair(PSERVER_DATA server, char* pin)
         gs_set_error("Could not generate pairing secret");
         return gs_pair_cleanup(GS_FAILED, server, &result);
     }
-    Data challengeRespHashInput = serverChallenge
-                                      .append(CryptoManager::signature(CryptoManager::cert_data()))
-                                      .append(clientSecret);
+    Data clientCertSignature = CryptoManager::signature(CryptoManager::cert_data());
+    if (clientCertSignature.is_empty())
+    {
+        gs_set_error("Invalid client pairing certificate");
+        return gs_pair_cleanup(GS_FAILED, server, &result);
+    }
+    Data challengeRespHashInput = serverChallenge.append(clientCertSignature).append(clientSecret);
+    if (challengeRespHashInput.is_empty())
+    {
+        gs_set_error("Could not assemble pairing challenge response");
+        return gs_pair_cleanup(GS_FAILED, server, &result);
+    }
 
     Data challengeRespHash;
 
@@ -510,6 +530,11 @@ int gs_pair(PSERVER_DATA server, char* pin)
         challengeRespHash = CryptoManager::SHA1_hash_data(challengeRespHashInput);
     }
     Data challengeRespEncrypted = CryptoManager::aes_encrypt(challengeRespHash, aesKey);
+    if (challengeRespEncrypted.size() != 32)
+    {
+        gs_set_error("Could not encrypt pairing response");
+        return gs_pair_cleanup(GS_FAILED, server, &result);
+    }
 
     snprintf(
         url, sizeof(url),
@@ -561,9 +586,18 @@ int gs_pair(PSERVER_DATA server, char* pin)
         return gs_pair_cleanup(ret, server, &result);
     }
 
-    Data serverChallengeRespHashInput = randomChallenge
-                                            .append(CryptoManager::signature(serverCert))
-                                            .append(serverSecret);
+    Data serverCertSignature = CryptoManager::signature(serverCert);
+    if (serverCertSignature.is_empty())
+    {
+        gs_set_error("Invalid server pairing certificate signature");
+        return gs_pair_cleanup(GS_INVALID, server, &result);
+    }
+    Data serverChallengeRespHashInput = randomChallenge.append(serverCertSignature).append(serverSecret);
+    if (serverChallengeRespHashInput.is_empty())
+    {
+        gs_set_error("Could not assemble server pairing response");
+        return gs_pair_cleanup(GS_FAILED, server, &result);
+    }
     Data serverChallengeRespHash;
 
     if (server->serverMajorVersion >= 7)
@@ -575,8 +609,18 @@ int gs_pair(PSERVER_DATA server, char* pin)
         serverChallengeRespHash = CryptoManager::SHA1_hash_data(serverChallengeRespHashInput);
     }
 
-    Data clientPairingSecret = clientSecret.append(
-        CryptoManager::sign_data(clientSecret, CryptoManager::key_data()));
+    Data clientSignature = CryptoManager::sign_data(clientSecret, CryptoManager::key_data());
+    if (clientSignature.size() != 256)
+    {
+        gs_set_error("Could not sign client pairing secret");
+        return gs_pair_cleanup(GS_FAILED, server, &result);
+    }
+    Data clientPairingSecret = clientSecret.append(clientSignature);
+    if (clientPairingSecret.size() != 16 + 256)
+    {
+        gs_set_error("Could not assemble client pairing secret");
+        return gs_pair_cleanup(GS_FAILED, server, &result);
+    }
 
     snprintf(
         url, sizeof(url),

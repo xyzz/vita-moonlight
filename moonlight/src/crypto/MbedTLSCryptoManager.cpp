@@ -14,6 +14,8 @@
 #include <mbedtls/x509_crt.h>
 #include <string.h>
 
+#include <limits>
+
 static Data m_cert;
 static Data m_key;
 static std::string m_loadedKeyDir;
@@ -94,67 +96,70 @@ Data MbedTLSCryptoManager::create_AES_key_from_salt_SHA256(Data salted_pin)
     return SHA256_hash_data(salted_pin).subdata(0, 16);
 }
 
-static int get_encrypt_size(Data data)
+static size_t get_encrypt_size(const Data& data)
 {
-    // the size is the length of the data ceiling to the nearest 16 bytes
-    return (((int)data.size() + 15) / 16) * 16;
+    if (data.is_empty() || data.size() > std::numeric_limits<size_t>::max() - 15)
+        return 0;
+    return (data.size() + 15) & ~static_cast<size_t>(15);
 }
 
 Data MbedTLSCryptoManager::aes_encrypt(Data data, Data key)
 {
+    const size_t size = get_encrypt_size(data);
+    if (key.size() != 16 || size == 0)
+        return Data();
+
+    Data padded(size);
+    Data encrypted(size);
+    if (padded.is_empty() || encrypted.is_empty())
+        return Data();
+    memcpy(padded.bytes(), data.bytes(), data.size());
+
     mbedtls_aes_context ctx;
     mbedtls_aes_init(&ctx);
-    mbedtls_aes_setkey_enc(&ctx, key.bytes(), 128);
-
-    int size                            = get_encrypt_size(data);
-    unsigned char* buffer               = (unsigned char*)malloc(size);
-    unsigned char* block_rounded_buffer = (unsigned char*)calloc(1, size);
-    memcpy(block_rounded_buffer, data.bytes(), data.size());
-
-    int block_offset = 0;
-    while (block_offset < size)
+    int result = mbedtls_aes_setkey_enc(&ctx, key.bytes(), 128);
+    for (size_t offset = 0; result == 0 && offset < size; offset += 16)
     {
-        mbedtls_aes_crypt_ecb(&ctx, MBEDTLS_AES_ENCRYPT,
-            block_rounded_buffer + block_offset,
-            buffer + block_offset);
-        block_offset += 16;
+        result = mbedtls_aes_crypt_ecb(&ctx, MBEDTLS_AES_ENCRYPT,
+            padded.bytes() + offset, encrypted.bytes() + offset);
     }
-
-    Data encrypted_data = Data((char*)buffer, size);
     mbedtls_aes_free(&ctx);
-    free(buffer);
-    free(block_rounded_buffer);
-    return encrypted_data;
+    return result == 0 ? encrypted : Data();
 }
 
 Data MbedTLSCryptoManager::aes_decrypt(Data data, Data key)
 {
+    if (key.size() != 16 || data.is_empty() || (data.size() % 16) != 0)
+        return Data();
+
+    Data decrypted(data.size());
+    if (decrypted.is_empty())
+        return Data();
+
     mbedtls_aes_context ctx;
     mbedtls_aes_init(&ctx);
-    mbedtls_aes_setkey_dec(&ctx, key.bytes(), 128);
-    unsigned char* buffer = (unsigned char*)malloc(data.size());
-
-    int block_offset = 0;
-    while (block_offset < data.size())
+    int result = mbedtls_aes_setkey_dec(&ctx, key.bytes(), 128);
+    for (size_t offset = 0; result == 0 && offset < data.size(); offset += 16)
     {
-        mbedtls_aes_crypt_ecb(&ctx, MBEDTLS_AES_DECRYPT,
-            data.bytes() + block_offset,
-            buffer + block_offset);
-        block_offset += 16;
+        result = mbedtls_aes_crypt_ecb(&ctx, MBEDTLS_AES_DECRYPT,
+            data.bytes() + offset, decrypted.bytes() + offset);
     }
-
-    Data decrypted_data = Data(buffer, data.size());
     mbedtls_aes_free(&ctx);
-    free(buffer);
-    return decrypted_data;
+    return result == 0 ? decrypted : Data();
 }
 
 Data MbedTLSCryptoManager::signature(Data cert)
 {
+    if (cert.is_empty())
+        return Data();
     mbedtls_x509_crt x509;
     mbedtls_x509_crt_init(&x509);
 
-    mbedtls_x509_crt_parse(&x509, cert.bytes(), cert.size() + 1);
+    if (mbedtls_x509_crt_parse(&x509, cert.bytes(), cert.size() + 1) != 0)
+    {
+        mbedtls_x509_crt_free(&x509);
+        return Data();
+    }
 
     Data data(x509.sig.p, x509.sig.len);
     mbedtls_x509_crt_free(&x509);
@@ -188,6 +193,9 @@ bool MbedTLSCryptoManager::verify_signature(Data data, Data signature,
 
 Data MbedTLSCryptoManager::sign_data(Data data, Data key)
 {
+    if (data.is_empty() || key.is_empty())
+        return Data();
+
     mbedtls_pk_context pk;
     mbedtls_entropy_context entropy;
     mbedtls_ctr_drbg_context ctr_drbg;
@@ -199,17 +207,19 @@ Data MbedTLSCryptoManager::sign_data(Data data, Data key)
     mbedtls_entropy_init(&entropy);
     mbedtls_ctr_drbg_init(&ctr_drbg);
     mbedtls_pk_init(&pk);
-    mbedtls_ctr_drbg_seed(&ctr_drbg, mbedtls_entropy_func, &entropy, NULL, 0);
-
-    int parseRet = mbedtls_pk_parse_key(&pk, key.bytes(), key.size() + 1, NULL, 0, NULL, NULL);
-    int mdRet    = mbedtls_md(mbedtls_md_info_from_type(MBEDTLS_MD_SHA256), data.bytes(), data.size(), hash);
-    int signRet  = mbedtls_pk_sign(&pk, MBEDTLS_MD_SHA256, hash, sizeof(hash), buf, sizeof(buf), &sig_len, mbedtls_ctr_drbg_random, &ctr_drbg);
+    int result = mbedtls_ctr_drbg_seed(&ctr_drbg, mbedtls_entropy_func, &entropy, NULL, 0);
+    if (result == 0)
+        result = mbedtls_pk_parse_key(&pk, key.bytes(), key.size() + 1, NULL, 0, NULL, NULL);
+    if (result == 0)
+        result = mbedtls_md(mbedtls_md_info_from_type(MBEDTLS_MD_SHA256), data.bytes(), data.size(), hash);
+    if (result == 0)
+        result = mbedtls_pk_sign(&pk, MBEDTLS_MD_SHA256, hash, sizeof(hash), buf, sizeof(buf), &sig_len, mbedtls_ctr_drbg_random, &ctr_drbg);
 
     mbedtls_pk_free(&pk);
     mbedtls_ctr_drbg_free(&ctr_drbg);
     mbedtls_entropy_free(&entropy);
 
-    if (parseRet == 0 && mdRet == 0 && signRet == 0 && sig_len > 0)
+    if (result == 0 && sig_len > 0)
     {
         return Data(buf, sig_len);
     }

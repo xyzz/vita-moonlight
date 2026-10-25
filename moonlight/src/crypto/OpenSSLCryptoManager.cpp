@@ -11,6 +11,7 @@
 #include <string.h>
 
 #include <cstdlib>
+#include <limits>
 
 static Data m_cert;
 static Data m_key;
@@ -105,52 +106,48 @@ Data OpenSSLCryptoManager::create_AES_key_from_salt_SHA256(Data salted_pin)
     return SHA256_hash_data(salted_pin).subdata(0, 16);
 }
 
-static int get_encrypt_size(Data data)
+static size_t get_encrypt_size(const Data& data)
 {
-    // the size is the length of the data ceiling to the nearest 16 bytes
-    return (((int)data.size() + 15) / 16) * 16;
+    if (data.is_empty() || data.size() > std::numeric_limits<size_t>::max() - 15)
+        return 0;
+    return (data.size() + 15) & ~static_cast<size_t>(15);
 }
 
 Data OpenSSLCryptoManager::aes_encrypt(Data data, Data key)
 {
+    const size_t size = get_encrypt_size(data);
+    if (key.size() != 16 || size == 0)
+        return Data();
+
+    Data padded(size);
+    Data encrypted(size);
+    if (padded.is_empty() || encrypted.is_empty())
+        return Data();
+    memcpy(padded.bytes(), data.bytes(), data.size());
+
     AES_KEY aes_key;
-    AES_set_encrypt_key((unsigned char*)key.bytes(), 128, &aes_key);
-    int size                            = get_encrypt_size(data);
-    unsigned char* buffer               = (unsigned char*)malloc(size);
-    unsigned char* block_rounded_buffer = (unsigned char*)calloc(1, size);
-    memcpy(block_rounded_buffer, data.bytes(), data.size());
-
-    // AES_encrypt only encrypts the first 16 bytes so iterate the entire buffer
-    int block_offset = 0;
-    while (block_offset < size)
-    {
-        AES_encrypt(block_rounded_buffer + block_offset, buffer + block_offset, &aes_key);
-        block_offset += 16;
-    }
-
-    Data encrypted_data = Data((char*)buffer, size);
-    free(buffer);
-    free(block_rounded_buffer);
-    return encrypted_data;
+    if (AES_set_encrypt_key(key.bytes(), 128, &aes_key) != 0)
+        return Data();
+    for (size_t offset = 0; offset < size; offset += 16)
+        AES_encrypt(padded.bytes() + offset, encrypted.bytes() + offset, &aes_key);
+    return encrypted;
 }
 
 Data OpenSSLCryptoManager::aes_decrypt(Data data, Data key)
 {
+    if (key.size() != 16 || data.is_empty() || (data.size() % 16) != 0)
+        return Data();
+
+    Data decrypted(data.size());
+    if (decrypted.is_empty())
+        return Data();
+
     AES_KEY aes_key;
-    AES_set_decrypt_key(key.bytes(), 128, &aes_key);
-    unsigned char* buffer = (unsigned char*)malloc(data.size());
-
-    // AES_decrypt only decrypts the first 16 bytes so iterate the entire buffer
-    int block_offset = 0;
-    while (block_offset < data.size())
-    {
-        AES_decrypt(data.bytes() + block_offset, buffer + block_offset, &aes_key);
-        block_offset += 16;
-    }
-
-    Data decrypted_data = Data(buffer, data.size());
-    free(buffer);
-    return decrypted_data;
+    if (AES_set_decrypt_key(key.bytes(), 128, &aes_key) != 0)
+        return Data();
+    for (size_t offset = 0; offset < data.size(); offset += 16)
+        AES_decrypt(data.bytes() + offset, decrypted.bytes() + offset, &aes_key);
+    return decrypted;
 }
 
 Data OpenSSLCryptoManager::signature(Data cert)

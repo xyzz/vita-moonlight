@@ -4,6 +4,7 @@
 
 #include <borealis.hpp>
 #include <cstdlib>
+#include <limits>
 #ifdef __vita__
 #include <psp2/kernel/rng.h>
 #else
@@ -14,21 +15,26 @@
 
 Data::Data(unsigned char* bytes, size_t size)
 {
-    if (bytes && size > 0)
-    {
-        m_bytes       = (unsigned char*)malloc(size + 1);
-        m_bytes[size] = '\0';
-        memcpy(m_bytes, bytes, size);
-        m_size = size;
-    }
+    if (!bytes || size == 0 || size == std::numeric_limits<size_t>::max())
+        return;
+
+    m_bytes = (unsigned char*)malloc(size + 1);
+    if (!m_bytes)
+        return;
+    memcpy(m_bytes, bytes, size);
+    m_bytes[size] = '\0';
+    m_size        = size;
 }
 
 Data::Data(size_t capacity)
 {
+    if (capacity == std::numeric_limits<size_t>::max())
+        return;
     m_bytes = (unsigned char*)malloc(capacity + 1);
+    if (!m_bytes)
+        return;
     memset(m_bytes, 0, capacity + 1);
-    m_bytes[capacity] = '\0';
-    m_size            = capacity;
+    m_size = capacity;
 }
 
 Data::~Data()
@@ -54,45 +60,42 @@ Data Data::subdata(size_t start, size_t size)
 Data Data::append(Data other)
 {
     if (is_empty())
-    {
         return other;
-    }
+    if (other.is_empty())
+        return *this;
+    if (other.m_size >= std::numeric_limits<size_t>::max() - m_size)
+        return Data();
 
     Data data(m_size + other.m_size);
+    if (data.is_empty())
+        return Data();
     memcpy(data.m_bytes, m_bytes, m_size);
-    memcpy(&data.m_bytes[m_size], other.m_bytes, other.m_size);
+    memcpy(data.m_bytes + m_size, other.m_bytes, other.m_size);
     return data;
 }
 
 Data::Data(const Data& that)
-    : Data(0)
+    : Data(that.m_size)
 {
-    if (m_bytes)
-    {
-        free(m_bytes);
-    }
-
-    m_bytes = (unsigned char*)malloc(that.size() + 1);
-    if (that.m_size > 0)
+    if (m_bytes && that.m_size > 0)
         memcpy(m_bytes, that.m_bytes, that.m_size);
-    m_bytes[that.m_size] = '\0';
-    m_size               = that.m_size;
 }
 
 Data& Data::operator=(const Data& that)
 {
     if (this != &that)
     {
-        if (m_bytes)
-        {
-            free(m_bytes);
-        }
-
-        m_bytes = (unsigned char*)malloc(that.m_size + 1);
+        if (that.m_size == std::numeric_limits<size_t>::max())
+            return *this;
+        unsigned char* replacement = (unsigned char*)malloc(that.m_size + 1);
+        if (!replacement)
+            return *this;
         if (that.m_size > 0)
-            memcpy(m_bytes, that.m_bytes, that.m_size);
-        m_bytes[that.m_size] = '\0';
-        m_size               = that.m_size;
+            memcpy(replacement, that.m_bytes, that.m_size);
+        replacement[that.m_size] = '\0';
+        free(m_bytes);
+        m_bytes = replacement;
+        m_size  = that.m_size;
     }
     return *this;
 }
@@ -103,6 +106,8 @@ Data Data::random_bytes(size_t size)
         return Data();
 
     Data result(size);
+    if (result.is_empty())
+        return Data();
 #ifdef __vita__
     for (size_t offset = 0; offset < size;)
     {
@@ -191,6 +196,8 @@ Data Data::hex_to_bytes() const
     };
 
     Data result(m_size / 2);
+    if (result.is_empty())
+        return Data();
     for (size_t i = 0; i < m_size; i += 2)
     {
         int high = hex_digit(m_bytes[i]);
@@ -210,15 +217,17 @@ Data Data::hex() const
         return Data(&end, 1);
     }
 
-    int counter = 0;
+    if (m_size > (std::numeric_limits<size_t>::max() - 1) / 2)
+        return Data();
+
     Data hex(m_size * 2);
-    char fmt[3] = { '\0', '\0', '\0' };
-    for (int i = 0; i < m_size; i++)
+    if (hex.is_empty())
+        return Data();
+    constexpr char digits[] = "0123456789ABCDEF";
+    for (size_t i = 0; i < m_size; ++i)
     {
-        sprintf(fmt, "%02X", m_bytes[i]);
-        hex.m_bytes[counter++] = fmt[0];
-        hex.m_bytes[counter++] = fmt[1];
+        hex.m_bytes[2 * i]     = digits[m_bytes[i] >> 4];
+        hex.m_bytes[2 * i + 1] = digits[m_bytes[i] & 0x0F];
     }
-    hex.m_bytes[m_size * 2] = '\0';
     return hex;
 }

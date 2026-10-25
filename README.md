@@ -23,7 +23,7 @@ Embedded. It streams games and applications from a Sunshine-compatible host.
 
 ## Installation
 
-1. Download `moonlight.vpk` from the release page and copy it to the Vita.
+1. Download the VPK from the [Moonlight Vita releases](https://github.com/xyzz/vita-moonlight/releases) and copy it to the Vita.
 2. Install the package with VitaShell.
 3. Start Moonlight from LiveArea and pair it with the host.
 
@@ -32,13 +32,14 @@ Embedded. It streams games and applications from a Sunshine-compatible host.
 Linux, WSL and Windows/MSYS2 use the same build scripts. Install VitaSDK first
 and make sure `VITASDK/bin` is available in `PATH`.
 
-Clone the repository and its submodules:
+Clone the main Moonlight Vita repository and its submodules:
 
 ```bash
 git clone --recurse-submodules https://github.com/xyzz/vita-moonlight.git
 cd vita-moonlight
-git submodule update --init --recursive
 ```
+
+After pulling changes that update submodules, run `git submodule update --init --recursive`.
 
 ### Linux
 
@@ -123,7 +124,7 @@ directory names include the host and graphics backend, such as
 `cmake-build-psv-msys2-gxm`. Set `VITA_BUILD_ROOT` to place these directories
 outside the source tree.
 
-For fast incremental builds and direct deployment, copy the IP template first:
+For incremental builds that can also deploy to the Vita, copy the IP template and enter your Vita's address:
 
 ```bash
 cp ip_vita.txt.example ip_vita.txt
@@ -139,9 +140,7 @@ and troubleshooting.
 
 ## Contributing
 
-Keep changes focused and follow the existing code style. Update submodules after
-pulling changes that modify gitlinks, then run the relevant Vita build before
-submitting a pull request.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for commit conventions, tests and pull requests.
 
 ## License
 
@@ -164,7 +163,7 @@ Thanks also to [AorsiniYT](https://github.com/AorsiniYT), the
 and the maintainers of
 [moonlight-common-c](https://github.com/moonlight-stream/moonlight-common-c).
 
-The interface uses [Borealis](https://github.com/xfangfang/borealis), created and
+The modern interface uses [Borealis](https://github.com/xfangfang/borealis), created and
 maintained by Natinusala, xfangfang, XITRIX and its contributors. The toolchain
 and platform libraries are provided by the [VitaSDK](https://vitasdk.org/)
 community. The bundled UI font is a subset of

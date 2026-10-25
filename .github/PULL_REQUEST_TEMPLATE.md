@@ -1,15 +1,15 @@
 ## Change
 
-Describe the change and why it is needed.
+Explain what changed and why.
 
 ## Validation
 
-List the build or test commands run, the Vita/PSTV model tested, and the host
-software and stream/decoder path used when applicable.
+List the tests or builds you ran. For device-specific changes, include the Vita
+model, host software and decoder tested.
 
-Commit subjects must use `type(scope): description`; the scope is optional.
-Use the same Conventional Commit format for the pull request title so squash
-merges preserve the release type.
-The release helper derives version bumps and release notes from commit subjects.
-Leave `CHANGELOG.md` and `resources/changeinfo.xml` to release preparation
-unless the pull request is explicitly preparing a release.
+Use a Conventional Commit title (`type(scope): description`) so squash merges
+produce the correct release notes and version bump. See
+[CONTRIBUTING.md](../CONTRIBUTING.md) for details.
+
+Do not edit `CHANGELOG.md` or `resources/changeinfo.xml` unless this pull request
+prepares a release.

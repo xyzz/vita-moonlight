@@ -1,6 +1,6 @@
 ## 1.0.0
 
-- Replace the legacy interface with Borealis
+- Add the Borealis interface alongside Legacy
 - Add FFmpeg-vita hardware decoding and direct GXM presentation
 - Add 480p through 768p stream modes, automatic bitrate and in-stream display controls
 - Add front and rear touch zones, gyroscope settings and configurable shortcuts

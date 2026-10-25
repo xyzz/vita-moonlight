@@ -1,21 +1,14 @@
 # Contributing
 
-Moonlight Vita targets PS Vita and PSTV. Keep changes focused on the Vita client and
-follow the existing code style and project structure.
+Moonlight Vita runs on PS Vita and PSTV. Keep changes focused and follow the
+existing style.
 
 ## Development
 
-Clone the primary repository with its submodules:
+Follow the [build instructions](README.md#building) for Linux, WSL or
+Windows/MSYS2. Update submodules whenever their revisions change.
 
-```bash
-git clone --recurse-submodules https://github.com/xyzz/vita-moonlight.git
-cd vita-moonlight
-git submodule update --init --recursive
-```
-
-See [README.md](README.md) for the supported Linux, WSL and Windows/MSYS2 setup.
-Do not commit build directories, local logs, device addresses or other
-machine-specific files.
+Keep build directories, logs, host addresses and other local files out of commits.
 
 ## Commits
 
@@ -45,20 +38,20 @@ commit subject.
 
 ## Validation
 
-Run the checks that apply to the change. A normal release build is:
+Run the tests that cover your changes. To build a release VPK:
 
 ```bash
 ./makepsv --gxm --release --no-deploy
 ```
 
-Changes to release automation should also pass:
+To run the automated tests, including the release checks:
 
 ```bash
 python3 -m unittest discover -s tests
 ```
 
-When hardware behavior changes, test on the relevant PS Vita or PSTV model and
-include the host software and stream/decoder path used.
+For streaming or input changes, test on a PS Vita or PSTV. Record the host
+software and decoder used.
 
 ## Pull requests
 

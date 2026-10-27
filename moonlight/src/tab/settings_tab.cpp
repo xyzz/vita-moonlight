@@ -646,7 +646,7 @@ SettingsTab::SettingsTab()
                 {
             int result = sceAppMgrLoadExec("app0:eboot.bin", nullptr, nullptr);
             if (result < 0) {
-                vita_log::error("[Settings] sceAppMgrLoadExec fallo=0x%X", result);
+                vita_log::error("[Settings] sceAppMgrLoadExec failed=0x%X", result);
                 brls::Application::notify(brls::getStr("moonlight/settings_tab/language_restart_failed"));
             } });
 #else

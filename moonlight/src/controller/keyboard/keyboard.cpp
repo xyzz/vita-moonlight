@@ -322,7 +322,6 @@ void KeyboardOverlay::willAppear(bool resetState)
     BaseOverlay::willAppear(resetState);
     if (!loaded)
     {
-        // Still work without CSS - just use defaults
     }
     auto it = properties.find("transparent");
     if (it != properties.end())

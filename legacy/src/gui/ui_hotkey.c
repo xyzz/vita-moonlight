@@ -1,6 +1,4 @@
 // ui_hotkey.c
-// Sistema de hotkeys personalizables para Moonlight Vita Motion
-// Solo funciones de menú y helpers UI, sin lógica de almacenamiento ni callbacks
 #include "ui_hotkey.h"
 
 #include <stdio.h>
@@ -11,13 +9,10 @@
 #include "ime.h"
 #include "ui_settings.h"
 
-// Prototipo para strdup si falta
 char* strdup(const char* s);
 
-// Prototipo para nombre_boton (debe estar implementada en algún lado)
 void nombre_boton(int btn, char* out, int outlen);
 
-// Implementación de nombre_boton para evitar error de linker y mostrar nombres correctos
 void nombre_boton(int btn, char* out, int outlen)
 {
     const char* name = "?";
@@ -77,11 +72,9 @@ void nombre_boton(int btn, char* out, int outlen)
     snprintf(out, outlen, "%s", name);
 }
 
-// Declaraciones con atributo unused para evitar warnings
 static int hotkey_edit_menu(int idx) __attribute__((unused));
 static int hotkey_buttons_menu(SceCtrlButtons* out_buttons, int* out_count) __attribute__((unused));
 
-// helpers para obtener el nombre de la función y botones
 void hotkey_func_name(int idx, char* out, int outlen)
 {
     extern char* settings_special_names[];
@@ -153,7 +146,7 @@ void hotkey_buttons_name(const hotkey_t* hk, char* out, int outlen)
             case SCE_CTRL_SQUARE:
                 name = "SQUARE";
                 break;
-            // Elimina SCE_CTRL_PS para evitar duplicado
+            // Exclude SCE_CTRL_PS to avoid duplicate button events.
             default:
                 name = "?";
                 break;
@@ -189,11 +182,9 @@ static int hotkey_func_menu(int* func_idx)
     return 0;
 }
 
-// Definición normal, sin atributo
 static int hotkey_buttons_menu(SceCtrlButtons* out_buttons, int* out_count)
 {
     display_error("Mantén pulsados los botones para el hotkey y pulsa START para confirmar.");
-    // ...lógica de UI para capturar botones...
     return 1;
 }
 
@@ -239,10 +230,8 @@ static int hotkey_edit_menu(int idx)
     return 0;
 }
 
-// Declaración de HOTKEY_MENU_MAX
 #define HOTKEY_MENU_MAX 16
 
-// --- NUEVO SUBMENÚ PARA AGREGAR HOTKEY ---
 int add_hotkey_menu();
 
 int add_hotkey_menu()
@@ -255,7 +244,6 @@ int add_hotkey_menu()
     {
         menu_entry menu[8] = { 0 };
         int idx            = 0;
-        // Mostrar selección actual
         char btn1[32] = "No asignado", btn2[32] = "Ninguno", act[64] = "No asignada";
         if (first_btn >= 0)
             nombre_boton(first_btn, btn1, sizeof(btn1));
@@ -280,7 +268,6 @@ int add_hotkey_menu()
         int sel     = display_menu(menu, idx, NULL, NULL, NULL, NULL, NULL);
         if (sel == 1)
         {
-            // Selección de primer botón
             menu_entry btn_menu[18];
             int bidx                = 0;
             const char* btn_names[] = { "START", "SELECT", "UP", "DOWN", "LEFT", "RIGHT", "L1", "R1", "L2", "R2", "L3", "R3", "TRIANGLE", "CIRCLE", "CROSS", "SQUARE" };
@@ -293,7 +280,6 @@ int add_hotkey_menu()
         }
         else if (sel == 2)
         {
-            // Selección de segundo botón (opcional)
             menu_entry btn_menu[18];
             int bidx                = 0;
             btn_menu[bidx++]        = (menu_entry) { .name = "Ninguno", .id = -1 };
@@ -309,14 +295,13 @@ int add_hotkey_menu()
         }
         else if (sel == 3)
         {
-            // Selección de acción
             int fidx = action;
             if (hotkey_func_menu(&fidx))
                 action = fidx;
         }
         else if (sel == 4)
         {
-            // Guardar atajo
+
             if (first_btn < 0 || action < 0)
             {
                 display_error("Debes seleccionar al menos un botón y una acción.");
@@ -356,7 +341,6 @@ int ui_hotkey_menu()
     {
         menu_entry menu[HOTKEY_MENU_MAX + 8] = { 0 };
         int idx                              = 0;
-        // --- Resumen decorativo como item de menú deshabilitado ---
         if (g_hotkey_count == 0)
         {
             menu[idx].name     = "-----------------------------";
@@ -403,7 +387,6 @@ int ui_hotkey_menu()
         }
         else if (sel == 200)
         {
-            // Eliminar: muestra lista de atajos para elegir cuál borrar
             menu_entry del_menu[HOTKEY_MENU_MAX + 1] = { 0 };
             int didx                                 = 0;
             for (int i = 0; i < g_hotkey_count; ++i)

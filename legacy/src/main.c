@@ -83,7 +83,6 @@ static void vita_init()
     RAND_seed(random_seed, sizeof(random_seed));
     OpenSSL_add_all_algorithms();
 
-    // This is only used for PIN codes, doesn't really matter
     srand(time(NULL));
 
 #ifdef __vita__
@@ -165,7 +164,7 @@ int main(int argc, char* argv[])
     config_path = out_path;
     strcpy(config.key_dir, out_key_dir);
     vita_debug_log("[Moonlight] Carpeta seleccionada: %s", config.key_dir);
-    // Ya no se guarda config antes de inicializar todos los valores
+    // Do not save settings before all defaults have been initialized.
     config_parse(argc, argv, &config);
 
     // Hosts and pairing credentials are shared with the Borealis frontend.
@@ -174,10 +173,8 @@ int main(int argc, char* argv[])
     strcpy(config.key_dir, out_key_dir);
     config_save(config_path, &config);
 
-    // Restaurar estado de Absolute Touch al iniciar
     touchabsolute_enable(config.touchscreen_mode == 2);
 
-    // Aplicar el layout guardado después de cargar la config
     keyboardsystem_set_layout((KeyboardLayout)config.keyboard_layout);
 
     vitapower_config(config);

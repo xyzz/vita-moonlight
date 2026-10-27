@@ -83,7 +83,7 @@ static inline void update_touch_points();
 
 double mouse_multiplier;
 
-#define PSBTN_DOUBLETAP_DELAY 250000 // 100ms
+#define PSBTN_DOUBLETAP_DELAY 250000
 
 #define MOUSE_ACTION_DELAY 100000 // 100ms
 #define MOTION_ACTION_DELAY 200000 // 200ms
@@ -237,7 +237,6 @@ inline uint8_t read_backscreen()
     return 0;
 }
 
-// Nueva función: solo actualiza touch.points y touch.finger
 static inline void update_touch_points()
 {
     touch.finger = 0;
@@ -293,8 +292,6 @@ inline uint8_t read_frontscreen()
                 continue;
             }
         }
-
-        // Ya no actualiza touch.points ni touch.finger aquí
     }
     return 0;
 }
@@ -387,43 +384,42 @@ inline void special(uint32_t defined, uint32_t pressed, uint32_t old_pressed)
         switch (dev_type)
         {
             case INPUT_TYPE_SPECIAL:
-                // Limpiar input físico ANTES de overlays/eventos modales
+                // Release physical input before entering a modal overlay.
                 memset(&curr, 0, sizeof(input_data));
                 curr.lt     = 0;
                 curr.rt     = 0;
                 pad.buttons = 0;
-                // Enviar frame vacío al host para limpiar estado
+                // Send a neutral controller frame to release buttons on the host.
                 LiSendMultiControllerEvent(0, 1, 0, 0, 0, 0, 0, 0, 0);
                 if (dev_val == INPUT_SPECIAL_KEY_PAUSE)
                 {
                     connection_minimize();
-                    // Limpiar input físico DESPUÉS de overlays/eventos modales
+                    // Reset physical input after closing a modal overlay.
                     memset(&curr, 0, sizeof(input_data));
                     curr.lt     = 0;
                     curr.rt     = 0;
                     pad.buttons = 0;
-                    // Enviar frame vacío al host para limpiar estado
+                    // Send a neutral controller frame to release buttons on the host.
                     LiSendMultiControllerEvent(0, 1, 0, 0, 0, 0, 0, 0, 0);
                     return;
                 }
                 if (dev_val == INPUT_SPECIAL_KEY_KEYBOARD)
                 {
                     keyboardsystem_open_keyboard();
-                    // Limpiar input físico DESPUÉS de overlays/eventos modales
+                    // Reset physical input after closing a modal overlay.
                     memset(&curr, 0, sizeof(input_data));
                     curr.lt     = 0;
                     curr.rt     = 0;
                     pad.buttons = 0;
-                    // Enviar frame vacío al host para limpiar estado
+                    // Send a neutral controller frame to release buttons on the host.
                     LiSendMultiControllerEvent(0, 1, 0, 0, 0, 0, 0, 0, 0);
                     return;
                 }
-                // Si hay otros overlays, añadir aquí
                 memset(&curr, 0, sizeof(input_data));
                 curr.lt     = 0;
                 curr.rt     = 0;
                 pad.buttons = 0;
-                // Enviar frame vacío al host para limpiar estado
+                // Send a neutral controller frame to release buttons on the host.
                 LiSendMultiControllerEvent(0, 1, 0, 0, 0, 0, 0, 0, 0);
                 return;
             case INPUT_TYPE_GAMEPAD:
@@ -536,7 +532,7 @@ inline void check_for_double_click(input_data* curr)
         {
 #ifdef DOUBLETAP_DEBUG
             vita_debug_log("Condition three: return to center was less than step time, delta: %llu", current_time - dc_tracker.returned_to_center_time);
-            vita_debug_log("Should be sprinting");
+            vita_debug_log("Sprint input activated");
 #endif
             dc_tracker.currently_sprinting = true;
         }
@@ -598,10 +594,9 @@ static bool has_specialkey(int key)
     return 0;
 }
 
-// Callback para enviar eventos de mouse absoluto
 // static void send_absolute_mouse_event(int x, int y, bool down) {
 //     if (down) {
-//         // Usar las dimensiones de referencia de la pantalla Vita
+//         // Use Vita display dimensions for touch coordinates.
 //         LiSendMousePositionEvent(x, y, 960, 544);
 //         LiSendMouseButtonEvent(BUTTON_ACTION_PRESS, BUTTON_LEFT);
 //     } else {
@@ -706,7 +701,7 @@ void process_touchzones()
 
 void process_buttons()
 {
-    // --- LECTURA DE BOTONES Y STICKS SIEMPRE (antes de los modos táctiles) ---
+    // Read physical buttons and sticks before dispatching touch input.
     curr.button |= is_pressed(map.btn_dpad_up) ? UP_FLAG : 0;
     curr.button |= is_pressed(map.btn_dpad_left) ? LEFT_FLAG : 0;
     curr.button |= is_pressed(map.btn_dpad_down) ? DOWN_FLAG : 0;
@@ -733,10 +728,10 @@ void process_triggers()
     // Swap L1<=>L2 y R1<=>R2 correctamente
     if (swap_shoulder_buttons)
     {
-        // Físicos: L1 manda L2 (analógico), rear touch L2 manda L1 (digital)
+        // Physical L1 sends analog L2; rear-touch L2 sends digital L1.
         if (is_pressed(map.btn_thumbl))
         {
-            curr.lt = 0xff; // L1 físico activa L2 analógico
+            curr.lt = 0xff;
         }
         if (is_pressed(map.btn_tl))
         {
@@ -750,10 +745,10 @@ void process_triggers()
         {
             curr.lt = 0;
         }
-        // Físicos: R1 manda R2 (analógico), rear touch R2 manda R1 (digital)
+        // Physical R1 sends analog R2; rear-touch R2 sends digital R1.
         if (is_pressed(map.btn_thumbr))
         {
-            curr.rt = 0xff; // R1 físico activa R2 analógico
+            curr.rt = 0xff;
         }
         if (is_pressed(map.btn_tr))
         {
@@ -770,7 +765,7 @@ void process_triggers()
     }
     else
     {
-        // Físicos: L1 manda L1 (digital), L2 manda L2 (analógico)
+        // With standard mapping, physical L1 stays digital L1 and L2 stays analog L2.
         if (is_pressed(map.btn_thumbl))
         {
             curr.button |= LB_FLAG;
@@ -778,9 +773,9 @@ void process_triggers()
         if (is_pressed(map.btn_tl))
         {
             curr.lt = 0xff;
-            // No modificar curr.button aquí
+            // Keep curr.button until the input update is complete.
         }
-        // Físicos: R1 manda R1 (digital), R2 manda R2 (analógico)
+        // With standard mapping, physical R1 stays digital R1 and R2 stays analog R2.
         if (is_pressed(map.btn_thumbr))
         {
             curr.button |= RB_FLAG;
@@ -788,7 +783,7 @@ void process_triggers()
         if (is_pressed(map.btn_tr))
         {
             curr.rt = 0xff;
-            // No modificar curr.button aquí
+            // Keep curr.button until the input update is complete.
         }
     }
 }
@@ -804,8 +799,6 @@ void process_touch()
 
     if (in_front_touchzone())
         return;
-
-    // --- PROCESAMIENTO DE MODOS TÁCTILES EXCLUSIVOS ---
 
     if (config.touchscreen_mode == 1)
     {
@@ -823,8 +816,8 @@ void process_touch()
     {
         static bool mouse_released __attribute__((unused)) = false;
         mouse_released                                     = false;
-        // mouse y gestos solo si no está en modo touchscreen
-        // Si el toque está en una sección de special key, NO procesar como ratón
+        // Mouse gestures are disabled in touchscreen mode.
+        // Do not forward special-key touches as mouse input.
 
         switch (front_state)
         {
@@ -906,13 +899,12 @@ inline void vitainput_process(void)
     sceCtrlPeekBufferPositiveExt2(controller_port, &pad, 1);
     sceTouchPeek(SCE_TOUCH_PORT_FRONT, &front, 1);
     sceTouchPeek(SCE_TOUCH_PORT_BACK, &back, 1);
-    // Siempre actualizar los puntos táctiles del frente
     update_touch_points();
-    // Siempre procesar las esquinas del back (para compatibilidad o futuros usos)
+    // Keep rear-touch corner handling active for compatibility.
     read_backscreen();
 
     sceRtcGetCurrentTick(&current);
-    // analogs: solo asignar si no están activos por rear touch
+    // Don't override analog input already generated by rear touch.
     if (!swap_shoulder_buttons && !is_pressed(map.btn_tl2))
         curr.lt = read_analog(map.btn_tl); // l2
     if (!swap_shoulder_buttons && !is_pressed(map.btn_tr2))
@@ -927,19 +919,19 @@ inline void vitainput_process(void)
     handle_psbutton();
     process_triggers();
 
-    // --- GESTIÓN DE LIMPIEZA DE INPUT AL ABRIR/CERRAR TECLADO VIRTUAL Y PAUSA ---
+    // Release stale input when opening or closing modal overlays.
     static bool keyboard_overlay_active = false;
     static bool pause_overlay_active    = false;
     static SceCtrlData pad_snapshot     = { 0 };
     static input_data curr_snapshot     = { 0 };
 
-    // Hook para saber si el teclado virtual está abierto
+    // Tracks whether the virtual keyboard is open.
 
     bool shortcut_triggered = process_physical_shortcuts(&pad, &pad_old);
     bool keyboard_now       = keyboardsystem_is_open();
     bool pause_now          = pause_overlay_is_open();
 
-    // --- BLOQUEO Y LIMPIEZA DE INPUT AL ABRIR TECLADO VIRTUAL ---
+    // Block input while the virtual keyboard opens.
     if (keyboard_now && !keyboard_overlay_active)
     {
         memcpy(&pad_snapshot, &pad, sizeof(SceCtrlData));
@@ -957,12 +949,12 @@ inline void vitainput_process(void)
         curr.ry = 128;
         curr.lt = 0;
         curr.rt = 0;
-        vita_debug_log("[VITA.C] Overlay activo: ABRIR teclado, input bloqueado (sticks centrados, sin enviar frame vacío)");
+        vita_debug_log("[VITA.C] Keyboard overlay opening; input blocked (sticks centered, no empty frame sent)");
         keyboard_overlay_active = true;
     }
     else if (!keyboard_now && keyboard_overlay_active)
     {
-        vita_debug_log("[VITA.C] Teclado virtual CERRADO: restaurando snapshot (sin enviar frame vacío)");
+        vita_debug_log("[VITA.C] Virtual keyboard closed; restoring input snapshot (no empty frame sent)");
         memcpy(&pad, &pad_snapshot, sizeof(SceCtrlData));
         memcpy(&curr, &curr_snapshot, sizeof(input_data));
         keyboard_overlay_active = false;
@@ -983,7 +975,7 @@ inline void vitainput_process(void)
         curr.rt = 0;
     }
 
-    // --- BLOQUEO Y LIMPIEZA DE INPUT AL ABRIR/CERRAR MENÚ DE PAUSA ---
+    // Block input when opening or closing the pause menu.
     if (pause_now && !pause_overlay_active)
     {
         memcpy(&pad_snapshot, &pad, sizeof(SceCtrlData));
@@ -1000,12 +992,12 @@ inline void vitainput_process(void)
         curr.ry = 128;
         curr.lt = 0;
         curr.rt = 0;
-        vita_debug_log("[VITA.C] Overlay activo: ABRIR menú de pausa, input bloqueado (sticks centrados, sin enviar frame vacío)");
+        vita_debug_log("[VITA.C] Pause overlay opening; input blocked (sticks centered, no empty frame sent)");
         pause_overlay_active = true;
     }
     else if (!pause_now && pause_overlay_active)
     {
-        vita_debug_log("[VITA.C] Menú de pausa CERRADO: restaurando snapshot (sin enviar frame vacío)");
+        vita_debug_log("[VITA.C] Pause overlay closed; restoring input snapshot (no empty frame sent)");
         memcpy(&pad, &pad_snapshot, sizeof(SceCtrlData));
         memcpy(&curr, &curr_snapshot, sizeof(input_data));
         pause_overlay_active = false;
@@ -1033,8 +1025,8 @@ inline void vitainput_process(void)
 
     process_touch();
 
-    // --- ENVÍO DE EVENTOS DE GAMEPAD SOLO SI NO hay overlay de teclado activo ---
-    // O si el overlay está activo pero NO están ambos botones del shortcut presionados
+    // Suppress gamepad events while the keyboard overlay is active.
+    // Exception: allow input that does not complete the shortcut.
     bool shortcut_both_pressed = (pad.buttons & SCE_CTRL_START) && (pad.buttons & SCE_CTRL_LEFT);
     if (!keyboard_overlay_active || (keyboard_overlay_active && !shortcut_both_pressed))
     {
@@ -1086,7 +1078,6 @@ bool vitainput_init()
 
 void vitainput_config(CONFIGURATION config)
 {
-    // Sincroniza el modo swap global con la configuración cargada
     swap_shoulder_buttons = config.swap_shoulder_buttons;
     map.abs_x             = LEFTX | INPUT_TYPE_ANALOG;
     map.abs_y             = LEFTY | INPUT_TYPE_ANALOG;
@@ -1192,7 +1183,6 @@ void vitainput_start(void)
     gamepadSupportedButtonFlags |= TOUCHPAD_FLAG;
     gamepadSupportedButtonFlags |= MISC_FLAG;
 
-    // Determinar tipo de control a enviar según config.controller_type
     uint8_t controller_type = LI_CTYPE_PS;
     switch (config.controller_type)
     {

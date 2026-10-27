@@ -41,7 +41,6 @@ SessionMainView::SessionMainView(const HostInfo& host, const RemoteAppInfo& app,
 
     this->inflateFromXMLRes("xml/views/session_main.xml");
 
-    // Inicializar input manager
     g_controllerInput = new ControllerInputManager();
     this->addGestureRecognizer(new KeyboardTouchRecognizer([](brls::GestureState state, const brls::Point& position)
         {
@@ -106,7 +105,6 @@ SessionMainView::SessionMainView(const HostInfo& host, const RemoteAppInfo& app,
     if (g_controllerInput)
         g_controllerInput->dropInput();
 
-    // Hide base UI to leave only video and overlay
     if (title)
         title->setVisibility(brls::Visibility::GONE);
     if (appLabel)
@@ -116,13 +114,8 @@ SessionMainView::SessionMainView(const HostInfo& host, const RemoteAppInfo& app,
     if (endBtn)
         endBtn->setVisibility(brls::Visibility::GONE);
 
-    // Note: Pause shortcut management is done from ControllerInputManager.
-    // Previously it was also registered in HotkeyManager but this caused the
-    // overlay will be created twice in race conditions. It avoids the
-    // duplication by registering the callback only in the input manager.
+    // ControllerInputManager owns the pause shortcut to avoid duplicate overlays.
 
-
-    // Try to force render loop at 60fps if the host negotiates >30.
     // Recover streaming and video settings.
     ConfigManager cfgMgr;
     cfgMgr.load();

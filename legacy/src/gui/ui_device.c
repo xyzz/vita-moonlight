@@ -86,17 +86,16 @@ char* strrstr(const char* str, const char* pat)
 
 static void moonlight_found_callback(int idx, const char* host, const char* pcname, const char* ip, int port)
 {
-    vita_debug_log("[mDNS] Dispositivo encontrado: %s (%s:%d)\n", pcname, ip, port);
-    // Verificar si ya existe un dispositivo con el mismo nombre y misma IP
+    vita_debug_log("[mDNS] Device found: %s (%s:%d)\n", pcname, ip, port);
     for (int i = 0; i < found_device; i++)
     {
         if (strncmp(devices[i].name, pcname, sizeof(devices[i].name)) == 0 && strncmp(devices[i].internal, ip, sizeof(devices[i].internal)) == 0)
         {
-            vita_debug_log("[mDNS] Dispositivo duplicado ignorado: %s (%s)\n", pcname, ip);
+            vita_debug_log("[mDNS] Duplicate device ignored: %s (%s)\n", pcname, ip);
             return;
         }
     }
-    // Si el nombre es igual pero la IP es diferente, sí se agrega
+    // Keep same-name devices when their IP addresses differ.
     memset(&devices[found_device], 0, sizeof(device_info_t));
     strncpy(devices[found_device].name, pcname, sizeof(devices[found_device].name) - 1);
     strncpy(devices[found_device].internal, ip, sizeof(devices[found_device].internal) - 1);
@@ -106,7 +105,7 @@ static void moonlight_found_callback(int idx, const char* host, const char* pcna
 
 int mdns_discovery_main(SceSize args, void* argp)
 {
-    vita_debug_log("[mDNS] Iniciando búsqueda de dispositivos...\n");
+    vita_debug_log("[mDNS] Starting device discovery...\n");
     if (search_thread_status != SEARCH_THREAD_IDLE)
     {
         vita_debug_log("[mDNS] search_thread_status != IDLE, saliendo.\n");
@@ -117,10 +116,10 @@ int mdns_discovery_main(SceSize args, void* argp)
     found_device         = 0;
 
     udp_sniffer_vita_deinit(); // Cierra socket y limpia estado
-    udp_sniffer_vita_init(); // Limpia estado (opcional, por simetría)
+    udp_sniffer_vita_init();
     udp_sniffer_vita_set_callback(moonlight_found_callback);
 
-    // Esperar y procesar durante 10 segundos máximo
+    // Stop processing after a 10-second timeout.
     int ticks     = 0;
     int max_ticks = 100; // 100 * 100ms = 10s
     while (search_thread_status == SEARCH_THREAD_RUNNING && ticks < max_ticks)
@@ -131,7 +130,7 @@ int mdns_discovery_main(SceSize args, void* argp)
     }
 
     search_thread_status = SEARCH_THREAD_IDLE;
-    vita_debug_log("[mDNS] Búsqueda finalizada. found_device=%d\n", found_device);
+    vita_debug_log("[mDNS] Search finished. found_device=%d\n", found_device);
     return 0;
 }
 
@@ -145,7 +144,7 @@ void stop_search_thread_if_running()
     {
         vita_debug_log("[mDNS] Llamando a end_search_thread(%d)\n", search_thread_id);
         end_search_thread(search_thread_id);
-        vita_debug_log("[mDNS] end_search_thread terminado\n");
+        vita_debug_log("[mDNS] end_search_thread finished\n");
         search_thread_id = -1;
     }
 }
@@ -159,23 +158,23 @@ static void clear_devices()
 
 SceUID start_search_thread()
 {
-    vita_debug_log("[mDNS] start_search_thread: limpiando y creando hilo\n");
+    vita_debug_log("[mDNS] start_search_thread: resetting and creating thread\n");
     clear_devices();
     SceUID thid = sceKernelCreateThread("mdns", mdns_discovery_main, 0x10000100, 0x10000, 0, 0, NULL);
     if (thid < 0)
     {
-        vita_debug_log("[mDNS] Error creando hilo de búsqueda\n");
+        vita_debug_log("[mDNS] Failed to create discovery thread\n");
         return -1;
     }
     sceKernelStartThread(thid, 0, 0);
     search_thread_id = thid;
-    vita_debug_log("[mDNS] Hilo de búsqueda iniciado: thid=%d\n", thid);
+    vita_debug_log("[mDNS] Discovery thread started: thid=%d\n", thid);
     return thid;
 }
 
 int end_search_thread(SceUID thid)
 {
-    vita_debug_log("[mDNS] end_search_thread: solicitando parada de hilo %d\n", thid);
+    vita_debug_log("[mDNS] end_search_thread: requesting thread stop %d\n", thid);
     search_thread_status = SEARCH_THREAD_REQ_STOP;
 
     SceUInt timeout;
@@ -185,7 +184,7 @@ int end_search_thread(SceUID thid)
     } while (sceKernelWaitThreadEnd(thid, NULL, &timeout) < 0);
 
     sceKernelDeleteThread(thid);
-    vita_debug_log("[mDNS] Hilo %d eliminado\n", thid);
+    vita_debug_log("[mDNS] Thread %d removed\n", thid);
     return 0;
 }
 
@@ -193,10 +192,10 @@ static int ui_search_device_callback(int id, void* context, const input_data* in
 {
     if ((input->buttons & SCE_CTRL_TRIANGLE) != 0)
     {
-        vita_debug_log("[mDNS] TRIÁNGULO presionado: refrescando búsqueda\n");
+        vita_debug_log("[mDNS] TRIANGLE pressed: restarting discovery\n");
         stop_search_thread_if_running();
         start_search_thread();
-        return 2; // Fuerza refresco del menú
+        return 2;
     }
     if ((input->buttons & config.btn_confirm) == 0 || (input->buttons & SCE_CTRL_HOLD) != 0)
     {
@@ -275,7 +274,6 @@ int ui_search_device_loop()
         idx++;                                                                        \
     } while (0)
 
-    // Mostrar mensaje de refresco con triángulo
     MENU_MESSAGE("Press TRIANGLE to refresh the search");
 
     MENU_CATEGORY("Search device ...");
@@ -290,7 +288,6 @@ int ui_search_device_loop()
         {
             continue;
         }
-        // Mostrar MAC en el sufijo si está disponible
         char suffix[64] = { 0 };
         if (devices[i].mac[0])
         {
@@ -310,11 +307,11 @@ int ui_search_device_loop()
 
 void ui_search_device()
 {
-    stop_search_thread_if_running(); // Siempre detener cualquier búsqueda previa
-    start_search_thread(); // Siempre iniciar búsqueda al entrar
+    stop_search_thread_if_running();
+    start_search_thread(); // Start discovery on entry
 
     while (ui_search_device_loop() == 2)
         ;
 
-    stop_search_thread_if_running(); // Detener búsqueda al salir
+    stop_search_thread_if_running();
 }

@@ -193,7 +193,7 @@ MoonmicBridge::HandshakeResult MoonmicBridge::sendResolutionHandshake(const std:
     }
 
     // Bind to ephemeral port (port 0) to ensure socket can receive replies
-    // This is CRITICAL on PS Vita - without bind, recvfrom may not work
+    // Vita requires an explicit UDP bind before recvfrom can receive responses.
     struct sockaddr_in bind_addr = {};
     bind_addr.sin_family         = AF_INET;
     bind_addr.sin_port           = htons(0); // 0 = OS assigns ephemeral port
@@ -227,7 +227,7 @@ MoonmicBridge::HandshakeResult MoonmicBridge::sendResolutionHandshake(const std:
     // Wait for ACK
     // Loop to handle potential PING packets arriving before the ACK
     // Host starts ConnectionMonitor immediately which sends a PING (12 bytes)
-    // We need to discard PINGs and wait for the real ACK (~93+ bytes)
+    // Ignore ping replies; the expected ACK contains the session payload.
 
     auto start_time = std::chrono::steady_clock::now();
 

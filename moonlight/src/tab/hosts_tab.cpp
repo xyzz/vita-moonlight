@@ -47,7 +47,7 @@ HostsTab::HostsTab()
     this->inflateFromXMLRes("xml/tabs/hosts_tab.xml");
     VITALOG("[HostsTab::HostsTab] Antes de refreshHostsList\n");
     this->refreshHostsList();
-    VITALOG("[HostsTab::HostsTab] Después de refreshHostsList\n");
+    VITALOG("[HostsTab::HostsTab] After refreshHostsList\n");
 }
 
 brls::View* HostsTab::create()
@@ -89,7 +89,7 @@ void HostsTab::refreshHostsList()
         {
             row = new brls::Box(brls::Axis::ROW);
             this->hostsList->addView(row);
-            VITALOG("[HostsTab::refreshHostsList] Nueva fila creada\n");
+            VITALOG("[HostsTab::refreshHostsList] Row created\n");
         }
         auto* card = new PCCard(host.name, "img/moonlight/pc.png");
         card->setClickAction([this, host, card]()
@@ -105,7 +105,7 @@ void HostsTab::refreshHostsList()
         }
         row->addView(card);
 #ifdef __PSV__
-        VITALOG("[HostsTab::refreshHostsList] Card añadida para host: %s\n", host.name.c_str());
+        VITALOG("[HostsTab::refreshHostsList] Card added for host: %s\n", host.name.c_str());
 #endif
         count++;
     }

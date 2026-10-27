@@ -135,7 +135,6 @@ void returnToMainMenuAsync(int retries = 8)
         }
 
         // 3) Fallback: neither overlay nor session main found on top.
-        //    Just dismiss SessionAppSelect if present and refresh.
         if (dismissSessionAppSelectIfPresent()) {
             vita_log::warning("[VitaPauseOverlay] Dismissed SessionAppSelect via fallback");
             return;

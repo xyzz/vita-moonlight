@@ -78,14 +78,14 @@ bool GameStreamClient::connect(const HostInfo& host)
     std::lock_guard<std::recursive_mutex> lock(m_mutex);
     if (host.ip.empty())
     {
-        vita_log::error("[GameStreamClient] Dirección vacía en connect(host)");
+        vita_log::error("[GameStreamClient] Empty address in connect(host)");
         return false;
     }
     std::string addr     = host.ip;
     std::string endpoint = formatHostEndpoint(host.ip, host.port);
     if (m_server_data.count(addr) > 0)
     {
-        vita_log::info("[GameStreamClient] Ya conectado a %s", addr.c_str());
+        vita_log::info("[GameStreamClient] Already connected to %s", addr.c_str());
         return true;
     }
     SERVER_DATA serverData {};
@@ -97,16 +97,16 @@ bool GameStreamClient::connect(const HostInfo& host)
     std::string keyDir      = findDeviceKeyDirectory(candidates);
     if (keyDir.empty())
         keyDir = candidates.front();
-    vita_log::info("[GameStreamClient] keyDir elegido para '%s' => '%s' (safeId base='%s')", addr.c_str(), keyDir.c_str(), safe.c_str());
+    vita_log::info("[GameStreamClient] Selected keyDir for '%s' => '%s' (safeId base='%s')", addr.c_str(), keyDir.c_str(), safe.c_str());
     int status = gs_init(&serverData, endpoint, keyDir);
     if (status != GS_OK)
     {
-        vita_log::error("[GameStreamClient] Error al inicializar servidor: %d", status);
+        vita_log::error("[GameStreamClient] Failed to initialize server: %d", status);
         return false;
     }
     m_key_dirs[addr]    = keyDir;
     m_server_data[addr] = serverData;
-    vita_log::info("[GameStreamClient] Conexión exitosa a %s", addr.c_str());
+    vita_log::info("[GameStreamClient] Connected to %s", addr.c_str());
     const char* srv_addr = serverData.serverInfo.address ? serverData.serverInfo.address : "NULL";
     vita_log::info("[GameStreamClient] ServerInfo address: %s", srv_addr);
 
@@ -121,7 +121,7 @@ bool GameStreamClient::connect(const HostInfo& host)
         }
         catch (...)
         {
-            vita_log::warning("[GameStreamClient] No se pudo crear device.ini para %s", addr.c_str());
+            vita_log::warning("[GameStreamClient] Could not create device.ini for %s", addr.c_str());
         }
     }
     return true;
@@ -164,17 +164,17 @@ bool GameStreamClient::startApp(const std::string& address, STREAM_CONFIGURATION
     std::lock_guard<std::recursive_mutex> lock(m_mutex);
     if (m_server_data.count(address) == 0)
     {
-        vita_log::error("[GameStreamClient] No conectado a %s", address.c_str());
+        vita_log::error("[GameStreamClient] Not connected to %s", address.c_str());
         return false;
     }
-    vita_log::info("[GameStreamClient] Iniciando aplicación %d en %s (mode=%d) display=%dx%d", appId, address.c_str(), (int)mode, displayWidth, displayHeight);
+    vita_log::info("[GameStreamClient] Starting application %d en %s (mode=%d) display=%dx%d", appId, address.c_str(), (int)mode, displayWidth, displayHeight);
 
     if (mode == StartMode::RESUME_ONLY)
     {
         SERVER_DATA& sd = m_server_data[address];
         if (sd.currentGame == 0)
         {
-            vita_log::warning("[GameStreamClient] Resume solicitado pero server.currentGame==0 para %s", address.c_str());
+            vita_log::warning("[GameStreamClient] Resume requested but server.currentGame==0 for %s", address.c_str());
             return false;
         }
     }
@@ -183,7 +183,7 @@ bool GameStreamClient::startApp(const std::string& address, STREAM_CONFIGURATION
     bool markedResume = false;
     if (mode == StartMode::RESUME_ONLY)
     {
-        vita_log::info("[GameStreamClient] Marcando resume en progreso para %s", address.c_str());
+        vita_log::info("[GameStreamClient] Marking resume in progress for %s", address.c_str());
         m_resume_in_progress.insert(address);
         markedResume               = true;
         m_resume_attempts[address] = std::chrono::steady_clock::now();
@@ -234,11 +234,11 @@ bool GameStreamClient::startApp(const std::string& address, STREAM_CONFIGURATION
     {
         if (markedResume)
         {
-            vita_log::info("[GameStreamClient] Resume falló para %s -> limpiando resume en progreso (status=%d)", address.c_str(), status);
+            vita_log::info("[GameStreamClient] Resume failed for %s -> clearing in-progress resume state (status=%d)", address.c_str(), status);
             m_resume_in_progress.erase(address);
             m_resume_attempts.erase(address);
         }
-        vita_log::error("[GameStreamClient] Error al iniciar aplicación: %d", status);
+        vita_log::error("[GameStreamClient] Failed to start application: %d", status);
         return false;
     }
 
@@ -286,7 +286,7 @@ bool GameStreamClient::resumeApp(const std::string& address, STREAM_CONFIGURATIO
     auto server = m_server_data.find(address);
     if (server == m_server_data.end() || server->second.currentGame == 0)
     {
-        vita_log::warning("[GameStreamClient] No hay sesión activa para reanudar en %s", address.c_str());
+        vita_log::warning("[GameStreamClient] No active session to resume on %s", address.c_str());
         return false;
     }
 
@@ -297,12 +297,12 @@ bool GameStreamClient::resumeApp(const std::string& address, STREAM_CONFIGURATIO
                     settings.localaudio, 0x1, 0, 0);
     if (status != GS_OK)
     {
-        vita_log::error("[GameStreamClient] Reanudación de sesión falló: %d", status);
+        vita_log::error("[GameStreamClient] Session resume failed: %d", status);
         return false;
     }
 
     m_last_stream_cfg[address] = config;
-    vita_log::info("[GameStreamClient] Sesión reanudada y parámetros RTSP renovados");
+    vita_log::info("[GameStreamClient] Session resumed and RTSP parameters refreshed");
     return true;
 }
 
@@ -325,7 +325,7 @@ bool GameStreamClient::unpair(const std::string& address)
     int status     = gs_unpair(&s);
     if (status != GS_OK)
     {
-        vita_log::error("[GameStreamClient] unpair fallo status=%d", status);
+        vita_log::error("[GameStreamClient] unpair failed status=%d", status);
         return false;
     }
     s.paired = false;
@@ -341,7 +341,7 @@ bool GameStreamClient::beginPairing(const HostInfo& host, std::function<void(boo
     std::string endpoint = formatHostEndpoint(localHost.ip, localHost.port);
     if (addr.empty())
     {
-        vita_log::error("[GameStreamClient] beginPairing: host ip vacío");
+        vita_log::error("[GameStreamClient] beginPairing: empty host IP");
         if (onFinished)
             onFinished(false);
         return false;
@@ -372,7 +372,7 @@ bool GameStreamClient::beginPairing(const HostInfo& host, std::function<void(boo
             }
             catch (...)
             {
-                vita_log::error("[Pairing][fast-path] Excepción al usar keyDir='%s'", keyDir.c_str());
+                vita_log::error("[Pairing][fast-path] Exception while using keyDir='%s'", keyDir.c_str());
             }
         }
     }
@@ -412,7 +412,7 @@ bool GameStreamClient::beginPairing(const HostInfo& host, std::function<void(boo
             std::string keyDir = base + "/" + localHost.safeId;
             if (!cfg.ensureKeyDirExists(localHost.safeId))
             {
-                vita_log::error("[Pairing] No se pudo crear/asegurar keyDir '%s'", keyDir.c_str());
+                vita_log::error("[Pairing] Could not create/validate keyDir '%s'", keyDir.c_str());
                 brls::sync([label]()
                     { label->setText(brls::getStr("host_dialog/pairing_error_init")); });
                 std::this_thread::sleep_for(std::chrono::milliseconds(900));
@@ -435,13 +435,13 @@ bool GameStreamClient::beginPairing(const HostInfo& host, std::function<void(boo
             }
             catch (...)
             {
-                vita_log::warning("[Pairing] No se pudo limpiar cache de certificados para keyDir='%s'", keyDir.c_str());
+                vita_log::warning("[Pairing] Could not clear certificate cache for keyDir='%s'", keyDir.c_str());
             }
 
             int initResult = gs_init(&serverData, endpoint, keyDir);
             if (initResult != GS_OK)
             {
-                vita_log::error("[Pairing] gs_init fallo %d", initResult);
+                vita_log::error("[Pairing] gs_init failed %d", initResult);
                 brls::sync([label]()
                     { label->setText(brls::getStr("host_dialog/pairing_error_init")); });
                 std::this_thread::sleep_for(std::chrono::milliseconds(900));
@@ -454,7 +454,7 @@ bool GameStreamClient::beginPairing(const HostInfo& host, std::function<void(boo
             if (serverData.currentGame != 0)
             {
                 forced = true;
-                vita_log::warning("[Pairing] host ocupado (currentGame=%d) -> forzando emparejado (puede fallar)", serverData.currentGame);
+                vita_log::warning("[Pairing] host busy (currentGame=%d) -> forcing paired state (may fail)", serverData.currentGame);
                 brls::sync([label]()
                     { label->setText(brls::getStr("host_dialog/pairing_force_warning")); });
                 serverData.currentGame = 0;
@@ -489,7 +489,7 @@ bool GameStreamClient::beginPairing(const HostInfo& host, std::function<void(boo
                 serverData.paired = true;
                 if (!HostStorage::savePairedHost(localHost.safeId, addr, serverData.httpPort,
                         serverData.paired, serverData.mac, localHost.microphone_port))
-                    vita_log::warning("[Pairing] No se pudo guardar device.ini para %s", addr.c_str());
+                    vita_log::warning("[Pairing] Could not save device.ini for %s", addr.c_str());
 
                 {
                     std::lock_guard<std::recursive_mutex> lock(m_mutex);
@@ -505,7 +505,7 @@ bool GameStreamClient::beginPairing(const HostInfo& host, std::function<void(boo
 
             std::string gse_str = gs_error();
             const char* gse      = gse_str.empty() ? "(empty)" : gse_str.c_str();
-            vita_log::error("[Pairing] gs_pair fallo %d -> gs_error='%s'", pairResult, gse);
+            vita_log::error("[Pairing] gs_pair failed %d -> gs_error='%s'", pairResult, gse);
             brls::sync([label]()
                 { label->setText(brls::getStr("host_dialog/pairing_error")); });
             std::this_thread::sleep_for(std::chrono::milliseconds(1200));
@@ -519,7 +519,7 @@ void GameStreamClient::getAppList(const std::string& address, AppListCallback ca
     std::lock_guard<std::recursive_mutex> lock(m_mutex);
     if (m_server_data.count(address) == 0)
     {
-        vita_log::error("[GameStreamClient] No conectado a %s", address.c_str());
+        vita_log::error("[GameStreamClient] Not connected to %s", address.c_str());
         callback(std::vector<RemoteAppInfo>());
         return;
     }
@@ -534,7 +534,7 @@ void GameStreamClient::getAppList(const std::string& address, AppListCallback ca
     int status = gs_applist(&m_server_data[address], &appList);
     if (status != GS_OK)
     {
-        vita_log::error("[GameStreamClient] Error al obtener lista de aplicaciones: %d", status);
+        vita_log::error("[GameStreamClient] Failed to fetch application list: %d", status);
         callback(std::vector<RemoteAppInfo>());
         return;
     }
@@ -581,13 +581,13 @@ bool GameStreamClient::getAppBoxart(const std::string& address, int appId, Data&
     std::lock_guard<std::recursive_mutex> lock(m_mutex);
     if (m_server_data.count(address) == 0)
     {
-        vita_log::error("[GameStreamClient] getAppBoxart: no conectado a %s", address.c_str());
+        vita_log::error("[GameStreamClient] getAppBoxart: not connected to %s", address.c_str());
         return false;
     }
     int status = gs_app_boxart(&m_server_data[address], appId, &outData);
     if (status != GS_OK)
     {
-        vita_log::warning("[GameStreamClient] gs_app_boxart falló para appId=%d con status=%d", appId, status);
+        vita_log::warning("[GameStreamClient] gs_app_boxart failed for appId=%d con status=%d", appId, status);
         return false;
     }
     return true;
@@ -598,7 +598,7 @@ bool GameStreamClient::quitApp(const std::string& address)
     std::lock_guard<std::recursive_mutex> lock(m_mutex);
     if (m_server_data.count(address) == 0)
     {
-        vita_log::error("[GameStreamClient] No conectado a %s", address.c_str());
+        vita_log::error("[GameStreamClient] Not connected to %s", address.c_str());
         return false;
     }
 
@@ -607,7 +607,7 @@ bool GameStreamClient::quitApp(const std::string& address)
     int status = gs_quit_app(&m_server_data[address]);
     if (status != GS_OK)
     {
-        vita_log::error("[GameStreamClient] Error al terminar aplicación: %d", status);
+        vita_log::error("[GameStreamClient] Failed to stop application: %d", status);
         return false;
     }
 
@@ -631,7 +631,7 @@ void GameStreamClient::setActiveStream(const std::string& address, int appId, co
     m_active_streams[address] = { appId, appName };
     if (m_resume_in_progress.erase(address) > 0)
     {
-        vita_log::info("[GameStreamClient] setActiveStream: limpiando resume en progreso para %s", address.c_str());
+        vita_log::info("[GameStreamClient] setActiveStream: clearing in-progress resume state for %s", address.c_str());
     }
     m_resume_attempts.erase(address);
 }
@@ -717,7 +717,7 @@ bool GameStreamClient::probeActiveSession(const HostInfo& host, RemoteAppInfo& o
                 hasUid = true;
             if (!hasClient || !hasKey || !hasUid)
             {
-                vita_log::info("[GameStreamClient] probeActiveSession: keyDir='%s' falta client/key/uniqueid -> no reanudar", kd.c_str());
+                vita_log::info("[GameStreamClient] probeActiveSession: keyDir='%s' missing client/key/uniqueid; cannot resume", kd.c_str());
                 return false;
             }
         }
@@ -725,7 +725,7 @@ bool GameStreamClient::probeActiveSession(const HostInfo& host, RemoteAppInfo& o
     // Do not reopen the active-session dialog while the UI is resuming it.
     if (m_resume_in_progress.count(address) > 0)
     {
-        vita_log::info("[GameStreamClient] probeActiveSession: omitiendo notificación de sesión activa para %s porque resume está en progreso (resume_in_progress_count=%d)",
+        vita_log::info("[GameStreamClient] probeActiveSession: skipping active-session notification for %s because resume is in progress (resume_in_progress_count=%d)",
             address.c_str(), (int)m_resume_in_progress.count(address));
         return false;
     }
@@ -738,12 +738,12 @@ bool GameStreamClient::probeActiveSession(const HostInfo& host, RemoteAppInfo& o
         const long long kExpireMs = 10000;
         if (ageMs >= 0 && ageMs < kExpireMs)
         {
-            vita_log::info("[GameStreamClient] probeActiveSession: omitiendo notificación para %s porque resumeAttempt reciente (ageMs=%lld)", address.c_str(), ageMs);
+            vita_log::info("[GameStreamClient] probeActiveSession: skipping notification for %s because resumeAttempt is recent (ageMs=%lld)", address.c_str(), ageMs);
             return false;
         }
         else
         {
-            vita_log::info("[GameStreamClient] probeActiveSession: resumeAttempt para %s expiró (ageMs=%lld) -> continuar comprobación", address.c_str(), ageMs);
+            vita_log::info("[GameStreamClient] probeActiveSession: resumeAttempt for %s expired (ageMs=%lld) -> continuing check", address.c_str(), ageMs);
             m_resume_attempts.erase(itAttempt);
         }
     }

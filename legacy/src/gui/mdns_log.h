@@ -9,7 +9,6 @@
 #define MDNS_LOG(...) printf(__VA_ARGS__)
 #endif
 
-// Usar el macro MDNS_LOG en vez de mdns_log
 #define mdns_log MDNS_LOG
 
 #endif // MDNS_LOG_H

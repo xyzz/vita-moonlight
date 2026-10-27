@@ -335,8 +335,6 @@ void VitaVideoRenderer::onFramePresented(const void* textureData, uint32_t gener
         s_presentWindowRepeats++;
     }
 
-    // Only process ffmpeg deferred releases when in ffmpeg mode.
-    // In legacy mode, the deferred list is always empty but we'd still
     // pay for a mutex lock+unlock on every single frame for nothing.
     if (video_runtime::renderMode() == 1)
     {

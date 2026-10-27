@@ -194,7 +194,6 @@ std::string ConfigManager::getKeysDir() const
 {
     if (keysDirLoaded)
         return cachedKeysDir;
-    // 1. Try to read from the config
     std::string dir = get("general", "keys_dir", "");
     if (!dir.empty())
     {
@@ -202,7 +201,6 @@ std::string ConfigManager::getKeysDir() const
         keysDirLoaded = true;
         return cachedKeysDir;
     }
-    // 2. If not in config, use cross-platform default value
 #if defined(__PSV__) || defined(__psp2__) || defined(__PSP2__)
     cachedKeysDir = "ux0:data/moonlight/devices";
 #elif defined(_WIN32)
@@ -229,14 +227,14 @@ bool ConfigManager::load()
     keysDirLoaded    = false;
     std::string path = getConfigPath();
 #if defined(__PSV__) || defined(__psp2__) || defined(__PSP2__)
-    vita_log::info("[ConfigManager] Cargando configuración desde: %s", path.c_str());
+    vita_log::info("[ConfigManager] Loading configuration from: %s", path.c_str());
 #else
-    std::cout << "[ConfigManager] Cargando configuración desde: " << path << std::endl;
+    std::cout << "[ConfigManager] Loading configuration from: " << path << std::endl;
 #endif
     int result = ini_parse(path.c_str(), iniHandler, this);
     if (result != 0)
     {
-        std::cout << "[ConfigManager] Error al cargar el archivo o no existe." << std::endl;
+        std::cout << "[ConfigManager] Configuration file missing or could not be loaded." << std::endl;
         return false;
     }
     return true;
@@ -250,7 +248,7 @@ bool ConfigManager::save() const
     std::ofstream file(tempPath, std::ios::trunc);
     if (!file.is_open())
     {
-        std::cout << "[ConfigManager] No se pudo abrir el archivo para guardar." << std::endl;
+        std::cout << "[ConfigManager] Could not open file for writing." << std::endl;
         return false;
     }
     for (const auto& sec : data)

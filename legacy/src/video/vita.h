@@ -18,9 +18,9 @@
  */
 #include <math.h>
 
-// Vita's sceVideodecInitLibrary only accept resolution that is multiple of 16 on either dimension,
-// and the smallest resolution is 64
-// Full supported resolution list can be found at:
+// Vita's decoder requires dimensions divisible by 16 and at least 64 pixels.
+
+// Supported resolutions are documented at:
 // https://github.com/MakiseKurisu/vita-sceVideodecInitLibrary-test/
 #define ROUND_NEAREST_16(x) (round(((double)(x)) / 16) * 16)
 #define VITA_DECODER_RESOLUTION_LOWER_BOUND(x) ((x) < 64 ? 64 : (x))

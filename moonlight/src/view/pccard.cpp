@@ -48,7 +48,6 @@ PCCard::PCCard(const std::string& name, const std::string& imagePath)
     box->setAlignItems(brls::AlignItems::CENTER);
     box->setFocusable(false);
 
-    // Make the card focusable so navigation selects the card (restore selection UX)
     this->setFocusable(true);
 
     image           = new brls::Image();
@@ -112,7 +111,6 @@ void PCCard::setPCName(const std::string& name)
         label->setText(name);
         if (name.empty())
         {
-            // If there is no name, we hide the image to avoid leaving a card with only a photo
             if (image)
             {
                 image->setVisibility(brls::Visibility::GONE);

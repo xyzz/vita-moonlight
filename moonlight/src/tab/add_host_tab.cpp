@@ -233,7 +233,7 @@ extern "C" void AddHostTab::winHostFoundCb(int idx, const char* host, const char
 {
     if (!AddHostTab::activeInstance.load(std::memory_order_acquire))
         return;
-    vita_log::info("[AddHostTab] Host detectado (WIN): %s - %s:%d (host=%s)",
+    vita_log::info("[AddHostTab] Host discovered (Windows): %s - %s:%d (host=%s)",
         pcname ? pcname : "", ip ? ip : "", port, host ? host : "");
     queueDiscoveredHost(pcname, ip);
 }
@@ -244,11 +244,11 @@ void AddHostTab::startDeviceDiscovery()
     brls::View* spinnerRow = this->getView("spinner_row");
     if (!this->hostsList)
     {
-        vita_log::error("[AddHostTab] hostsList es nulo. No se puede limpiar la lista de hosts.");
+        vita_log::error("[AddHostTab] hostsList is null; cannot clear host list.");
     }
     else if (!spinnerRow)
     {
-        vita_log::error("[AddHostTab] spinnerRow es nulo. No se puede mostrar el spinner.");
+        vita_log::error("[AddHostTab] spinnerRow is null; cannot show spinner.");
     }
     else
     {
@@ -267,7 +267,7 @@ void AddHostTab::startDeviceDiscovery()
         {
         if (!AddHostTab::activeInstance.load(std::memory_order_acquire))
             return;
-        vita_log::info("[AddHostTab] Host detectado (VITA): %s - %s:%d (host=%s)", pcname ? pcname : "(null)", ip ? ip : "(null)", port, host ? host : "(null)");
+        vita_log::info("[AddHostTab] Host discovered (Vita): %s - %s:%d (host=%s)", pcname ? pcname : "(null)", ip ? ip : "(null)", port, host ? host : "(null)");
         queueDiscoveredHost(pcname, ip); });
 #elif defined(_WIN32)
     check_host::startWinDiscovery(winHostFoundCb);
@@ -303,7 +303,7 @@ void AddHostTab::rebuildDiscoveredHostsUI()
 {
     if (!this->hostsList)
     {
-        vita_log::error("[AddHostTab] hostsList es nulo durante rebuild");
+        vita_log::error("[AddHostTab] hostsList is null during rebuild");
         return;
     }
 

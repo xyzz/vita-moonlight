@@ -46,7 +46,7 @@ extern "C" int vitavideo_setup(int videoFormat, int width, int height, int redra
     (void)videoFormat;
     (void)redrawRate;
     (void)context;
-    (void)drFlags; // currently not used on this simplified route
+    (void)drFlags;
     int ret = 0;
     if (redrawRate > 0)
     {
@@ -63,7 +63,7 @@ extern "C" int vitavideo_setup(int videoFormat, int width, int height, int redra
         decoder_buffer      = (char*)malloc(decoder_buffer_size);
         if (!decoder_buffer)
         {
-            VITA_DEBUG_LOG("[Video] Error: No hay memoria para decoder_buffer");
+            VITA_DEBUG_LOG("[Video] Error: Insufficient memory for decoder_buffer");
             ret = 0x80010001;
             goto cleanup;
         }
@@ -73,7 +73,7 @@ extern "C" int vitavideo_setup(int videoFormat, int width, int height, int redra
         decoder_output_mode = video_runtime::pixelFormatMode();
         if (decoder_output_mode != 0 && decoder_output_mode != 1)
         {
-            VITA_DEBUG_LOG("[Video][INIT] pixel_format_mode desconocido=%d -> forzando RGBA", decoder_output_mode);
+            VITA_DEBUG_LOG("[Video][INIT] Unknown pixel_format_mode=%d -> falling back to RGBA", decoder_output_mode);
             decoder_output_mode = 0;
         }
 
@@ -127,7 +127,7 @@ extern "C" int vitavideo_setup(int videoFormat, int width, int height, int redra
 
         if (width > 1280 || height > 720)
         {
-            VITA_DEBUG_LOG("[Video] Detectada resolución > 720p, usando API Internal");
+            VITA_DEBUG_LOG("[Video] Resolution above 720p detected; using internal API");
             ret = vitavideo_init_1080p_internal_api(width, height, init);
             if (ret < 0)
             {
@@ -312,7 +312,7 @@ extern "C" int vitavideo_setup(int videoFormat, int width, int height, int redra
                     SCE_KERNEL_MEMBLOCK_TYPE_USER_CDRAM_RW);
                 if (!frame_textures[i])
                 {
-                    VITA_DEBUG_LOG("[Video][ERR] No se pudo crear textura %d (%dx%d)", i, width, height);
+                    VITA_DEBUG_LOG("[Video][ERR] Could not create texture %d (%dx%d)", i, width, height);
                     ret = 0x80010005;
                     goto cleanup;
                 }
@@ -340,7 +340,7 @@ extern "C" int vitavideo_setup(int videoFormat, int width, int height, int redra
     VITA_DEBUG_LOG("[Video] vitavideo_setup completado exitosamente, retornando 0");
     if (video_status_canary_pre != 0xDEADBEEF || video_status_canary_post != 0xBAADF00D)
     {
-        VITA_DEBUG_LOG("[Video][CORRUPT] Canarios video_status alterados despues de setup pre=0x%08X post=0x%08X", video_status_canary_pre, video_status_canary_post);
+        VITA_DEBUG_LOG("[Video][CORRUPT] video_status canaries corrupted after setup pre=0x%08X post=0x%08X", video_status_canary_pre, video_status_canary_post);
     }
     return 0;
 cleanup:

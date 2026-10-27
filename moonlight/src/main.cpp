@@ -80,11 +80,11 @@ void finishResumeReconnect(const std::shared_ptr<ResumeReconnectState>& state, b
 
     if (reconnected)
     {
-        vita_log::info("[Main] Stream reconectado tras reanudar la aplicación");
+        vita_log::info("[Main] Stream reconnected after app resume");
     }
     else
     {
-        vita_log::error("[Main] No se pudo reconectar el stream tras reanudar la aplicación");
+        vita_log::error("[Main] Could not reconnect stream after app resume");
         brls::Application::notify(brls::getStr("moonlight/session/app_select/reconnect_failed"));
     }
 }
@@ -112,7 +112,7 @@ void reconnectStreamAfterResume(const std::shared_ptr<ResumeReconnectState>& sta
             finishResumeReconnect(state, true);
         } else if (state->retriesRemaining > 0) {
             state->retriesRemaining--;
-            vita_log::warning("[Main] Reconnect tras resume falló; reintentando en 1 segundo");
+            vita_log::warning("[Main] Reconnect after resume failed; retrying in one second");
             brls::delay(1000, [state]() {
                 std::thread([state]() {
                     reconnectStreamAfterResume(state);
@@ -217,18 +217,18 @@ int main(int argc, char* argv[])
                 {
                     dst << src.rdbuf();
 #if defined(__PSV__)
-                    brls::Logger::info("[main] Copiado CSS teclado por defecto a {}", destCss);
+                    brls::Logger::info("[main] Default keyboard CSS copied to {}", destCss);
 #else
-                    std::cout << "[main] Copiado CSS teclado por defecto a " << destCss << std::endl;
+                    std::cout << "[main] Default keyboard CSS copied to " << destCss << std::endl;
 #endif
                 }
             }
             else
             {
 #if defined(__PSV__)
-                brls::Logger::info("[main] No se encontró resources/keyboard/style.css para copiar");
+                brls::Logger::info("[main] resources/keyboard/style.css not found; cannot copy default CSS");
 #else
-                std::cout << "[main] No se encontró resources/keyboard/style.css para copiar" << std::endl;
+                std::cout << "[main] resources/keyboard/style.css not found; cannot copy default CSS" << std::endl;
 #endif
             }
         }
@@ -236,9 +236,9 @@ int main(int argc, char* argv[])
 
     std::string lang = moonlight::settings::getLanguageFromConfig();
 #if defined(__PSV__)
-    brls::Logger::info("[DEBUG] Idioma forzado desde config: {}", lang);
+    brls::Logger::info("[DEBUG] Locale selected from config: {}", lang);
 #else
-    std::cout << "[DEBUG] Idioma forzado desde config: " << lang << std::endl;
+    std::cout << "[DEBUG] Locale selected from config: " << lang << std::endl;
 #endif
     if (!lang.empty())
     {
@@ -250,12 +250,12 @@ int main(int argc, char* argv[])
     {
         if (std::strcmp(argv[i], "-d") == 0)
         {
-            vita_debug_log("[main] -d recibido: usando salida via vita_debug_log");
+            vita_debug_log("[main] -d received: using vita_debug_log output");
         }
         else if (std::strcmp(argv[i], "-o") == 0)
         {
             const char* path = (i + 1 < argc) ? argv[++i] : "borealis.log";
-            vita_debug_log("[main] -o ignorado (ruta solicitada: %s), salida controlada por save_debug_log", path);
+            vita_debug_log("[main] -o ignored (requested path: %s); output controlled by save_debug_log", path);
         }
         else if (std::strcmp(argv[i], "-v") == 0)
         {
@@ -279,16 +279,16 @@ int main(int argc, char* argv[])
     {
         brls::loadTranslations();
 #if defined(__PSV__)
-        brls::Logger::info("[DEBUG] Traducciones cargadas para idioma: {}", lang);
+        brls::Logger::info("[DEBUG] Translations loaded for locale: {}", lang);
 #else
-        std::cout << "[DEBUG] Traducciones cargadas para idioma: " << lang << std::endl;
+        std::cout << "[DEBUG] Translations loaded for locale: " << lang << std::endl;
 #endif
     }
 
 #if defined(__PSV__)
-    brls::Logger::info("[DEBUG] Locale detectado por Borealis: {}", brls::Application::getLocale());
+    brls::Logger::info("[DEBUG] Locale detected by Borealis: {}", brls::Application::getLocale());
 #else
-    std::cout << "[DEBUG] Locale detectado por Borealis: " << brls::Application::getLocale() << std::endl;
+    std::cout << "[DEBUG] Locale detected by Borealis: " << brls::Application::getLocale() << std::endl;
 #endif
 
     {

@@ -141,7 +141,7 @@ extern "C" int vitavideo_submit_decode_unit(PDECODE_UNIT decodeUnit)
 
     if (!decodeTarget)
     {
-        VITA_DEBUG_LOG("[Video][ERR] No hay destino válido para decodificar (modo=%d)", decoder_output_mode);
+        VITA_DEBUG_LOG("[Video][ERR] No valid decode target (modo=%d)", decoder_output_mode);
         return DR_NEED_IDR;
     }
 

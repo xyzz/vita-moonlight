@@ -384,7 +384,6 @@ void ControllerInputManager::handleInput()
             activeKeyboardSeenOpen = true;
         }
 
-        // Auto-cleanup only after the keyboard has reached open state at least once.
         // This avoids destroying legacy keyboard while its IME thread is still starting.
         if (activeKeyboardSeenOpen && !activeKeyboard->isOpen())
         {
@@ -725,11 +724,11 @@ void ControllerInputManager::setGamepadType(GamepadType type)
     vita_log::info("[ControllerInput] Cambiando tipo de gamepad a %d (%s)",
         (int)type, (type == GAMEPAD_TYPE_PS4) ? "PS4" : "XBOX");
 
-    // Sunshine applies a new controller type only after a disconnect.
-    vita_log::info("[ControllerInput] Desconectando controlador para cambio de tipo...");
+    // Sunshine applies controller-type changes after the next connection.
+    vita_log::info("[ControllerInput] Disconnecting controller to change type...");
     if (LiSendMultiControllerEvent(0, 0, 0, 0, 0, 0, 0, 0, 0) != 0)
     {
-        vita_log::error("[ControllerInput][ERR] Fallo al desconectar controlador");
+        vita_log::error("[ControllerInput][ERR] Failed to disconnect controller");
     }
 
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
@@ -745,7 +744,7 @@ void ControllerInputManager::setGamepadType(GamepadType type)
     vita_log::info("[ControllerInput] Reconectando controlador con nuevo tipo (LI_CTYPE=%d)...", liType);
     if (LiSendControllerArrivalEvent(0, 0x01, liType, supportedButtonFlags, capabilities) != 0)
     {
-        vita_log::error("[ControllerInput][ERR] LiSendControllerArrivalEvent fallo");
+        vita_log::error("[ControllerInput][ERR] LiSendControllerArrivalEvent failed");
     }
     else
     {
@@ -865,7 +864,7 @@ bool ControllerInputManager::setTouchscreenModeRuntime(int newMode)
     }
 
     touchscreenMode = newMode;
-    vita_log::info("[ControllerInput] Modo touch cambiado en tiempo de ejecución a %d", newMode);
+    vita_log::info("[ControllerInput] Touch mode changed at runtime to %d", newMode);
 
     ConfigManager config;
     config.updateVideoSettings([newMode](VideoSettings& settings)

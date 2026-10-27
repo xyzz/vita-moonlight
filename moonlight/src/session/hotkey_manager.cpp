@@ -18,7 +18,6 @@ void HotkeyManager::onButtonEvent(brls::ControllerButton button, bool pressed)
             btnStart = pressed;
             if (pressed)
                 lastStart = now;
-            // START alone does not activate anything, only for combos
             break;
         case brls::ControllerButton::BUTTON_LB:
             btnL = pressed;

@@ -64,7 +64,7 @@ void VitaSession::notifyGamepadType()
 
     if (LiSendControllerArrivalEvent(0, 0x01, liType, supportedButtonFlags, capabilities) != 0)
     {
-        vita_log::error("[VitaSession] Fallo notificar tipo de gamepad al servidor");
+        vita_log::error("[VitaSession] Failed to notify server of gamepad type");
     }
     else
     {
@@ -85,7 +85,7 @@ bool VitaSession::start()
     if (havePrev)
     {
         m_config = prev;
-        vita_log::info("[VitaSession] Reutilizando configuración previa");
+        vita_log::info("[VitaSession] Reusing previous configuration");
     }
     else
     {
@@ -109,7 +109,7 @@ bool VitaSession::start()
 
     if (!VideoManager::instance()->initialize())
     {
-        vita_log::error("[VitaSession] Fallo al inicializar VideoManager");
+        vita_log::error("[VitaSession] Failed to initialize VideoManager");
         m_start_attempted  = false;
         m_cleanup_complete = true;
         return false;
@@ -145,14 +145,14 @@ bool VitaSession::internalStart()
     SERVER_INFORMATION serverInfo {};
     if (!GameStreamClient::instance().serverInfo(m_address, serverInfo))
     {
-        vita_log::error("[VitaSession] No hay información para %s", m_address.c_str());
+        vita_log::error("[VitaSession] No stream information for %s", m_address.c_str());
         return false;
     }
     void* renderContext = VideoManager::instance()->getRenderContext();
     int res             = LiStartConnection(&serverInfo, &m_config, &m_conn_callbacks, &m_video_callbacks, &m_audio_callbacks, renderContext, 0, nullptr, 0);
     if (res != 0)
     {
-        vita_log::error("[VitaSession] LiStartConnection fallo=%d", res);
+        vita_log::error("[VitaSession] LiStartConnection failed=%d", res);
         LiStopConnection();
         return false;
     }
@@ -203,11 +203,11 @@ bool VitaSession::reconnectAfterResume()
 {
     if (!m_allow_resume_reconnect)
     {
-        vita_log::info("[VitaSession] Reconnect tras resume omitido: sesión no reanudable");
+        vita_log::info("[VitaSession] Skipping reconnect after resume: session cannot be resumed");
         return true;
     }
 
-    vita_log::info("[VitaSession] Reanudación de Vita detectada; renovando sesión y stream");
+    vita_log::info("[VitaSession] Vita resume detected; renewing session and stream");
     return restartConnection(true);
 }
 

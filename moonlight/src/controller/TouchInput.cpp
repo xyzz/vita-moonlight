@@ -33,7 +33,7 @@ TouchInputManager::TouchInputManager()
     VideoSettings settings      = config.getVideoSettings();
     trackpadPointerSpeed        = settings.trackpad_pointer_speed;
     trackpadDeadZone            = settings.trackpad_dead_zone;
-    trackpadTapToClick          = true; // Always on on PS Vita
+    trackpadTapToClick          = true;
     trackpadTwoFingerRightClick = settings.trackpad_two_finger_right_click;
     trackpadTwoFingerScroll     = settings.trackpad_two_finger_scroll;
     trackpadInvertScroll        = settings.trackpad_invert_scroll;
@@ -566,7 +566,7 @@ void TouchInputManager::setTrackpadSettings(int pointerSpeed, int deadZone, bool
         pointerSpeed = 200;
     trackpadPointerSpeed        = pointerSpeed;
     trackpadDeadZone            = deadZone;
-    trackpadTapToClick          = true; // Always on on PS Vita
+    trackpadTapToClick          = true;
     trackpadTwoFingerRightClick = twoFingerRightClick;
     trackpadTwoFingerScroll     = twoFingerScroll;
     trackpadInvertScroll        = invertScroll;
@@ -589,7 +589,7 @@ int TouchInputManager::getDeadZone() const
 
 bool TouchInputManager::isTapToClickEnabled() const
 {
-    return true; // Always on on PS Vita
+    return true;
 }
 
 bool TouchInputManager::isTwoFingerRightClickEnabled() const

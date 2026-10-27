@@ -163,7 +163,7 @@ void draw_menu(menu_entry menu[], int total_elements, menu_geom geom, int cursor
         long text_color = 0xffffffff;
         if (cursor == cursor_idx)
         {
-            text_color = 0xff00ff00; // Verde para seleccionado
+            text_color = 0xff00ff00;
         }
         if (!menu[i].disabled)
         {
@@ -174,7 +174,6 @@ void draw_menu(menu_entry menu[], int total_elements, menu_geom geom, int cursor
             text_color = 0xffaaaaaa;
         }
 
-        // Color del puntito de estado (solo para hosts, si menu[i].color != 0)
         unsigned int dot_color = menu[i].color ? menu[i].color : 0xffaaaaaa;
 
         int el_x = geom.x + 10,
@@ -198,18 +197,17 @@ void draw_menu(menu_entry menu[], int total_elements, menu_geom geom, int cursor
                 0xffaaaaaa);
         }
 
-        // Dibuja el puntito de estado solo para hosts emparejados (solo menú principal)
         if (menu[i].is_host_entry && menu[i].name && strlen(menu[i].name) > 0)
         {
             int dot_radius                 = 8;
-            int dot_x                      = el_x + dot_radius; // Asegura que el puntito no quede pegado al borde
+            int dot_x                      = el_x + dot_radius; // Keep the status dot away from the edge
             int dot_y                      = el_y + text_height / 2 + 2;
             unsigned int visible_dot_color = (dot_color & 0x00FFFFFF) | 0xFF000000;
             vita2d_draw_fill_circle(dot_x, dot_y, dot_radius + 2, 0xFF000000);
             vita2d_draw_fill_circle(dot_x, dot_y, dot_radius, visible_dot_color);
             vita2d_font_draw_text(
                 font,
-                dot_x + dot_radius + 6, // Más espacio a la derecha del puntito
+                dot_x + dot_radius + 6, // Space to the right of the status dot
                 el_y + text_height,
                 text_color,
                 18,

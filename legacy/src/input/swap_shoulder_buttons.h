@@ -1,5 +1,5 @@
-// Declaración global para swap_shoulder_buttons
-// Esto permite que otros archivos accedan a la variable
+// Shared shoulder-button swap flag.
+// Exposed to the input and settings modules.
 #ifndef SWAP_SHOULDER_BUTTONS_H
 #define SWAP_SHOULDER_BUTTONS_H
 

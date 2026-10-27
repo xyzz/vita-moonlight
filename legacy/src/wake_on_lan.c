@@ -1,7 +1,3 @@
-/*
- * Wake-on-LAN para Moonlight Vita
- * Permite enviar paquetes mágicos para encender PCs compatibles desde la Vita
- */
 
 #include "wake_on_lan.h"
 
@@ -17,16 +13,14 @@
 
 #include "device.h"
 
-// Envía un paquete Wake-on-LAN a la MAC y broadcast especificados
-// mac: dirección MAC en formato XX:XX:XX:XX:XX:XX
-// ip_broadcast: dirección de broadcast (ej: "192.168.0.255")
+// Send a Wake-on-LAN packet to the requested MAC and broadcast address.
 // port: normalmente 9
 bool send_wol_packet(const char* mac, const char* ip_broadcast, int port)
 {
     extern void vita_debug_log(const char* fmt, ...);
     if (!mac || !mac[0])
     {
-        vita_debug_log("[WOL] MAC vacía o NULL");
+        vita_debug_log("[WOL] MAC is empty or NULL");
         return false;
     }
     uint8_t packet[102];
@@ -36,10 +30,10 @@ bool send_wol_packet(const char* mac, const char* ip_broadcast, int port)
     unsigned int m[6];
     int mac_ok = sscanf(mac, "%x:%x:%x:%x:%x:%x",
         &m[0], &m[1], &m[2], &m[3], &m[4], &m[5]);
-    vita_debug_log("[WOL] MAC de entrada: %s, sscanf=%d", mac, mac_ok);
+    vita_debug_log("[WOL] Input MAC: %s, sscanf=%d", mac, mac_ok);
     if (mac_ok != 6)
     {
-        vita_debug_log("[WOL] Error al parsear la MAC: %s", mac);
+        vita_debug_log("[WOL] Failed to parse MAC: %s", mac);
         return false;
     }
     for (i = 0; i < 6; i++)
@@ -48,11 +42,11 @@ bool send_wol_packet(const char* mac, const char* ip_broadcast, int port)
     {
         memcpy(packet + 6 + i * 6, mac_bytes, 6);
     }
-    vita_debug_log("[WOL] Paquete armado, enviando a %s:%d", ip_broadcast, port);
+    vita_debug_log("[WOL] Packet prepared; sending to %s:%d", ip_broadcast, port);
     int sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     if (sock < 0)
     {
-        vita_debug_log("[WOL] Error al crear socket UDP");
+        vita_debug_log("[WOL] Failed to create UDP socket");
         return false;
     }
     int broadcast = 1;
@@ -69,12 +63,12 @@ bool send_wol_packet(const char* mac, const char* ip_broadcast, int port)
     close(sock);
     if (sent > 0)
     {
-        vita_debug_log("[WOL] Paquete WOL enviado correctamente");
+        vita_debug_log("[WOL] WOL packet sent");
         return true;
     }
     else
     {
-        vita_debug_log("[WOL] Error al enviar paquete WOL");
+        vita_debug_log("[WOL] Failed to send WOL packet");
         return false;
     }
 }

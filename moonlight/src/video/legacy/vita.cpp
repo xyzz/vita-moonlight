@@ -24,4 +24,4 @@
 #include "modules/vita_globals.hpp"
 // The .cpp files are compiled separately via CMake
 
-static_assert(sizeof(DECODER_RENDERER_CALLBACKS) == (sizeof(void*) * 5 + sizeof(int)), "Tamaño inesperado de DECODER_RENDERER_CALLBACKS (posible padding diferente)");
+static_assert(sizeof(DECODER_RENDERER_CALLBACKS) == (sizeof(void*) * 5 + sizeof(int)), "Unexpected DECODER_RENDERER_CALLBACKS size (possible padding mismatch)");

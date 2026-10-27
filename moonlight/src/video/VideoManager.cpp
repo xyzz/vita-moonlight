@@ -106,7 +106,7 @@ DECODER_RENDERER_CALLBACKS VideoManager::getDecoderCallbacks()
         callbacks = get_ffmpeg_video_callbacks();
     }
 
-    vita_log::info("[VideoManager] Callbacks configurados para modo %s", _currentMode.c_str());
+    vita_log::info("[VideoManager] Callbacks configured for mode %s", _currentMode.c_str());
     vita_log::info("[VideoManager] Decoder callback ptrs - setup: %p, start: %p, stop: %p, cleanup: %p, submit: %p",
         (void*)callbacks.setup,
         (void*)callbacks.start,
@@ -121,18 +121,18 @@ void VideoManager::startVideo()
     std::lock_guard<std::recursive_mutex> lock(_mutex);
     if (!_initialized)
     {
-        vita_log::error("[VideoManager] No se puede iniciar video: sistema no inicializado");
+        vita_log::error("[VideoManager] Cannot start video: system not initialized");
         return;
     }
 
     if (_videoRunning)
     {
-        vita_log::warning("[VideoManager] Video ya está corriendo");
+        vita_log::warning("[VideoManager] Video is already running");
         return;
     }
 
     refreshSettings();
-    vita_log::info("[VideoManager] Iniciando video en modo %s", _currentMode.c_str());
+    vita_log::info("[VideoManager] Starting video in mode %s", _currentMode.c_str());
 
     if (_currentMode == "legacy")
     {

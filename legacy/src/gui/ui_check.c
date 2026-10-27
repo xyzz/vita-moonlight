@@ -7,7 +7,6 @@
 #include "../debug.h"
 #include "guilib.h"
 
-// Declarar las variables globales para poder limpiarlas aquí
 extern int pending_ip_update_idx;
 extern char pending_ip_update[64];
 #ifdef __vita__
@@ -17,7 +16,7 @@ void start_host_scan_thread();
 int ui_check_ip_update(device_info_t* info, const char* new_ip)
 {
     vita_debug_log("[UI_CHECK] Al entrar: name=%s, internal=%s, external=%s", info->name, info->internal, info->external);
-    // Siempre pedir confirmación, aunque internal esté vacío
+    // Confirm address changes even if the saved IP is empty.
     char msg[256];
     snprintf(msg, sizeof(msg),
         "Your host changed its IP address.\nOld: %s\nNew: %s",
@@ -26,7 +25,7 @@ int ui_check_ip_update(device_info_t* info, const char* new_ip)
     vita_debug_log("[UI_CHECK] Host %s display_confirm result: %d", info->name, confirm);
     if (confirm)
     {
-        // Copiar SIEMPRE la nueva IP a ambos campos antes de guardar
+        // Update both IP fields before saving a changed host address.
         strncpy(info->internal, new_ip, sizeof(info->internal) - 1);
         info->internal[sizeof(info->internal) - 1] = '\0';
         strncpy(info->external, new_ip, sizeof(info->external) - 1);
@@ -34,13 +33,13 @@ int ui_check_ip_update(device_info_t* info, const char* new_ip)
         info->prefer_external                      = false;
         info->paired                               = true;
         info->port                                 = info->port ? info->port : 47989;
-        vita_debug_log("[UI_CHECK] Antes de guardar: name=%s, internal=%s, external=%s, port=%d, paired=%d, prefer_external=%d", info->name, info->internal, info->external, info->port, info->paired, info->prefer_external);
+        vita_debug_log("[UI_CHECK] Before saving: name=%s, internal=%s, external=%s, port=%d, paired=%d, prefer_external=%d", info->name, info->internal, info->external, info->port, info->paired, info->prefer_external);
         save_device_info(info);
         load_all_known_devices();
         device_info_t* updated = find_device(info->name);
         if (updated)
             info = updated;
-        vita_debug_log("[UI_CHECK] Después de guardar y recargar: name=%s, internal=%s, external=%s, port=%d, paired=%d, prefer_external=%d", info->name, info->internal, info->external, info->port, info->paired, info->prefer_external);
+        vita_debug_log("[UI_CHECK] After saving and reloading: name=%s, internal=%s, external=%s, port=%d, paired=%d, prefer_external=%d", info->name, info->internal, info->external, info->port, info->paired, info->prefer_external);
         flash_message("Host IP updated!");
 #ifdef __vita__
         start_host_scan_thread();
@@ -56,7 +55,7 @@ int ui_check_ip_update(device_info_t* info, const char* new_ip)
 #ifdef __vita__
         start_host_scan_thread();
 #endif
-        // NO limpiar pending_ip_update_idx ni pending_ip_update aquí
+        // Keep pending-IP state until the confirmation flow finishes.
         return 0;
     }
 }

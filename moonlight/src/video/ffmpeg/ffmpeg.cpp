@@ -1190,7 +1190,6 @@ static bool publish_direct_frame(FFmpegVideoContext* ctx, AVFrame* frame)
         ctx->dr_textures[ctx->dr_spare_idx] = texSpare;
     }
 
-    // Recycle only the oldest texture slot.
     dr_texture_detach(texSpare);
     if (!dr_texture_attach(texSpare, frame))
     {
@@ -1535,7 +1534,6 @@ static bool publish_sw_frame(FFmpegVideoContext* ctx, AVFrame* frame)
         VITA_DEBUG_LOG("[FFMPEG] sws_scale returned %d", swsRet);
     }
 
-    // Diagnostics: treat only negative values as errors.
     // On some Vita FFmpeg builds sws_scale may return 0 while still producing output.
     if (swsRet < 0)
     {

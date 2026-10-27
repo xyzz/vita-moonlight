@@ -154,7 +154,7 @@ bool HostStorage::writeDeviceIni(const std::string& hostDir, const std::string& 
         return false;
 
     fprintf(f, "[Device]\n");
-    // The client identity lives in uniqueid.dat; device.ini only stores host data.
+    // Client identity is stored in uniqueid.dat, not device.ini.
     fprintf(f, "name=%s\n", safeHostName.c_str());
     fprintf(f, "type=psvita\n");
     fprintf(f, "paired=%s\n", paired ? "true" : "false");

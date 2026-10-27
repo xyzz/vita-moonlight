@@ -39,12 +39,10 @@ enum
     MAIN_MENU_QUIT = 999,
 };
 
-// Variables globales para actualización pendiente de IP
 int pending_ip_update_idx  = -1;
 char pending_ip_update[64] = "";
 int first_scan_pending     = 0;
 
-// Prototipos para el control del escaneo de hosts
 #define start_host_scan() start_host_scan_thread()
 #define stop_host_scan() stop_host_scan_thread()
 
@@ -64,10 +62,9 @@ enum
 static int ui_host_manage_menu_loop(int cursor, void* context, const input_data* input)
 {
     device_info_t* info = (device_info_t*)context;
-    // Permitir regresar con el botón cancelar (O)
     if ((input->buttons & config.btn_cancel) != 0)
     {
-        return 1; // Salir del menú
+        return 1;
     }
     if ((input->buttons & config.btn_confirm) == 0 || (input->buttons & SCE_CTRL_HOLD) != 0)
     {
@@ -77,7 +74,7 @@ static int ui_host_manage_menu_loop(int cursor, void* context, const input_data*
     {
         case HOST_MANAGE_CHECK_MAC:
         {
-            vita_debug_log("[UI] Menú gestión: check MAC %s", info->name);
+            vita_debug_log("[UI] Host management: check MAC %s", info->name);
             char mac[18] = { 0 };
             if (info->mac[0])
             {
@@ -86,19 +83,19 @@ static int ui_host_manage_menu_loop(int cursor, void* context, const input_data*
                 char msg[64];
                 snprintf(msg, sizeof(msg), "MAC: %s", mac);
                 flash_message(msg);
-                vita_debug_log("[UI] MAC guardada para %s: %s", info->internal, mac);
+                vita_debug_log("[UI] MAC saved for %s: %s", info->internal, mac);
             }
             else
             {
                 flash_message("No MAC saved for this host");
-                vita_debug_log("[UI] No MAC guardada para %s", info->internal);
+                vita_debug_log("[UI] No saved MAC for %s", info->internal);
             }
-            sceKernelDelayThread(2 * 1000 * 1000); // Esperar 2 segundos para que el mensaje sea visible
+            sceKernelDelayThread(2 * 1000 * 1000); // Keep the message visible for two seconds
             return 1;
         }
         case HOST_MANAGE_WAKE:
         {
-            vita_debug_log("[UI] Menú gestión: Wake-on-LAN %s", info->name);
+            vita_debug_log("[UI] Host management: Wake-on-LAN %s", info->name);
             if (!info->mac[0])
             {
                 flash_message("No MAC saved for this host");
@@ -106,7 +103,6 @@ static int ui_host_manage_menu_loop(int cursor, void* context, const input_data*
                 sceKernelDelayThread(2 * 1000 * 1000);
                 return 1;
             }
-            // Calcular broadcast a partir de la IP interna
             char broadcast[32] = { 0 };
             const char* ip     = info->internal;
             if (!ip[0])
@@ -114,7 +110,6 @@ static int ui_host_manage_menu_loop(int cursor, void* context, const input_data*
                 flash_message("No IP for this host");
                 return 1;
             }
-            // Copiar IP y reemplazar el último octeto por 255
             strncpy(broadcast, ip, sizeof(broadcast) - 1);
             char* last_dot = strrchr(broadcast, '.');
             if (last_dot)
@@ -131,21 +126,21 @@ static int ui_host_manage_menu_loop(int cursor, void* context, const input_data*
             if (wol_ok)
             {
                 flash_message("Wake-on-LAN sent!");
-                vita_debug_log("[UI] Wake-on-LAN enviado a %s (%s)", info->name, info->mac);
+                vita_debug_log("[UI] Wake-on-LAN sent to %s (%s)", info->name, info->mac);
             }
             else
             {
                 flash_message("Wake-on-LAN failed");
-                vita_debug_log("[UI] Wake-on-LAN falló para %s (%s)", info->name, info->mac);
+                vita_debug_log("[UI] Wake-on-LAN failed for %s (%s)", info->name, info->mac);
             }
             sceKernelDelayThread(2 * 1000 * 1000);
             return 1;
         }
         case HOST_MANAGE_CONNECT:
         {
-            vita_debug_log("[UI] Menú gestión: conectar a %s", info->name);
+            vita_debug_log("[UI] Host management: connect to %s", info->name);
             stop_host_scan();
-            // Si la IP está cambiada, pedir confirmación antes de emparejar
+            // Require confirmation before pairing with a host whose IP changed.
             extern int pending_ip_update_idx;
             extern char pending_ip_update[64];
             int host_idx = -1;
@@ -207,7 +202,7 @@ static int ui_host_manage_menu_loop(int cursor, void* context, const input_data*
         }
         case HOST_MANAGE_CHANGE_IP:
         {
-            vita_debug_log("[UI] Menú gestión: cambiar IP %s", info->name);
+            vita_debug_log("[UI] Host management: change IP for %s", info->name);
             char new_ip[256] = "";
             if (ime_dialog_string(new_ip, "Enter new IP:", info->internal) == 0 && strlen(new_ip) > 0)
             {
@@ -227,18 +222,16 @@ static int ui_host_manage_menu_loop(int cursor, void* context, const input_data*
         }
         case HOST_MANAGE_CHANGE_NAME:
         {
-            vita_debug_log("[UI] Menú gestión: cambiar nombre %s", info->name);
+            vita_debug_log("[UI] Host management: rename %s", info->name);
             char new_name[256] = "";
             if (ime_dialog_string(new_name, "Enter new name:", info->name) == 0 && strlen(new_name) > 0)
             {
-                // Guardar el nombre anterior para eliminar el archivo viejo
                 char old_name[256];
                 strncpy(old_name, info->name, sizeof(old_name) - 1);
                 old_name[sizeof(old_name) - 1] = '\0';
                 strncpy(info->name, new_name, sizeof(info->name) - 1);
                 info->name[sizeof(info->name) - 1] = '\0';
                 save_device_info(info);
-                // Eliminar el archivo antiguo si el nombre cambió
                 if (strcmp(old_name, new_name) != 0)
                 {
                     remove_device(old_name);
@@ -252,9 +245,9 @@ static int ui_host_manage_menu_loop(int cursor, void* context, const input_data*
             return 1;
         }
         case HOST_MANAGE_FORCE_CONNECT:
-            vita_debug_log("[UI] Menú gestión: conexión forzada a %s", info->name);
+            vita_debug_log("[UI] Host management: forced connection to %s", info->name);
             stop_host_scan();
-            ui_connect_paired_device(info); // Aquí podrías agregar lógica especial si lo necesitas
+            ui_connect_paired_device(info);
             return 1;
         case HOST_MANAGE_BACK:
             return 1;
@@ -276,7 +269,6 @@ void ui_host_manage_menu(device_info_t* info)
     // Mensaje principal
     menu[idx++] = (menu_entry) { .name = "Host management", .disabled = true, .color = 0xFFFFFFFF };
     menu[idx++] = (menu_entry) { .name = title, .disabled = true, .color = 0xFF00AAFF };
-    // Info IP y estado con punto de color
     char ipinfo[320];
     char status_text[64] = "Unpaired";
     int host_idx         = -1;
@@ -311,7 +303,6 @@ void ui_host_manage_menu(device_info_t* info)
             }
         }
     }
-    // Mostrar IP y puerto juntos
     snprintf(ipinfo, sizeof(ipinfo), "IP: %s  PORT: %d", info->internal, info->port);
     menu[idx] = (menu_entry) { .name = ipinfo, .disabled = true };
     strncpy(menu[idx].subname, status_text, sizeof(menu[idx].subname) - 1);
@@ -320,9 +311,8 @@ void ui_host_manage_menu(device_info_t* info)
     menu[idx++] = (menu_entry) { .name = "", .disabled = true, .separator = true };
     // Opciones (sin Info)
     menu[idx++] = (menu_entry) { .name = "Connect", .id = HOST_MANAGE_CONNECT };
-    // menu[idx++] = (menu_entry){ .name = "Check MAC", .id = HOST_MANAGE_CHECK_MAC }; // Oculta la opción Check MAC
+    // The Check MAC menu item is intentionally disabled.
     menu[idx++] = (menu_entry) { .name = "Wake on LAN (WOL)", .id = HOST_MANAGE_WAKE };
-// Opción extra para pruebas
 #define HOST_MANAGE_CHECK_MAC 3001
     menu[idx++]    = (menu_entry) { .name = "Force connect", .id = HOST_MANAGE_FORCE_CONNECT };
     menu[idx++]    = (menu_entry) { .name = "Delete", .id = HOST_MANAGE_DELETE };
@@ -335,23 +325,21 @@ void ui_host_manage_menu(device_info_t* info)
 
 int ui_main_menu_loop(int cursor, void* context, const input_data* input)
 {
-    // menu_entry *menu = (menu_entry*)context; // Variable no usada
     extern volatile int g_host_status_changed;
     extern volatile int g_host_scan_thread_status;
-    // Refresco manual con Triángulo
     if ((input->buttons & SCE_CTRL_TRIANGLE) != 0)
     {
-        vita_debug_log("[UI] Refresco manual solicitado (Triángulo): reiniciando escaneo de hosts");
+        vita_debug_log("[UI] Manual refresh requested (Triangle); restarting host scan");
         stop_host_scan();
         start_host_scan();
-        g_host_status_changed = 0; // Limpiar flag para evitar refresco doble
+        g_host_status_changed = 0; // Clear the flag to prevent duplicate refreshes
         first_scan_pending    = 0;
-        return 2; // Forzar refresco del menú
+        return 2;
     }
-    // Refresco automático solo una vez tras el primer escaneo, pero NO si hay IP cambiada
+    // Refresh once after initial discovery unless a host IP changed.
     if (first_scan_pending && g_host_status_changed && g_host_scan_thread_status != 1)
     {
-        // Si hay IP cambiada, no forzar refresco/reinicio del menú
+        // Do not reset the menu while an IP change is pending.
         int ip_changed = 0;
         for (int i = 0; i < known_devices.count; i++)
         {
@@ -364,28 +352,27 @@ int ui_main_menu_loop(int cursor, void* context, const input_data* input)
         }
         if (!ip_changed)
         {
-            vita_debug_log("[UI] Refresco automático tras primer escaneo\n");
+            vita_debug_log("[UI] Auto refresh after first host scan\n");
             g_host_status_changed = 0;
             first_scan_pending    = 0;
             return 2;
         }
-        // Si hay IP cambiada, solo limpiar flags pero NO reiniciar menú
+        // Clear status flags without rebuilding the menu if an IP change is pending.
         g_host_status_changed = 0;
         first_scan_pending    = 0;
     }
-    // Solo refrescar por cambio de estado si el hilo está activo
     if (g_host_status_changed && g_host_scan_thread_status == 1)
     {
-        vita_debug_log("[UI] Refrescando menú por cambio de estado de host\n");
+        vita_debug_log("[UI] Refreshing menu after host status change\n");
         g_host_status_changed = 0;
-        return 2; // Forzar refresco del menú
+        return 2;
     }
 
     if ((input->buttons & config.btn_confirm) == 0 || (input->buttons & SCE_CTRL_HOLD) != 0)
     {
         return 0;
     }
-    // Permitir acceder al menú de gestión de host siempre, incluso si está offline o la IP cambió
+    // Host management must remain accessible when the host is offline or its IP changes.
     if (cursor >= MAIN_MENU_CONNECT_PAIRED && cursor < MAIN_MENU_QUIT)
     {
         int host_idx        = cursor - MAIN_MENU_CONNECT_PAIRED;
@@ -396,7 +383,6 @@ int ui_main_menu_loop(int cursor, void* context, const input_data* input)
         return 2;
     }
 
-    // Al seleccionar cualquier opción que cambie de menú, detener el escaneo de hosts
     int exit_menu = 0;
     if (cursor >= MAIN_MENU_CONNECT_PAIRED && cursor < MAIN_MENU_QUIT)
     {
@@ -417,7 +403,7 @@ int ui_main_menu_loop(int cursor, void* context, const input_data* input)
         else if (st.status == HOST_ONLINE)
         {
             vita_debug_log("[UI] Host %s is ONLINE. Connecting normally.", info->name);
-            vita_debug_log("[UI] Deteniendo escaneo de hosts antes de conectar");
+            vita_debug_log("[UI] Stopping host discovery before connecting");
             stop_host_scan();
             ui_connect_paired_device(info);
             exit_menu = 2;
@@ -432,41 +418,41 @@ int ui_main_menu_loop(int cursor, void* context, const input_data* input)
     switch (cursor)
     {
         case MAIN_MENU_CONNECT:
-            vita_debug_log("[UI] Seleccionado: Add manually");
-            vita_debug_log("[UI] Deteniendo escaneo de hosts antes de entrar a Add manually");
+            vita_debug_log("[UI] Selected: Add manually");
+            vita_debug_log("[UI] Stopping host discovery before opening Add manually");
             stop_host_scan();
             ui_connect_manual();
-            vita_debug_log("[UI] Deteniendo escaneo de hosts al salir de Add manually");
+            vita_debug_log("[UI] Stopping host scan before leaving Add manually");
             stop_host_scan();
             exit_menu = 2;
             break;
         case MAIN_MENU_SEARCH:
-            vita_debug_log("[UI] Seleccionado: Search devices");
-            vita_debug_log("[UI] Deteniendo escaneo de hosts antes de entrar a Search devices");
+            vita_debug_log("[UI] Selected: Search devices");
+            vita_debug_log("[UI] Stopping host discovery before opening Search devices");
             stop_host_scan();
             ui_search_device();
-            vita_debug_log("[UI] Deteniendo escaneo de hosts al salir de Search devices");
+            vita_debug_log("[UI] Stopping host scan before leaving Search devices");
             stop_host_scan();
             exit_menu = 2;
             break;
         case MAIN_MENU_CONNECT_RESUME:
-            vita_debug_log("[UI] Seleccionado: Resume connection");
-            vita_debug_log("[UI] Deteniendo escaneo de hosts antes de reanudar conexión");
+            vita_debug_log("[UI] Selected: Resume connection");
+            vita_debug_log("[UI] Stopping host discovery before resuming connection");
             stop_host_scan();
             ui_connect_resume();
             exit_menu = 2;
             break;
         case MAIN_MENU_SETTINGS:
-            vita_debug_log("[UI] Seleccionado: Settings");
-            vita_debug_log("[UI] Deteniendo escaneo de hosts antes de entrar a Settings");
+            vita_debug_log("[UI] Selected: Settings");
+            vita_debug_log("[UI] Stopping host discovery before opening Settings");
             stop_host_scan();
             ui_settings_menu();
             exit_menu = 0;
             start_host_scan();
             break;
         case MAIN_MENU_QUIT:
-            vita_debug_log("[UI] Seleccionado: Quit");
-            vita_debug_log("[UI] Deteniendo escaneo de hosts antes de salir");
+            vita_debug_log("[UI] Selected: Quit");
+            vita_debug_log("[UI] Stopping host discovery before exiting");
             stop_host_scan();
             if (connection_get_status() != LI_DISCONNECTED)
             {
@@ -475,10 +461,9 @@ int ui_main_menu_loop(int cursor, void* context, const input_data* input)
             exit(0);
             return 0;
     }
-    // Si se va a salir del menú, detener el escaneo
     if (exit_menu)
     {
-        vita_debug_log("[UI] Saliendo del menú principal, deteniendo escaneo de hosts");
+        vita_debug_log("[UI] Leaving main menu; stopping host scan");
         stop_host_scan();
         return exit_menu;
     }
@@ -491,20 +476,19 @@ int ui_main_menu_back(void* context)
 }
 int ui_main_menu()
 {
-    // Siempre reiniciar escaneo de hosts al entrar al menú principal
-    vita_debug_log("[UI] Entrando al menú principal");
-    // Solo iniciar escaneo si NO hay conexión activa
+    // Restart discovery when returning to the main menu.
+    vita_debug_log("[UI] Opening main menu");
     if (!ui_connect_connected())
     {
-        vita_debug_log("[UI] Iniciando escaneo de hosts (no hay conexión activa)");
+        vita_debug_log("[UI] Starting host discovery (no active connection)");
         start_host_scan();
         first_scan_pending = 1;
     }
     else
     {
-        vita_debug_log("[UI] No se inicia escaneo de hosts porque hay conexión activa");
+        vita_debug_log("[UI] Host discovery skipped (connection active)");
         first_scan_pending = 0;
-        stop_host_scan(); // Detener escaneo si por alguna razón sigue activo
+        stop_host_scan();
     }
 
     menu_entry menu[16];
@@ -581,15 +565,14 @@ int ui_main_menu()
                 MENU_ENTRY(MAIN_MENU_CONNECT_PAIRED + i, cur->name, false);
                 int real_idx                 = idx - 1;
                 menu[real_idx].is_host_entry = true;
-                // Si hay cambio de IP pendiente para este host, forzar amarillo y saltar el resto
+                // Show yellow status while awaiting confirmation of a host IP change.
                 if (pending_ip_update_idx == i && pending_ip_update[0] != '\0')
                 {
                     strcpy(menu[real_idx].subname, "[IP changed]");
                     menu[real_idx].color = 0xFF00FFFF;
-                    vita_debug_log("[UI] Host %s menu idx=%d, color=0x%08X (YELLOW, IP pendiente), archivo=ui.c", cur->name, real_idx, 0xFF00FFFF);
+                    vita_debug_log("[UI] Host %s menu idx=%d, color=0x%08X (YELLOW, pending IP change), file=ui.c", cur->name, real_idx, 0xFF00FFFF);
                     continue;
                 }
-                // ...lógica normal de color...
                 if (st.current_ip[0] && strcmp(cur->internal, st.current_ip) != 0)
                 {
                     if (strcmp(last_ip_logged, st.current_ip) != 0)
@@ -600,22 +583,22 @@ int ui_main_menu()
                     }
                     strcpy(menu[real_idx].subname, "[IP changed]");
                     menu[real_idx].color = 0xFF00FFFF;
-                    vita_debug_log("[UI] Host %s menu idx=%d, color=0x%08X (YELLOW), archivo=ui.c", cur->name, real_idx, 0xFF00FFFF);
+                    vita_debug_log("[UI] Host %s menu idx=%d, color=0x%08X (YELLOW), file=ui.c", cur->name, real_idx, 0xFF00FFFF);
                 }
                 else if (strcmp(menu[real_idx].subname, "[IP changed]") == 0)
                 {
                     menu[real_idx].color = 0xFF00FFFF;
-                    vita_debug_log("[UI] Host %s menu idx=%d, color=0x%08X (YELLOW), archivo=ui.c", cur->name, real_idx, 0xFF00FFFF);
+                    vita_debug_log("[UI] Host %s menu idx=%d, color=0x%08X (YELLOW), file=ui.c", cur->name, real_idx, 0xFF00FFFF);
                 }
                 else if (st.status == HOST_ONLINE)
                 {
                     menu[real_idx].color = 0xFF00FF00;
-                    vita_debug_log("[UI] Host %s menu idx=%d, color=0x%08X (GREEN), archivo=ui.c", cur->name, real_idx, 0xFF00FF00);
+                    vita_debug_log("[UI] Host %s menu idx=%d, color=0x%08X (GREEN), file=ui.c", cur->name, real_idx, 0xFF00FF00);
                 }
                 else
                 {
                     menu[real_idx].color = 0xFF0000FF;
-                    vita_debug_log("[UI] Host %s menu idx=%d, color=0x%08X (RED), archivo=ui.c", cur->name, real_idx, 0xFF0000FF);
+                    vita_debug_log("[UI] Host %s menu idx=%d, color=0x%08X (RED), file=ui.c", cur->name, real_idx, 0xFF0000FF);
                 }
             }
         }
@@ -625,7 +608,7 @@ int ui_main_menu()
     MENU_ENTRY(MAIN_MENU_SETTINGS, "Settings", false);
     MENU_ENTRY(MAIN_MENU_QUIT, "Quit", false);
 
-    // Solo iniciar escaneo si NO hay cambio de IP pendiente y no se ha hecho ya
+    // Avoid starting another scan while an IP change is pending.
     menu_geom geom = make_geom_centered(500, 200);
     return display_menu(menu, idx, &geom, &ui_main_menu_loop, &ui_main_menu_back, NULL, NULL);
 }

@@ -178,7 +178,7 @@ static void XMLCALL _xml_write_data_legacy(void* userData, const XML_Char* s, in
         char* newMem = (char*)realloc(search->memory, search->size + len + 1);
         if (!newMem)
         {
-            vita_log::error("[xml] realloc falló (size={}, len={})", search->size, len);
+            vita_log::error("[xml] realloc failed (size={}, len={})", search->size, len);
             return;
         }
         search->memory = newMem;

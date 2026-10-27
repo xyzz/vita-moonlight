@@ -79,12 +79,10 @@ void vita_debug_log(const char* s, ...)
     }
     else
     {
-        // Si no se pudo abrir el log, mostrar por pantalla
-        printf("[Moonlight] No se pudo abrir el archivo de log. Mensaje: %s\n", &buffer[25]);
+        printf("[Moonlight] Could not open log file. Message: %s\n", &buffer[25]);
     }
 
 #ifdef __vita__
-    // También imprimir por mdns_log (sceClibPrintf)
     mdns_log("%s", &buffer[25]);
 #endif
 

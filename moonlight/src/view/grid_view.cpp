@@ -51,7 +51,7 @@ void GridView::reload()
 
     if (itemNames.empty())
     {
-        vita_log::info("[GridView] reload: lista vacía, no se añaden elementos");
+        vita_log::info("[GridView] reload: empty list; no items added");
         return;
     }
 
@@ -89,7 +89,7 @@ void GridView::reload()
             itemNames[i].c_str(), currentRow, (i % columns) + 1);
     }
 
-    vita_log::info("[GridView] reload finalizado, %d filas creadas", currentRow);
+    vita_log::info("[GridView] reload complete; %d rows created", currentRow);
 }
 
 brls::View* GridView::getNextFocus(brls::FocusDirection direction, brls::View* currentView)

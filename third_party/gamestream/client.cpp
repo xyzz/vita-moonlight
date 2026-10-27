@@ -67,7 +67,7 @@ static int load_unique_id(const std::string& keyDirectory)
         FILE* wfd = fopen(uniqueFilePath.c_str(), "w");
         if (wfd == NULL)
         {
-            vita_log::error("[load_unique_id] no se pudo crear/abrir '{}' para escribir uniqueid", uniqueFilePath);
+            vita_log::error("[load_unique_id] could not create/open '{}' to write uniqueid", uniqueFilePath);
             return GS_FAILED;
         }
         fwrite(unique_id.c_str(), UNIQUEID_CHARS, 1, wfd);
@@ -131,7 +131,7 @@ static int load_serverinfo(PSERVER_DATA server, bool https)
     HTTPRequestTimeout timeout = https ? HTTPRequestTimeoutLong : HTTPRequestTimeoutLow;
     if (http_request(url, &data, timeout) != GS_OK)
     {
-        vita_log::error("[load_serverinfo] http_request fallo");
+        vita_log::error("[load_serverinfo] http_request failed");
         return GS_IO_ERROR;
     }
     if (xml_status(data) == GS_ERROR)
@@ -169,31 +169,31 @@ static int load_serverinfo(PSERVER_DATA server, bool https)
 
     if (!extractTag(xmlPayload, "currentgame", currentGameText))
     {
-        vita_log::error("[load_serverinfo] simpleXML fallo currentgame");
+        vita_log::error("[load_serverinfo] simpleXML failed currentgame");
         return ret;
     }
     if (!extractTag(xmlPayload, "PairStatus", pairedText))
     {
-        vita_log::error("[load_serverinfo] simpleXML fallo PairStatus");
+        vita_log::error("[load_serverinfo] simpleXML failed PairStatus");
         return ret;
     }
     std::string serverUniqueId;
     extractTag(xmlPayload, "uniqueid", serverUniqueId);
     if (!extractTag(xmlPayload, "appversion", server->serverInfoAppVersion))
     {
-        vita_log::error("[load_serverinfo] simpleXML fallo appversion");
+        vita_log::error("[load_serverinfo] simpleXML failed appversion");
         return ret;
     }
     if (!extractTag(xmlPayload, "state", stateText))
     {
-        vita_log::error("[load_serverinfo] simpleXML fallo state");
+        vita_log::error("[load_serverinfo] simpleXML failed state");
         return ret;
     }
 
     std::string scms;
     if (!extractTag(xmlPayload, "ServerCodecModeSupport", scms))
     {
-        vita_log::error("[load_serverinfo] simpleXML fallo ServerCodecModeSupport");
+        vita_log::error("[load_serverinfo] simpleXML failed ServerCodecModeSupport");
         return ret;
     }
     server->serverInfo.serverCodecModeSupport = scms.empty() ? 0 : atoi(scms.c_str());
@@ -202,7 +202,7 @@ static int load_serverinfo(PSERVER_DATA server, bool https)
     extractTag(xmlPayload, "GsVersion", server->gsVersion);
     if (!extractTag(xmlPayload, "hostname", server->hostname))
     {
-        vita_log::error("[load_serverinfo] simpleXML fallo hostname");
+        vita_log::error("[load_serverinfo] simpleXML failed hostname");
         return ret;
     }
     extractTag(xmlPayload, "GfeVersion", server->serverInfoGfeVersion);
@@ -218,7 +218,7 @@ static int load_serverinfo(PSERVER_DATA server, bool https)
     server->paired = pairedText == "1";
     if (!server->paired)
     {
-        vita_log::info("[load_serverinfo] Host no emparejado (PairStatus=0). Se requerirá pairing antes de lanzar.");
+        vita_log::info("[load_serverinfo] Host is not paired (PairStatus=0); pairing is required before launch.");
         if (!serverUniqueId.empty() && serverUniqueId != unique_id)
         {
             vita_log::debug("[load_serverinfo] Server and client unique IDs differ");
@@ -727,7 +727,7 @@ int gs_applist(PSERVER_DATA server, PAPP_LIST* list)
         std::string idStr, titleStr;
         if (!extract(appBlock, "ID", idStr) || !extract(appBlock, "AppTitle", titleStr))
         {
-            vita_log::error("[gs_applist] fallo parse parcial appBlock");
+            vita_log::error("[gs_applist] failed parsing partial appBlock");
             pos = end + 6;
             continue;
         }
@@ -736,7 +736,7 @@ int gs_applist(PSERVER_DATA server, PAPP_LIST* list)
         PAPP_LIST app = (PAPP_LIST)malloc(sizeof(APP_LIST));
         if (!app)
         {
-            vita_log::error("[gs_applist] malloc APP_LIST fallo");
+            vita_log::error("[gs_applist] APP_LIST allocation failed");
             break;
         }
         memset(app, 0, sizeof(APP_LIST));
@@ -848,7 +848,7 @@ int gs_start_app(PSERVER_DATA server, STREAM_CONFIGURATION* config, int appId,
             LiGetLaunchUrlQueryParameters());
         if (forceFresh && server->currentGame != 0)
         {
-            vita_log::warning("[gs_start_app] Ignorando resume para forzar renegociación H.264 (fresh launch)");
+            vita_log::warning("[gs_start_app] Skipping resume to force H.264 renegotiation (fresh launch)");
         }
     }
     else

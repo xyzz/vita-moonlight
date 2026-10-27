@@ -63,7 +63,7 @@ void GyroManager::update()
 
     if (LiSendControllerMotionEvent(0, LI_MOTION_TYPE_GYRO, sx_v, sy_v, sz_v) != 0)
     {
-        vita_log::error("[Gyro] LiSendControllerMotionEvent (gyro) fallo");
+        vita_log::error("[Gyro] LiSendControllerMotionEvent (gyro) failed");
     }
 
     float ax_v = ax * kGyroBaseScale * sx;
@@ -72,7 +72,7 @@ void GyroManager::update()
 
     if (LiSendControllerMotionEvent(0, LI_MOTION_TYPE_ACCEL, ax_v, ay_v, az_v) != 0)
     {
-        vita_log::error("[Gyro] LiSendControllerMotionEvent (accel) fallo");
+        vita_log::error("[Gyro] LiSendControllerMotionEvent (accel) failed");
     }
 
     lastSendUs = now;

@@ -12,7 +12,6 @@ extern "C"
 {
 #endif
 
-// Estados posibles para el host
 #define HOST_OFFLINE 0
 #define HOST_ONLINE 1
 #define HOST_IP_CHANGED 2
@@ -23,7 +22,6 @@ extern "C"
         char current_ip[64];
     };
 
-    // Chequea el estado de un host registrado
     struct host_status check_host_status(const device_info_t* info);
 
 #include <psp2/kernel/threadmgr.h>

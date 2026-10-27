@@ -1,6 +1,5 @@
 #include "keyboardkeys.h"
 
-// Diccionario para layout EN_US (teclado inglés)
 static const struct CharVKMap char_to_vk_dict_en_us[] = {
     // Letras
     { L'a', 0x41, 0 },
@@ -55,7 +54,6 @@ static const struct CharVKMap char_to_vk_dict_en_us[] = {
     { L'Y', 0x59, 1 },
     { L'z', 0x5A, 0 },
     { L'Z', 0x5A, 1 },
-    // Números
     { L'0', 0x30, 0 },
     { L'1', 0x31, 0 },
     { L'2', 0x32, 0 },
@@ -71,7 +69,7 @@ static const struct CharVKMap char_to_vk_dict_en_us[] = {
     { L'\t', 0x09, 0 },
     { L'\n', 0x0D, 0 },
     { L'\r', 0x0D, 0 },
-    // Símbolos principales (US)
+    // Unshifted US symbols.
     { L'-', 0xBD, 0 },
     { L'_', 0xBD, 1 },
     { L'=', 0xBB, 0 },
@@ -94,7 +92,7 @@ static const struct CharVKMap char_to_vk_dict_en_us[] = {
     { L'?', 0xBF, 1 },
     { L'`', 0xC0, 0 },
     { L'~', 0xC0, 1 },
-    // Shifted números (símbolos)
+    // Shifted US numbers and symbols.
     { L'!', 0x31, 1 },
     { L'@', 0x32, 1 },
     { L'#', 0x33, 1 },
@@ -109,7 +107,6 @@ static const struct CharVKMap char_to_vk_dict_en_us[] = {
     { L'\b', 0x08, 0 },
 };
 
-// Diccionario para layout ES_ES (teclado español España)
 static const struct CharVKMap char_to_vk_dict_es_es[] = {
     // Letras
     { L'a', 0x41, 0 },
@@ -166,7 +163,6 @@ static const struct CharVKMap char_to_vk_dict_es_es[] = {
     { L'Z', 0x5A, 1 },
     { L'ñ', 0xBA, 0 },
     { L'Ñ', 0xBA, 1 }, // VK_OEM_1
-    // Números
     { L'0', 0x30, 0 },
     { L'1', 0x31, 0 },
     { L'2', 0x32, 0 },
@@ -182,7 +178,7 @@ static const struct CharVKMap char_to_vk_dict_es_es[] = {
     { L'\t', 0x09, 0 },
     { L'\n', 0x0D, 0 },
     { L'\r', 0x0D, 0 },
-    // Símbolos principales (España)
+    // Spanish symbols.
     { L'¡', 0xC0, 0 },
     { L'¿', 0xBF, 0 },
     { L'-', 0xBD, 0 },
@@ -210,7 +206,6 @@ static const struct CharVKMap char_to_vk_dict_es_es[] = {
     { L'\b', 0x08, 0 },
 };
 
-// Diccionario para layout ES_LATAM (teclado español latinoamericano)
 static const struct CharVKMap char_to_vk_dict_es_latam[] = {
     // Letras
     { L'a', 0x41, 0 },
@@ -267,7 +262,6 @@ static const struct CharVKMap char_to_vk_dict_es_latam[] = {
     { L'Z', 0x5A, 1 },
     { L'ñ', 0xDB, 0 },
     { L'Ñ', 0xDB, 1 }, // VK_OEM_4
-    // Números
     { L'0', 0x30, 0 },
     { L'1', 0x31, 0 },
     { L'2', 0x32, 0 },
@@ -283,7 +277,7 @@ static const struct CharVKMap char_to_vk_dict_es_latam[] = {
     { L'\t', 0x09, 0 },
     { L'\n', 0x0D, 0 },
     { L'\r', 0x0D, 0 },
-    // Símbolos principales (Latino)
+    // Latin American symbols.
     { L'¡', 0xC0, 0 },
     { L'¿', 0xBF, 0 },
     { L'-', 0xBD, 0 },

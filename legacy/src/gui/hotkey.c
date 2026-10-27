@@ -1,5 +1,4 @@
 // hotkey.c
-// Implementación de la lógica de hotkeys (almacenamiento, callbacks, lógica principal)
 #include <psp2/ctrl.h>
 #include <psp2/kernel/threadmgr.h>
 #include <stdio.h>

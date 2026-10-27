@@ -1,7 +1,3 @@
-/*
-    session_app_select.cpp - Selección de aplicación para iniciar streaming en Moonlight PSVita/Windows
-    Autor: aorsini + comunidad
-*/
 #include "session/session_app_select.hpp"
 
 #include <sys/stat.h>
@@ -72,7 +68,7 @@ SessionAppSelect::SessionAppSelect(const std::string& hostName)
     , host()
 {
     this->isAlive = std::make_shared<std::atomic<bool>>(true);
-    vita_log::info("View: SessionAppSelect para host: %s", hostName.c_str());
+    vita_log::info("View: SessionAppSelect for host: %s", hostName.c_str());
 
     // Find the real host by name
     auto found = HostStorage::findHost(hostName);
@@ -82,7 +78,7 @@ SessionAppSelect::SessionAppSelect(const std::string& hostName)
     }
     else
     {
-        vita_log::error("[SessionAppSelect] No se encontró el host '%s' en HostStorage", hostName.c_str());
+        vita_log::error("[SessionAppSelect] Host not found: '%s' in HostStorage", hostName.c_str());
     }
 
     this->inflateFromXMLRes("xml/views/session_app_select.xml");
@@ -110,7 +106,7 @@ SessionAppSelect::SessionAppSelect(const std::string& hostName)
                 if (this->gridView && this->gridView->getVisibility() != brls::Visibility::VISIBLE) {
                     return;
                 }
-                vita_log::info("[SessionAppSelect] Sesión activa detectada para %s", hostCopy.ip.c_str());
+                vita_log::info("[SessionAppSelect] Active session detected for %s", hostCopy.ip.c_str());
                 auto* holder = new brls::Box(brls::Axis::COLUMN);
                 auto* label = new brls::Label();
                 std::string msg = brls::getStr("moonlight/session/app_select/active_session_msg");
@@ -153,7 +149,7 @@ SessionAppSelect::SessionAppSelect(const std::string& hostName)
                     dialog->dismiss();
                     auto* waitDlg = createLoadingDialog(brls::getStr("moonlight/session/app_select/ending_session"));
                     std::thread([hostCopy, this, waitDlg, isAliveCopy]() mutable {
-                        vita_log::info("[SessionAppSelect] Enviando quitApp para %s antes de mostrar apps", hostCopy.ip.c_str());
+                        vita_log::info("[SessionAppSelect] Sending quitApp for %s before displaying apps", hostCopy.ip.c_str());
                         if (!GameStreamClient::instance().isConnected(hostCopy.ip)) {
                             GameStreamClient::instance().connect(hostCopy);
                         }
@@ -187,14 +183,14 @@ SessionAppSelect::~SessionAppSelect()
 
 void SessionAppSelect::populateAppList()
 {
-    vita_log::info("[SessionAppSelect] populateAppList llamado para host: %s (ip: %s)", host.name.c_str(), host.ip.c_str());
+    vita_log::info("[SessionAppSelect] populateAppList called for host: %s (ip: %s)", host.name.c_str(), host.ip.c_str());
 
     // Wait for Moonmic to confirm/prepare Sunshine before requesting the app list
     if (!sunshineReady)
     {
         if (sunshineCheckInFlight)
         {
-            vita_log::info("[SessionAppSelect] Esperando señal de Moonmic/Sunshine (spinner activo)");
+            vita_log::info("[SessionAppSelect] Waiting for Moonmic/Sunshine signal (spinner active)");
             return;
         }
 
@@ -231,7 +227,7 @@ void SessionAppSelect::populateAppList()
                 if (spinner)
                     spinner->setVisibility(brls::Visibility::GONE);
 
-                vita_log::info("[SessionAppSelect] Moonmic no disponible; continuando sin integración");
+                vita_log::info("[SessionAppSelect] Moonmic unavailable; continuing without integration");
                 this->populateAppList();
                 return;
             }
@@ -273,10 +269,10 @@ void SessionAppSelect::populateAppList()
     HostInfo hostCopy = this->host;
     brls::async([this, hostCopy, isAliveCopy]()
         {
-    vita_log::info("[SessionAppSelect] Llamando a GameStreamClient::getAppList para host: %s (ip: %s)", hostCopy.name.c_str(), hostCopy.ip.c_str());
+    vita_log::info("[SessionAppSelect] Calling GameStreamClient::getAppList for host: %s (ip: %s)", hostCopy.name.c_str(), hostCopy.ip.c_str());
     std::vector<RemoteAppInfo> apps;
     GameStreamClient::instance().getAppList(hostCopy.ip, [&apps](const std::vector<RemoteAppInfo>& a){ apps = a; });
-    vita_log::info("[SessionAppSelect] getAppList devolvió %u apps", (unsigned)apps.size());
+    vita_log::info("[SessionAppSelect] getAppList returned %u apps", (unsigned)apps.size());
         for (const auto& app : apps) {
             vita_log::info("[SessionAppSelect] App recibida: id='%s', name='%s', iconUrl='%s'", app.id.c_str(), app.name.c_str(), app.iconUrl.c_str());
         }
@@ -284,7 +280,7 @@ void SessionAppSelect::populateAppList()
             if (!isAliveCopy->load(std::memory_order_acquire)) return;
             if (spinner) spinner->setVisibility(brls::Visibility::GONE);
             if (apps.empty()) {
-                vita_log::info("[SessionAppSelect] No se encontraron aplicaciones en este host.");
+                vita_log::info("[SessionAppSelect] No applications found on this host.");
                 if (app_select_empty) {
                     app_select_empty->setText(brls::getStr("moonlight/session/app_select/no_apps"));
                     app_select_empty->setVisibility(brls::Visibility::VISIBLE);
@@ -344,13 +340,13 @@ void SessionAppSelect::populateAppList()
                                 continue;
                             }
 
-                            vita_log::info("[SessionAppSelect] Descargando boxart para App: %s (ID: %d)", app.name.c_str(), appId);
+                            vita_log::info("[SessionAppSelect] Downloading box art for app: %s (ID: %d)", app.name.c_str(), appId);
                             Data boxartData;
                             bool ok = GameStreamClient::instance().getAppBoxart(hostIp, appId, boxartData);
                             if (ok && boxartData.size() > 0) {
                                 std::string cachePath = cacheDir + "/boxart_" + app.id + ".png";
                                 boxartData.write_to_file(cachePath);
-                                vita_log::info("[SessionAppSelect] Boxart guardado en: %s", cachePath.c_str());
+                                vita_log::info("[SessionAppSelect] Box art saved to: %s", cachePath.c_str());
 
                                 brls::sync([isAliveCopy, gridViewCopy, idx, cachePath]() {
                                     if (!isAliveCopy->load(std::memory_order_acquire)) return;
@@ -359,7 +355,7 @@ void SessionAppSelect::populateAppList()
                                     }
                                 });
                             } else {
-                                vita_log::warning("[SessionAppSelect] Fallo al descargar boxart para App: %s (ID: %d)", app.name.c_str(), appId);
+                                vita_log::warning("[SessionAppSelect] Failed to download box art for app: %s (ID: %d)", app.name.c_str(), appId);
                             }
 
                             // Prevent flooding the network/server
@@ -390,7 +386,7 @@ void SessionAppSelect::AppSelected(const RemoteAppInfo& app, bool forceStart)
     ConfigManager configManager;
     if (!configManager.load())
     {
-        vita_log::warning("[SessionAppSelect] No se pudo cargar configuración, usando valores por defecto");
+        vita_log::warning("[SessionAppSelect] Could not load settings; using defaults");
     }
 
     StreamConfiguration streamSettings = configManager.getStreamConfig();
@@ -403,11 +399,11 @@ void SessionAppSelect::AppSelected(const RemoteAppInfo& app, bool forceStart)
     const bool automaticBitrate       = streamSettings.bitrate == -1;
     STREAM_CONFIGURATION streamConfig = stream::buildConfiguration(streamSettings);
 
-    vita_log::info("[SessionAppSelect] Configuración de streaming:");
-    vita_log::info("[SessionAppSelect] - Resolución: %dx%d", streamConfig.width, streamConfig.height);
+    vita_log::info("[SessionAppSelect] Stream configuration:");
+    vita_log::info("[SessionAppSelect] - Resolution: %dx%d", streamConfig.width, streamConfig.height);
     vita_log::info("[SessionAppSelect] - FPS: %d", streamConfig.fps);
     vita_log::info("[SessionAppSelect] - Bitrate: %d Kbps%s", streamConfig.bitrate,
-        automaticBitrate ? " (auto por resolución/FPS)" : "");
+        automaticBitrate ? " (automatic based on resolution/FPS)" : "");
 
     vita_log::info("[SessionAppSelect] - packetSize: %d streamingRemotely=%d formats=0x%X",
         streamConfig.packetSize, streamConfig.streamingRemotely, streamConfig.supportedVideoFormats);

@@ -25,7 +25,7 @@ extern "C"
 namespace vita_log
 {
 
-inline void vlog(const char* level, const char* fmt, va_list args)
+__attribute__((format(printf, 2, 0))) inline void vlog(const char* level, const char* fmt, va_list args)
 {
     char buffer[1024];
     size_t level_length = strlen(level);
@@ -46,35 +46,35 @@ inline void vlog(const char* level, const char* fmt, va_list args)
     vita_debug_log_raw(buffer);
 }
 
-inline void info(const char* fmt, ...)
+__attribute__((format(printf, 1, 2))) inline void info(const char* fmt, ...)
 {
     va_list args;
     va_start(args, fmt);
     vlog("INFO", fmt, args);
     va_end(args);
 }
-inline void warning(const char* fmt, ...)
+__attribute__((format(printf, 1, 2))) inline void warning(const char* fmt, ...)
 {
     va_list args;
     va_start(args, fmt);
     vlog("WARNING", fmt, args);
     va_end(args);
 }
-inline void error(const char* fmt, ...)
+__attribute__((format(printf, 1, 2))) inline void error(const char* fmt, ...)
 {
     va_list args;
     va_start(args, fmt);
     vlog("ERROR", fmt, args);
     va_end(args);
 }
-inline void debug(const char* fmt, ...)
+__attribute__((format(printf, 1, 2))) inline void debug(const char* fmt, ...)
 {
     va_list args;
     va_start(args, fmt);
     vlog("DEBUG", fmt, args);
     va_end(args);
 }
-inline void verbose(const char* fmt, ...)
+__attribute__((format(printf, 1, 2))) inline void verbose(const char* fmt, ...)
 {
     va_list args;
     va_start(args, fmt);

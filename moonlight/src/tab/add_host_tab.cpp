@@ -103,7 +103,7 @@ AddHostTab::AddHostTab()
     {
         this->addButton->registerClickAction([this](brls::View*)
             {
-            vita_log::info("[AddHostTab][MANUAL] Emparejamiento manual iniciado");
+            vita_log::info("[AddHostTab][MANUAL] Manual pairing started");
             std::string ipInput = this->ipField->getValue();
             std::string name    = this->nameField->getValue();
             if (ipInput.empty() || name.empty())

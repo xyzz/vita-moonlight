@@ -21,7 +21,6 @@
 
 #include <Limelight.h>
 #include <errno.h>
-#include <fmt/format.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
@@ -67,7 +66,7 @@ static int load_unique_id(const std::string& keyDirectory)
         FILE* wfd = fopen(uniqueFilePath.c_str(), "w");
         if (wfd == NULL)
         {
-            vita_log::error("[load_unique_id] could not create/open '{}' to write uniqueid", uniqueFilePath);
+            vita_log::error("[load_unique_id] Could not open '%s' to write uniqueid", uniqueFilePath.c_str());
             return GS_FAILED;
         }
         fwrite(unique_id.c_str(), UNIQUEID_CHARS, 1, wfd);
@@ -160,7 +159,7 @@ static int load_serverinfo(PSERVER_DATA server, bool https)
     const std::string xmlPayload((const char*)data.bytes(), data.size());
     if (xmlPayload.size() < 20)
     {
-        vita_log::error("[load_serverinfo] XML demasiado corto");
+        vita_log::error("[load_serverinfo] XML response is too short");
     }
     std::string pairedText;
     std::string currentGameText;
@@ -211,7 +210,7 @@ static int load_serverinfo(PSERVER_DATA server, bool https)
 
     if (currentGameText.empty() || pairedText.empty() || server->serverInfoAppVersion.empty() || stateText.empty())
     {
-        vita_log::error("[load_serverinfo] campos requeridos vacios");
+        vita_log::error("[load_serverinfo] Required fields are missing");
         return ret;
     }
 
@@ -226,18 +225,18 @@ static int load_serverinfo(PSERVER_DATA server, bool https)
     }
     if (currentGameText.size() > 32)
     {
-        vita_log::error("[load_serverinfo] currentGameText demasiado largo ({} bytes)", currentGameText.size());
+        vita_log::error("[load_serverinfo] currentGameText exceeds 32 bytes (%lu)", (unsigned long)currentGameText.size());
         return ret;
     }
     server->currentGame = currentGameText.empty() ? 0 : atoi(currentGameText.c_str());
     if (server->currentGame != 0)
     {
-        vita_log::info("[load_serverinfo] currentGame reportado por host: {} (posible sesión previa)", server->currentGame);
+        vita_log::info("[load_serverinfo] Host reports currentGame=%d (possible previous session)", server->currentGame);
     }
     server->supports4K = server->serverInfo.serverCodecModeSupport != 0;
     if (server->serverInfoAppVersion.size() > 64)
     {
-        vita_log::error("[load_serverinfo] appversion demasiado largo ({} bytes)", server->serverInfoAppVersion.size());
+        vita_log::error("[load_serverinfo] appversion exceeds 64 bytes (%lu)", (unsigned long)server->serverInfoAppVersion.size());
         return ret;
     }
     server->serverMajorVersion = server->serverInfoAppVersion.empty() ? 0 : atoi(server->serverInfoAppVersion.c_str());
@@ -249,7 +248,8 @@ static int load_serverinfo(PSERVER_DATA server, bool https)
     {
         server->currentGame = 0;
     }
-    vita_log::info("[load_serverinfo] OK paired={}, currentGame={}, appVersion='{}', httpsPort={}, state='{}'", server->paired, server->currentGame, server->serverInfoAppVersion, server->httpsPort, stateText);
+    vita_log::info("[load_serverinfo] OK paired=%d, currentGame=%d, appVersion='%s', httpsPort=%d, state='%s'",
+        server->paired, server->currentGame, server->serverInfoAppVersion.c_str(), server->httpsPort, stateText.c_str());
     return GS_OK;
 }
 
@@ -372,7 +372,7 @@ int gs_pair(PSERVER_DATA server, char* pin)
         return GS_WRONG_STATE;
     }
 
-    vita_log::info("Client: Pairing with generation {} server",
+    vita_log::info("Client: Pairing with generation %d server",
         server->serverMajorVersion);
     vita_log::info("Client: Start pairing stage #1");
 
@@ -665,10 +665,10 @@ int gs_pair(PSERVER_DATA server, char* pin)
         int r = load_serverinfo(server, true);
         if (r == GS_OK && server->paired)
         {
-            vita_log::info("[gs_pair] post-pair server reports paired via HTTPS (attempt {})", attempt + 1);
+            vita_log::info("[gs_pair] HTTPS server reports paired (attempt %d)", attempt + 1);
             break;
         }
-        vita_log::warning("[gs_pair] post-pair /serverinfo HTTPS did not report PairStatus=1 (attempt {})", attempt + 1);
+        vita_log::warning("[gs_pair] HTTPS /serverinfo did not report PairStatus=1 (attempt %d)", attempt + 1);
         usleep(200 * 1000); // 200ms
     }
 
@@ -752,10 +752,10 @@ int gs_applist(PSERVER_DATA server, PAPP_LIST* list)
         app->next = head;
         head      = app;
         appCount++;
-        pos = end + 6; // avanzar tras </App>
+        pos = end + 6;
     }
     *list = head;
-    vita_log::info("[gs_applist] parse simple completo apps={} bytesXML={}", appCount, (int)xml.size());
+    vita_log::info("[gs_applist] Parsed %d apps from %lu XML bytes", appCount, (unsigned long)xml.size());
     return ret;
 }
 
@@ -837,7 +837,7 @@ int gs_start_app(PSERVER_DATA server, STREAM_CONFIGURATION* config, int appId,
             snprintf(url + currentLen, sizeof(url) - currentLen,
                 "&displayWidth=%d&displayHeight=%d",
                 displayWidth, displayHeight);
-            vita_log::info("[gs_start_app] Display resolution hint: {}x{} (stream: {}x{})",
+            vita_log::info("[gs_start_app] Display resolution hint: %dx%d (stream: %dx%d)",
                 displayWidth, displayHeight,
                 config->width, config->height);
         }

@@ -245,7 +245,7 @@ bool GameStreamClient::startApp(const std::string& address, STREAM_CONFIGURATION
     // Keep the resume guard until VitaSession confirms startup.
 
     m_last_stream_cfg[address] = config;
-    vita_log::info("[GameStreamClient] Aplicación iniciada correctamente (remoteInputKey set)");
+    vita_log::info("[GameStreamClient] App launched (remoteInputKey set)");
 
     if (videoSettings.enable_microphone)
     {
@@ -359,7 +359,7 @@ bool GameStreamClient::beginPairing(const HostInfo& host, std::function<void(boo
             try
             {
                 SERVER_DATA serverData {};
-                vita_log::info("[Pairing][fast-path] Comprobando emparejamiento con keyDir='%s'", keyDir.c_str());
+                vita_log::info("[Pairing][fast-path] Checking pairing with keyDir='%s'", keyDir.c_str());
                 int initResult = gs_init(&serverData, endpoint, keyDir);
                 if (initResult == GS_OK && serverData.paired)
                 {
@@ -485,7 +485,7 @@ bool GameStreamClient::beginPairing(const HostInfo& host, std::function<void(boo
 
             if (pairResult == GS_OK)
             {
-                vita_log::info("[Pairing] Emparejamiento OK");
+                vita_log::info("[Pairing] Pairing succeeded");
                 serverData.paired = true;
                 if (!HostStorage::savePairedHost(localHost.safeId, addr, serverData.httpPort,
                         serverData.paired, serverData.mac, localHost.microphone_port))
@@ -602,7 +602,7 @@ bool GameStreamClient::quitApp(const std::string& address)
         return false;
     }
 
-    vita_log::info("[GameStreamClient] Terminando aplicación en %s", address.c_str());
+    vita_log::info("[GameStreamClient] Stopping app on %s", address.c_str());
 
     int status = gs_quit_app(&m_server_data[address]);
     if (status != GS_OK)
@@ -611,7 +611,7 @@ bool GameStreamClient::quitApp(const std::string& address)
         return false;
     }
 
-    vita_log::info("[GameStreamClient] Aplicación terminada correctamente");
+    vita_log::info("[GameStreamClient] App stopped");
 
     MicrophoneManager::getInstance().stop();
     vita_log::info("[GameStreamClient] Microphone stopped");

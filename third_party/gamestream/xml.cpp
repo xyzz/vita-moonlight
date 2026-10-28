@@ -20,7 +20,6 @@
 #include "xml.h"
 
 #include <expat.h>
-#include <fmt/format.h>
 #include <string.h>
 
 #include <exception>
@@ -172,13 +171,13 @@ static void XMLCALL _xml_write_data_legacy(void* userData, const XML_Char* s, in
         const size_t MAX_XML_VALUE = 8192;
         if (search->size + (size_t)len + 1 > MAX_XML_VALUE)
         {
-            vita_log::error("[xml] Valor XML demasiado grande (>8KB), abortando acumulación");
+            vita_log::error("[xml] XML value exceeds 8 KB; refusing to append");
             return;
         }
         char* newMem = (char*)realloc(search->memory, search->size + len + 1);
         if (!newMem)
         {
-            vita_log::error("[xml] realloc failed (size={}, len={})", search->size, len);
+            vita_log::error("[xml] realloc failed (size=%lu, len=%d)", (unsigned long)search->size, len);
             return;
         }
         search->memory = newMem;
@@ -198,7 +197,7 @@ static void XMLCALL _xml_write_data_string(void* userData, const XML_Char* s, in
     {
         if (q->out->size() + (size_t)len > 8192)
         {
-            vita_log::error("[xml_string] Valor excede máximo 8KB, truncando");
+            vita_log::error("[xml_string] XML value exceeds 8 KB; refusing to append");
             return;
         }
         q->out->append(s, len);

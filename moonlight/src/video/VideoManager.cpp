@@ -71,7 +71,7 @@ bool VideoManager::initialize()
         prepareFfmpegContext();
     }
     _initialized = true;
-    vita_log::info("[VideoManager] Sistema de video inicializado correctamente");
+    vita_log::info("[VideoManager] Video initialized");
     return true;
 }
 
@@ -154,7 +154,7 @@ void VideoManager::stopVideo()
         return;
     }
 
-    vita_log::info("[VideoManager] Deteniendo video en modo %s", _currentMode.c_str());
+    vita_log::info("[VideoManager] Stopping video in mode %s", _currentMode.c_str());
 
     if (_currentMode == "legacy")
     {

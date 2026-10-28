@@ -1985,7 +1985,7 @@ extern "C"
             g_sps_ctx = new gs::SpsContext(width, height);
             if (g_sps_ctx)
             {
-                VITA_DEBUG_LOG("[FFMPEG][SPS] Contexto SPS inicializado (%dx%d)", width, height);
+                VITA_DEBUG_LOG("[FFMPEG][SPS] SPS context initialized (%dx%d)", width, height);
             }
         }
 

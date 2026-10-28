@@ -117,7 +117,7 @@ void startVitaDiscovery(void (*hostFoundCb)(int, const char*, const char*, const
             return;
         }
         net_initialized = true;
-        vita_log::info("[check_host] Red Vita inicializada correctamente (legacy)");
+        vita_log::info("[check_host] Vita network initialized (legacy path)");
     }
     vitaDiscoveryStatus = 1;
     udp_sniffer_vita_init();
@@ -126,7 +126,7 @@ void startVitaDiscovery(void (*hostFoundCb)(int, const char*, const char*, const
     vita_log::info("[check_host] startVitaDiscovery: udp_sniffer_vita_init called\n");
 #endif
     vitaHostFoundCb = hostFoundCb;
-    vita_log::info("[check_host] startVitaDiscovery: after asignar vitaHostFoundCb");
+    vita_log::info("[check_host] startVitaDiscovery: vitaHostFoundCb assigned");
 #if defined(__PSV__)
     vita_log::info("[check_host] startVitaDiscovery: vitaHostFoundCb set to %p\n", (void*)vitaHostFoundCb);
 #endif
@@ -135,7 +135,7 @@ void startVitaDiscovery(void (*hostFoundCb)(int, const char*, const char*, const
 #if defined(__PSV__)
     vita_log::info("[check_host] startVitaDiscovery: udp_sniffer_vita_set_callback called\n");
 #endif
-    vita_log::info("[check_host] startVitaDiscovery: before crear hilo");
+    vita_log::info("[check_host] startVitaDiscovery: creating thread");
 #if defined(__PSV__)
     vita_log::info("[check_host] startVitaDiscovery: about to create discovery thread\n");
 #endif
@@ -144,7 +144,7 @@ void startVitaDiscovery(void (*hostFoundCb)(int, const char*, const char*, const
     MDNS_LOG("[mdns_log] mDNS discovery started (up to 100 iterations or until the tab closes)\n");
     vita_log::info("[check_host] mDNS discovery started (up to 100 iterations or tab closure)");
 #if defined(__PSV__)
-    vita_log::debug("[mdns_log] Hilo de descubrimiento mDNS (VITA) iniciado\n");
+    vita_log::debug("[mdns_log] Vita mDNS discovery thread started\n");
 #endif
         int iter = 0;
         while (vitaDiscoveryStatus == 1 && iter < 100) {
@@ -174,7 +174,7 @@ void startVitaDiscovery(void (*hostFoundCb)(int, const char*, const char*, const
             }
         });
         return 0; }, 0x10000100, 0x10000, 0, 0, NULL);
-    vita_log::info("[check_host] startVitaDiscovery: after crear hilo");
+    vita_log::info("[check_host] startVitaDiscovery: thread created");
     if (vitaDiscoveryThread >= 0)
     {
         vita_log::info("[check_host] startVitaDiscovery: thread created; starting...");
@@ -203,12 +203,12 @@ void startVitaDiscovery(void (*hostFoundCb)(int, const char*, const char*, const
         }
         else
         {
-            vita_log::info("[check_host] startVitaDiscovery: hilo mDNS en ejecución (sceKernelStartThread=0x%08X)", startResult);
+            vita_log::info("[check_host] mDNS thread running (sceKernelStartThread=0x%08X)", startResult);
         }
     }
     else
     {
-        vita_log::error("[check_host] Error creando hilo de descubrimiento mDNS Vita");
+        vita_log::error("[check_host] Failed to create Vita mDNS discovery thread");
         udp_sniffer_vita_deinit();
         vitaDiscoveryStatus.store(0, std::memory_order_release);
     }

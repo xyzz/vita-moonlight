@@ -741,7 +741,7 @@ void ControllerInputManager::setGamepadType(GamepadType type)
     }
     uint32_t supportedButtonFlags = 0xFFFFFFFF; // All buttons
 
-    vita_log::info("[ControllerInput] Reconectando controlador con nuevo tipo (LI_CTYPE=%d)...", liType);
+    vita_log::info("[ControllerInput] Reconnecting controller with type LI_CTYPE=%d", liType);
     if (LiSendControllerArrivalEvent(0, 0x01, liType, supportedButtonFlags, capabilities) != 0)
     {
         vita_log::error("[ControllerInput][ERR] LiSendControllerArrivalEvent failed");
@@ -824,7 +824,7 @@ bool ControllerInputManager::setTouchscreenModeWithValidation(int newMode)
 {
     if (!touchManager)
     {
-        vita_log::error("[ControllerInput][ERR] TouchManager no inicializado");
+        vita_log::error("[ControllerInput][ERR] TouchManager not initialized");
         return false;
     }
 
@@ -852,7 +852,7 @@ bool ControllerInputManager::setTouchscreenModeRuntime(int newMode)
 
     if (!touchManager)
     {
-        vita_log::error("[ControllerInput][ERR] TouchManager no inicializado");
+        vita_log::error("[ControllerInput][ERR] TouchManager not initialized");
         return false;
     }
 

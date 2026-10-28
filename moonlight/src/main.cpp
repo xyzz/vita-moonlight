@@ -146,7 +146,7 @@ void handleWindowFocusChanged(bool focused)
     if (!focused)
     {
         appBackgrounded.store(true);
-        vita_log::info("[Main] Aplicación suspendida o enviada a segundo plano");
+        vita_log::info("[Main] App suspended or moved to background");
         return;
     }
 
@@ -155,7 +155,7 @@ void handleWindowFocusChanged(bool focused)
         return;
     }
 
-    vita_log::info("[Main] Aplicación reanudada; programando reconexión del stream");
+    vita_log::info("[Main] App resumed; scheduling stream reconnection");
     // Power callbacks run on Borealis' Vita callback thread.
     brls::sync([]()
         { brls::delay(750, []()

@@ -72,7 +72,7 @@ void GridView::reload()
 
         card->setClickAction([this, i]()
             {
-            vita_log::info("[GridView] Elemento seleccionado idx=%d", i);
+            vita_log::info("[GridView] Selected item idx=%d", i);
             if (onItemSelect) onItemSelect(i); });
 
         card->setFocusable(true);
@@ -85,7 +85,7 @@ void GridView::reload()
         currentRowBox->addView(card);
         itemViews.push_back(card);
 
-        vita_log::info("[GridView] Elemento añadido: '%s' en fila %d, columna %d",
+        vita_log::info("[GridView] Added item '%s' at row %d, column %d",
             itemNames[i].c_str(), currentRow, (i % columns) + 1);
     }
 

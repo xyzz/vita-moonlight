@@ -38,7 +38,7 @@ static void _gs_log_info(const std::string& msg) {
 #if defined(__PSV__) || defined(__psp2__) || defined(__PSP2__)
     vita_debug_log("%s", msg.c_str());
 #else
-    vita_log::info("{}", msg);
+    vita_log::info("%s", msg.c_str());
 #endif
 }
 
@@ -46,28 +46,8 @@ static void _gs_log_error(const std::string& msg) {
 #if defined(__PSV__) || defined(__psp2__) || defined(__PSP2__)
     vita_debug_log("%s", msg.c_str());
 #else
-    vita_log::error("{}", msg);
+    vita_log::error("%s", msg.c_str());
 #endif
-}
-
-static int _curl_debug_log(CURL* /*handle*/, curl_infotype type, char* data, size_t size, void* /*userptr*/) {
-    if (!data || size == 0) {
-        return 0;
-    }
-
-    // Keep only human-readable verbose lines (skip raw payload dumps)
-    if (type != CURLINFO_TEXT && type != CURLINFO_HEADER_IN && type != CURLINFO_HEADER_OUT) {
-        return 0;
-    }
-
-    std::string msg(data, size);
-    while (!msg.empty() && (msg.back() == '\n' || msg.back() == '\r')) {
-        msg.pop_back();
-    }
-    if (!msg.empty()) {
-        _gs_log_info(msg);
-    }
-    return 0;
 }
 
 static bool _file_exists(const std::string& path) {
@@ -131,8 +111,6 @@ CURL* makeCurl() {
     if (!curl)
         return nullptr;
 
-    curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
-    curl_easy_setopt(curl, CURLOPT_DEBUGFUNCTION, _curl_debug_log);
     curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
     curl_easy_setopt(curl, CURLOPT_SSLENGINE_DEFAULT, 1L);
     curl_easy_setopt(curl, CURLOPT_SSLCERTTYPE, "PEM");
@@ -153,7 +131,7 @@ void freeCurl(CURL* curl) {
 
 int http_request(const std::string& url, Data* data,
                  HTTPRequestTimeout timeout) {
-    _gs_log_info(fmt::format("Curl: Request:\n{}", url.c_str()));
+    _gs_log_info("Curl: Request");
 
     auto* http_data = (HTTP_DATA*)malloc(sizeof(HTTP_DATA));
     if (!http_data) {
@@ -198,11 +176,7 @@ int http_request(const std::string& url, Data* data,
 
     *data = Data(http_data->memory, http_data->size);
 
-    if (http_data->size > 3000) {
-        _gs_log_info("Curl: Response: Ok");
-    } else {
-        _gs_log_info(fmt::format("Curl: Response:\n{}", http_data->memory));
-    }
+    _gs_log_info(fmt::format("Curl: Response received ({} bytes)", http_data->size));
 
     free(http_data->memory);
     free(http_data);

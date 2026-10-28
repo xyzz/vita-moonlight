@@ -68,7 +68,7 @@ void VitaSession::notifyGamepadType()
     }
     else
     {
-        vita_log::info("[VitaSession] Tipo de gamepad notificado al servidor (LI_CTYPE=%d)", liType);
+        vita_log::info("[VitaSession] Gamepad type reported to host (LI_CTYPE=%d)", liType);
     }
 }
 
@@ -118,7 +118,7 @@ bool VitaSession::start()
         std::lock_guard<std::mutex> activeLock(s_active_mutex);
         s_active = shared_from_this();
     }
-    vita_log::info("[VitaSession] Decodificador inicializado: %s", VideoManager::instance()->getRenderMode().c_str());
+    vita_log::info("[VitaSession] Decoder initialized: %s", VideoManager::instance()->getRenderMode().c_str());
     LiInitializeVideoCallbacks(&m_video_callbacks);
     m_video_callbacks = VideoManager::instance()->getDecoderCallbacks();
 

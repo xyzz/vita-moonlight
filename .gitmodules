@@ -11,6 +11,7 @@
 [submodule "third_party/mdnsniff"]
 	path = third_party/mdnsniff
 	url = https://github.com/AorsiniYT/mdnsniff.git
+	branch = main
 [submodule "third_party/moonlight-common-c/enet"]
     path = third_party/moonlight-common-c/enet
     url = https://github.com/cgutman/enet.git
@@ -33,3 +34,4 @@
 [submodule "legacy/third_party/mdnsniff"]
 	path = legacy/third_party/mdnsniff
 	url = https://github.com/AorsiniYT/mdnsniff.git
+	branch = main

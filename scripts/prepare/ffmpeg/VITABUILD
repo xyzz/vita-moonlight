@@ -1,10 +1,10 @@
 pkgname=ffmpeg
 pkgver=6.0.vita
-pkgrel=4
-gitrev=6a127f9e840f62df364c37aac881b5407ed18a8b
+pkgrel=5
+gitrev=d395e7a8744338ed780dfcfe13d78b111715e173
 url="https://github.com/AorsiniYT/FFmpeg-vita"
 source=("FFmpeg-vita-${gitrev}.tar.gz::https://github.com/AorsiniYT/FFmpeg-vita/archive/${gitrev}.tar.gz")
-sha256sums=('SKIP')
+sha256sums=('bd56a2a9e2d1f927bace2f46cc3913e07f9f50a53a5bbea8c54ec918b44be880')
 depends=('mbedtls')
 
 build() {

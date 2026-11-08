@@ -1,6 +1,8 @@
 name: Build PSVita
 
 on:
+  push:
+    branches: [vita-dev, vita]
   pull_request:
   workflow_dispatch:
 
@@ -13,44 +15,117 @@ concurrency:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            host: linux
+            vpk: cmake-build-psv-linux-gxm/moonlight.vpk
+          - os: windows-latest
+            host: windows
+            vpk: cmake-build-psv-msys2-gxm/moonlight.vpk
+    runs-on: ${{ matrix.os }}
     env:
       VITASDK: ${{ github.workspace }}/vitasdk
     steps:
+      - name: Configure Windows line endings
+        if: runner.os == 'Windows'
+        run: git config --global core.autocrlf input
+
       - name: Checkout repository
         uses: actions/checkout@v7.0.1
         with:
           submodules: recursive
 
-      - name: Test release helper
+      - name: Install Windows host tools
+        if: runner.os == 'Windows'
+        id: msys2
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: >-
+            make git curl wget unzip libarchive cmake ninja pkgconf patch
+            python diffutils sed grep findutils tar
+            mingw-w64-ucrt-x86_64-gcc
+
+      - name: Expose Windows compiler to Python tests
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $compilerBin = Join-Path '${{ steps.msys2.outputs.msys2-location }}' 'ucrt64\bin'
+          Add-Content -Path $env:GITHUB_PATH -Value $compilerBin -Encoding utf8
+
+      - name: Test release helper (Linux)
+        if: runner.os == 'Linux'
         run: python3 -m unittest discover -s tests
 
-      - name: Install host tools
+      - name: Test release helper (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: python -m unittest discover -s tests
+
+      - name: Install Linux host tools
+        if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y \
             build-essential cmake ninja-build git curl wget unzip \
             libarchive-tools pkg-config fakeroot patch python3 bzip2 xz-utils
 
-      - name: Install VitaSDK
+      - name: Install VitaSDK (Linux)
+        if: runner.os == 'Linux'
+        env:
+          VITASDK_CHANNEL: '2026.08'
         run: |
           set -euo pipefail
           git clone --depth 1 https://github.com/vitasdk/vdpm.git "$RUNNER_TEMP/vdpm"
           "$RUNNER_TEMP/vdpm/bootstrap-vitasdk.sh" --install-dir "$VITASDK"
           echo "$VITASDK/bin" >> "$GITHUB_PATH"
 
-      - name: Install project dependencies
+      - name: Install VitaSDK (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          VITASDK_CHANNEL: '2026.08'
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $bootstrap = Join-Path $env:RUNNER_TEMP 'bootstrap-vitasdk.ps1'
+          Invoke-WebRequest https://github.com/vitasdk/vdpm/releases/latest/download/bootstrap-vitasdk.ps1 -OutFile $bootstrap
+          & $bootstrap
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Install project dependencies (Linux)
+        if: runner.os == 'Linux'
         run: ./scripts/prepare/install_all.sh
 
-      - name: Build release VPK
+      - name: Install project dependencies (Windows)
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        run: ./scripts/prepare/install_all.sh
+
+      - name: Build release VPK (Linux)
+        if: runner.os == 'Linux'
         run: ./makepsv --gxm --release --clean --no-deploy
 
-      - name: Smoke-test packaged launcher and frontends
-        run: python3 scripts/check_vpk.py cmake-build-psv-linux-gxm/moonlight.vpk
+      - name: Build release VPK (Windows)
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        run: ./makepsv --gxm --release --clean --no-deploy
+
+      - name: Smoke-test packaged launcher and frontends (Linux)
+        if: runner.os == 'Linux'
+        run: python3 scripts/check_vpk.py ${{ matrix.vpk }}
+
+      - name: Smoke-test packaged launcher and frontends (Windows)
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        run: python3 scripts/check_vpk.py ${{ matrix.vpk }}
 
       - name: Upload VPK
         uses: actions/upload-artifact@v7.0.1
         with:
-          name: moonlight-vita-pr-${{ github.event.pull_request.number || github.run_id }}
-          path: cmake-build-psv-linux-gxm/moonlight.vpk
+          name: moonlight-vita-${{ matrix.host }}-${{ github.event.pull_request.number || github.run_id }}
+          path: ${{ matrix.vpk }}
           if-no-files-found: error

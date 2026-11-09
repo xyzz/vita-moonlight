@@ -19,7 +19,22 @@ Embedded. It streams games and applications from a Sunshine-compatible host.
 - PS Vita or PSTV with homebrew support
 - VitaShell for VPK installation
 - A PC running Sunshine or another compatible GameStream host
-- A stable local network; Ethernet is recommended for the host PC
+- A stable local network shared by the console and host PC
+
+## Network and bitrate
+
+The handheld **PS Vita connects over Wi-Fi** and has no built-in Ethernet port.
+**PS TV** supports Wi-Fi and wired 10/100 Mbps Ethernet.
+
+Keep the console and host PC on the same local network. Connecting the host PC
+to the router with Ethernet is recommended. PS TV can also use a wired
+connection; a handheld PS Vita uses Wi-Fi.
+
+For the handheld PS Vita, **5,000 Kbps is a sensible conservative starting
+point**. If the stream remains stable, try 8,000–10,000 Kbps for better image
+quality. You can also leave bitrate on Automatic; at the default 720p60 setting,
+the current automatic calculation is approximately 10 Mbps. The best value
+depends on Wi-Fi conditions, resolution and frame rate.
 
 ## Installation
 

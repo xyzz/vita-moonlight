@@ -27,6 +27,19 @@ Embedded. It streams games and applications from a Sunshine-compatible host.
 2. Install the package with VitaShell.
 3. Start Moonlight from LiveArea and pair it with the host.
 
+## Controller shortcuts
+
+The default controller combinations are the same in both frontends:
+
+| Action | Legacy | Borealis default |
+| --- | --- | --- |
+| Open the pause menu | `START + L1 + R1` | `START + L1 + R1` |
+| Open the keyboard | `START + LEFT` | `START + LEFT` |
+
+In **Borealis**, open **Settings → Configure Shortcuts** to change or disable the pause and keyboard combinations. Borealis also supports additional custom shortcuts. **Legacy** uses the combinations shown above as fixed shortcuts and does not currently provide shortcut remapping.
+
+The keyboard shortcut opens the keyboard mode configured for the selected frontend; it is not tied to one specific keyboard presentation.
+
 ## Building
 
 Linux, WSL and Windows/MSYS2 use the same build scripts. Install VitaSDK first
@@ -166,6 +179,14 @@ and the maintainers of
 The modern interface uses [Borealis](https://github.com/xfangfang/borealis), created and
 maintained by Natinusala, xfangfang, XITRIX and its contributors. The toolchain
 and platform libraries are provided by the [VitaSDK](https://vitasdk.org/)
-community. The bundled UI font is a subset of
-[Noto Sans CJK](https://github.com/notofonts/noto-cjk), distributed under the
-SIL Open Font License 1.1.
+community. The modern UI font uses a subset of
+[Noto Sans CJK](https://github.com/notofonts/noto-cjk), while Legacy uses a
+bundled mononoki Nerd Font. Thanks to the authors of these fonts and
+[Material Icons](https://github.com/google/material-design-icons).
+
+Thanks also to the developers of [Moonbeam](https://github.com/AorsiniYT/moonbeam),
+[Moonmic](https://github.com/AorsiniYT/moonmic), [FFmpeg](https://ffmpeg.org/),
+[ENet](https://github.com/cgutman/enet), [inih](https://github.com/benhoyt/inih),
+[h264bitstream](https://github.com/aizvorski/h264bitstream), and
+[libuuid](https://github.com/util-linux/util-linux), whose work supports the
+Vita port. See the respective source repositories for licensing information.

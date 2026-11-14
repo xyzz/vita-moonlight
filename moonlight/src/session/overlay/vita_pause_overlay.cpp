@@ -8,7 +8,6 @@
 
 #include "ConfigManager.hpp"
 #include "GameStreamClient.hpp"
-#include "Settings.hpp"
 #include "activity/main_activity.hpp"
 #include "controller/ControllerInput.hpp"
 #include "controller/keyboard/keyboard.hpp"
@@ -17,6 +16,7 @@
 #include "session/session_app_select.hpp"
 #include "session/session_main.hpp"
 #include "session/vita_session.hpp"
+#include "settings.hpp"
 #include "tab/hosts_tab.hpp"
 #include "tab/settings_tab.hpp"
 #include "video/VitaVideoRenderer.hpp"

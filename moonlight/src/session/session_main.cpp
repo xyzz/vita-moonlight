@@ -9,7 +9,6 @@
 #include <utility>
 
 #include "ConfigManager.hpp"
-#include "Settings.hpp"
 #include "borealis.hpp"
 #include "controller/ControllerInput.hpp"
 #include "controller/keyboard/keyboard_launcher.hpp"
@@ -18,6 +17,7 @@
 #include "debug.hpp"
 #include "session/overlay/vita_pause_overlay.hpp"
 #include "session/vita_session.hpp"
+#include "settings.hpp"
 #include "video/VitaVideoRenderer.hpp"
 #include "video/legacy/modules/vita_globals.hpp"
 

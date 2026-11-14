@@ -4,8 +4,8 @@
 #include <string>
 #include <vector>
 
-#include "Settings.hpp"
 #include "controller/shortcuts.hpp"
+#include "settings.hpp"
 #include "shortcuts/shortcut_manager.hpp"
 #include "shortcuts/shortcut_text.hpp"
 

@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+: "${VITASDK:?VITASDK must be set}"
+
+vdpm_exe="$VITASDK/bin/vdpm.exe"
+if [ ! -x "$vdpm_exe" ]; then
+    echo "ERROR: VDPM executable not found at $vdpm_exe" >&2
+    exit 2
+fi
+if ! command -v cygpath >/dev/null 2>&1; then
+    echo "ERROR: cygpath is required to launch VDPM from MSYS2." >&2
+    exit 2
+fi
+
+pacman_args=()
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --config|--root|--dbpath|--cachedir|--logfile)
+            if [ "$#" -lt 2 ]; then
+                echo "ERROR: Missing value for pacman option $1" >&2
+                exit 2
+            fi
+            shift 2
+            ;;
+        *)
+            pacman_args+=("$1")
+            shift
+            ;;
+    esac
+done
+
+if [ "${#pacman_args[@]}" -eq 0 ]; then
+    echo "ERROR: No pacman operation was provided." >&2
+    exit 2
+fi
+
+sdk_native="$(cygpath -m "$VITASDK")"
+vdpm_native="$(cygpath -w "$vdpm_exe")"
+VITASDK="$sdk_native" "$vdpm_native" pacman -- "${pacman_args[@]}"

@@ -83,17 +83,17 @@ vita_host_init() {
     export VITA_BUILD_SUFFIX
 }
 
-# Some Vita packages use compatibility symlinks. On Windows/MSYS2 those links
-# can fail when Windows symlink privileges are unavailable. Repair only missing
-# aliases with ordinary copies so generic linker/pkg-config names remain usable.
+# Some Vita packages use compatibility symlinks. Native Windows VitaSDK tools
+# cannot reliably consume MSYS2 symlinks, so replace those aliases with copies.
 vita_fix_msys2_sdk_aliases() {
     [ "${VITA_HOST:-}" = "msys2" ] || return 0
 
     local src dst
     while IFS='|' read -r src dst; do
         [ -n "$src" ] || continue
-        if [ ! -e "$dst" ] && [ -f "$src" ]; then
+        if { [ ! -e "$dst" ] || [ -L "$dst" ]; } && [ -f "$src" ]; then
             echo "[+] Repairing MSYS2 SDK alias: ${dst#$VITASDK/}"
+            rm -f "$dst" || return 1
             cp -p "$src" "$dst" || return 1
         fi
     done <<EOF

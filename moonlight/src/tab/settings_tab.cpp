@@ -46,9 +46,9 @@
 #ifdef _WIN32
 #include <windows.h>
 #endif
-#include "Settings.hpp"
 #include "debug.hpp"
 #include "network/NetworkOptimizations.hpp"
+#include "settings.hpp"
 #include "video/runtime_settings.hpp"
 
 static void saveSettingsOpacity(float value)

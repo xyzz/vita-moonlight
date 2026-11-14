@@ -58,9 +58,11 @@ if ! command -v vita-makepkg >/dev/null 2>&1 || ! command -v vdpm >/dev/null 2>&
     exit 3
 fi
 
-# The Windows SDK seed keeps pacman beside its embedded MSYS runtime, while
-# vita-makepkg still defaults to $VITASDK/bin/pacman.
-if [ -x "$VITASDK/bin/pacman" ]; then
+# The Windows SDK seed keeps pacman inside VDPM's isolated MSYS runtime.
+# Route vita-makepkg through VDPM so it can supply the native SDK paths.
+if [ "$VITA_HOST" = "msys2" ] && [ -x "$VITASDK/bin/vdpm.exe" ]; then
+    PACMAN="$REPO_ROOT/scripts/msys2/vdpm-pacman"
+elif [ -x "$VITASDK/bin/pacman" ]; then
     PACMAN="$VITASDK/bin/pacman"
 elif [ -x "$VITASDK/libexec/vdpm/pacman" ]; then
     PACMAN="$VITASDK/libexec/vdpm/pacman"

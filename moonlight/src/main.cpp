@@ -35,10 +35,10 @@
 #endif
 
 #include "ConfigManager.hpp"
-#include "Settings.hpp"
 #include "activity/main_activity.hpp"
 #include "debug.hpp"
 #include "session/vita_session.hpp"
+#include "settings.hpp"
 #include "tab/add_host_tab.hpp"
 #include "tab/hosts_tab.hpp"
 #include "tab/settings_tab.hpp"

@@ -3,7 +3,7 @@
 
     SPDX-License-Identifier: GPL-3.0-only
 */
-#include "Settings.hpp"
+#include "settings.hpp"
 
 #include <algorithm>
 #include <borealis.hpp>

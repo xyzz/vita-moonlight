@@ -42,6 +42,7 @@ jobs:
           ref: ${{ github.event.repository.default_branch }}
           fetch-depth: 0
           token: ${{ secrets.RELEASE_TOKEN || github.token }}
+          submodules: recursive
 
       - name: Test release helper
         run: python3 -m unittest discover -s tests

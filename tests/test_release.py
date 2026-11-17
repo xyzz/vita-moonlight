@@ -517,14 +517,32 @@ class ComponentReleaseTests(unittest.TestCase):
 
     def test_legacy_only_update_is_idempotent(self):
         records = [("fix(legacy): align welcome", "", ("legacy/src/gui/ui.c",))]
+
+        def baseline_for(*args):
+            if args[0] == "rev-parse":
+                return args[1]
+            if args[0] == "merge-base":
+                return args[1]
+            if args[-1] == "CHANGELOG.md":
+                return "root-baseline"
+            if args[-1] == "legacy/CHANGELOG.md":
+                return (
+                    "legacy-baseline"
+                    if "## 0.13.2" in args else "prepared-legacy-baseline"
+                )
+            raise AssertionError(f"unexpected git arguments: {args}")
+
+        def records_for(revision):
+            return records if revision != "prepared-legacy-baseline" else []
+
         with tempfile.TemporaryDirectory() as tmp:
             self.build_release_fixture(tmp)
             previous = os.getcwd()
             try:
                 os.chdir(tmp)
                 with (
-                    mock.patch("release.git", return_value="legacy-baseline"),
-                    mock.patch("release.commit_records_with_paths", return_value=records),
+                    mock.patch("release.git", side_effect=baseline_for),
+                    mock.patch("release.commit_records_with_paths", side_effect=records_for),
                 ):
                     release.update_files("1.0.1", "1.0.0")
                     release.verify_version("1.0.1")
@@ -575,18 +593,94 @@ class ComponentReleaseTests(unittest.TestCase):
                         return args[1]
                     if args[-1] == "CHANGELOG.md":
                         return "root-baseline"
-                    return "legacy-baseline"
+                    if args[-1] == "legacy/CHANGELOG.md":
+                        return (
+                            "legacy-baseline"
+                            if "## 0.13.2" in args else "prepared-legacy-baseline"
+                        )
+                    raise AssertionError(f"unexpected git arguments: {args}")
+
+                def records_for(revision):
+                    return records if revision != "prepared-legacy-baseline" else []
 
                 with (
                     mock.patch("release.git", side_effect=baseline_for),
-                    mock.patch("release.commit_records_with_paths", return_value=records),
+                    mock.patch("release.commit_records_with_paths", side_effect=records_for),
                 ):
                     release.update_files("1.0.0", "0.13.2")
                     release.update_files("1.0.0", "0.13.2")
                 result = Path("CHANGELOG.md").read_text(encoding="utf-8")
-                self.assertEqual(result.count("### Previous release notes"), 1)
+                self.assertNotIn("### Previous release notes", result)
+                self.assertNotIn("### Moonlight Legacy", result)
                 self.assertIn("- Initial Borealis release", result)
+                self.assertIn("- Align welcome", result)
                 self.assertEqual(release.configured_legacy_version(), (0, 13, 3))
+            finally:
+                os.chdir(previous)
+
+    def test_prepared_release_appends_changes_and_updates_legacy_version(self):
+        records = [
+            ("fix(legacy): align welcome", "", ("legacy/src/gui/ui.c",)),
+            ("fix(ui): improve playback", "", ("moonlight/src/player.cpp",)),
+        ]
+
+        def baseline_for(*args):
+            if args[0] == "rev-parse":
+                return args[1]
+            if args[0] == "merge-base":
+                return args[1]
+            if args[-1] == "CHANGELOG.md":
+                return "root-baseline"
+            if args[-1] == "legacy/CHANGELOG.md":
+                return "legacy-baseline"
+            raise AssertionError(f"unexpected git arguments: {args}")
+
+        def records_for(revision):
+            if revision == "root-baseline":
+                return records
+            if revision == "legacy-baseline":
+                return [records[0]]
+            raise AssertionError(f"unexpected release baseline: {revision}")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            self.build_release_fixture(tmp)
+            previous = os.getcwd()
+            try:
+                os.chdir(tmp)
+                Path("legacy/CMakeLists.txt").write_text(
+                    'set(VERSION_MAJOR "0")\nset(VERSION_MINOR "13")\n'
+                    'set(VERSION_PATCH "3")\n',
+                    encoding="utf-8",
+                )
+                Path("legacy/CHANGELOG.md").write_text(
+                    "## 0.13.3\n\n- Existing Legacy notes\n",
+                    encoding="utf-8",
+                )
+                Path("CHANGELOG.md").write_text(
+                    "## 1.0.0\n\n"
+                    "### Moonlight Legacy v0.13.3\n\n- Existing Legacy notes\n\n"
+                    "### Moonlight Borealis v1.0.0\n\n- Existing Borealis notes\n",
+                    encoding="utf-8",
+                )
+                with (
+                    mock.patch("release.git", side_effect=baseline_for),
+                    mock.patch("release.commit_records_with_paths", side_effect=records_for),
+                ):
+                    release.update_files("1.0.0", "0.13.2")
+                    release.verify_version("1.0.0")
+
+                changelog = Path("CHANGELOG.md").read_text(encoding="utf-8")
+                self.assertIn("### Moonlight Legacy v0.13.4", changelog)
+                self.assertIn("- Existing Legacy notes", changelog)
+                self.assertIn("- Existing Borealis notes", changelog)
+                self.assertIn("- Align welcome", changelog)
+                self.assertIn("- Improve playback", changelog)
+                self.assertNotIn("### Additional changes", changelog)
+                self.assertEqual(release.configured_legacy_version(), (0, 13, 4))
+                self.assertIn(
+                    "## 0.13.4",
+                    Path("legacy/CHANGELOG.md").read_text(encoding="utf-8"),
+                )
             finally:
                 os.chdir(previous)
 
@@ -612,7 +706,10 @@ class ComponentReleaseTests(unittest.TestCase):
             if args[-1] == "CHANGELOG.md":
                 return "root-baseline"
             if args[-1] == "legacy/CHANGELOG.md":
-                return "legacy-baseline"
+                return (
+                    "legacy-baseline"
+                    if "## 0.13.2" in args else "prepared-legacy-baseline"
+                )
             raise AssertionError(f"unexpected git arguments: {args}")
 
         def records_for(revision):
@@ -620,6 +717,8 @@ class ComponentReleaseTests(unittest.TestCase):
                 return root_records
             if revision == "legacy-baseline":
                 return legacy_records
+            if revision == "prepared-legacy-baseline":
+                return []
             raise AssertionError(f"unexpected release baseline: {revision}")
 
         with tempfile.TemporaryDirectory() as tmp:
@@ -640,10 +739,12 @@ class ComponentReleaseTests(unittest.TestCase):
                 self.assertEqual(release.configured_legacy_version(), (0, 14, 0))
                 changelog = Path("CHANGELOG.md").read_text(encoding="utf-8")
                 self.assertEqual(changelog, first_changelog)
-                self.assertIn("### Moonlight Legacy v0.14.0", changelog)
-                self.assertIn("### Moonlight Borealis v1.0.0", changelog)
+                self.assertIn("- Initial Borealis release", changelog)
                 self.assertIn("- Add menu", changelog)
                 self.assertIn("- Improve playback", changelog)
+                self.assertNotIn("### Moonlight Legacy", changelog)
+                self.assertNotIn("### Moonlight Borealis", changelog)
+                self.assertNotIn("### Previous release notes", changelog)
                 self.assertNotIn("Record Legacy baseline", changelog)
 
                 legacy_changelog = Path("legacy/CHANGELOG.md").read_text(encoding="utf-8")
@@ -677,7 +778,10 @@ class ComponentReleaseTests(unittest.TestCase):
             if args[-1] == "CHANGELOG.md":
                 return "root-baseline"
             if args[-1] == "legacy/CHANGELOG.md":
-                return "legacy-baseline"
+                return (
+                    "legacy-baseline"
+                    if "## 0.13.2" in args else "prepared-legacy-baseline"
+                )
             raise AssertionError(f"unexpected git arguments: {args}")
 
         def records_for(revision):
@@ -685,6 +789,8 @@ class ComponentReleaseTests(unittest.TestCase):
                 return root_records
             if revision == "legacy-baseline":
                 return legacy_records
+            if revision == "prepared-legacy-baseline":
+                return []
             raise AssertionError(f"unexpected release baseline: {revision}")
 
         with tempfile.TemporaryDirectory() as tmp:
@@ -706,10 +812,11 @@ class ComponentReleaseTests(unittest.TestCase):
                     Path("CHANGELOG.md").read_text(encoding="utf-8"),
                     first_changelog,
                 )
-                self.assertIn("### Moonlight Legacy v0.13.3", first_changelog)
                 self.assertIn("- Align welcome", first_changelog)
                 self.assertNotIn("- Add menu", first_changelog)
-                self.assertIn("### Moonlight Borealis v1.0.0", first_changelog)
+                self.assertIn("- Improve playback", first_changelog)
+                self.assertNotIn("### Moonlight Legacy", first_changelog)
+                self.assertNotIn("### Moonlight Borealis", first_changelog)
 
                 legacy_changelog = Path("legacy/CHANGELOG.md").read_text(encoding="utf-8")
                 self.assertIn("## 0.13.3", legacy_changelog)

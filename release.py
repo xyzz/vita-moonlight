@@ -541,10 +541,6 @@ def update_files(version, previous_tag):
     changelog_path = Path("CHANGELOG.md")
     changelog = changelog_path.read_text(encoding="utf-8")
     current_section = version_section(changelog, version)
-    previously_prepared = (
-        declared_legacy_version(current_section.group("body"))
-        if current_section else None
-    )
     current_legacy = configured_legacy_version()
     release_baseline = later_baseline(
         previous_tag,
@@ -553,24 +549,18 @@ def update_files(version, previous_tag):
     records = commit_records_with_paths(release_baseline)
 
     legacy_changelog_path = Path("legacy/CHANGELOG.md")
-    if previously_prepared is not None:
-        legacy_records = []
-    else:
-        legacy_baseline = changelog_baseline_commit(
-            legacy_changelog_path,
-            version_text(current_legacy),
-        ) if legacy_changelog_path.exists() else ""
-        legacy_baseline = later_baseline(release_baseline, legacy_baseline)
-        legacy_source_records = (
-            commit_records_with_paths(legacy_baseline)
-            if legacy_baseline else records
-        )
-        legacy_records, _, _ = split_component_records(legacy_source_records)
-
-    next_legacy = (
-        previously_prepared if previously_prepared is not None
-        else bump_legacy_only_if_changed(current_legacy, legacy_records)
+    legacy_baseline = changelog_baseline_commit(
+        legacy_changelog_path,
+        version_text(current_legacy),
+    ) if legacy_changelog_path.exists() else ""
+    legacy_baseline = later_baseline(release_baseline, legacy_baseline)
+    legacy_source_records = (
+        commit_records_with_paths(legacy_baseline)
+        if legacy_baseline else records
     )
+    legacy_records, _, _ = split_component_records(legacy_source_records)
+
+    next_legacy = bump_legacy_only_if_changed(current_legacy, legacy_records)
     legacy_version = version_text(next_legacy)
 
     cmake_path = Path("CMakeLists.txt")
@@ -620,24 +610,53 @@ def update_files(version, previous_tag):
             + changelog.lstrip()
         )
         changelog_path.write_text(changelog, encoding="utf-8")
-    elif previously_prepared is None:
-        # 1.0.0 already has curated release notes. Preserve those notes while
-        # introducing per-component metadata for the initial combined release.
-        preserved = current_section.group("body").strip()
-        addition = component_changelog_section(
-            version,
-            legacy_version,
-            records,
-            legacy_records,
-        )
-        if preserved:
-            addition += "### Previous release notes\n\n" + preserved + "\n\n"
-        changelog = (
-            changelog[:current_section.start()]
-            + addition
-            + changelog[current_section.end():]
-        )
-        changelog_path.write_text(changelog, encoding="utf-8")
+    else:
+        _, borealis_records, shared_records = split_component_records(records)
+        eligible_subjects = {
+            subject
+            for subject, _ in legacy_records + borealis_records + shared_records
+        }
+        body = current_section.group("body")
+        existing_titles = {
+            line.strip()[2:].strip().casefold()
+            for line in body.splitlines()
+            if line.lstrip().startswith("- ")
+        }
+        additions = []
+        for subject, _, _ in reversed(records):
+            if subject.startswith("chore(release): prepare "):
+                continue
+            if subject not in eligible_subjects:
+                continue
+            title = readable_title(subject)
+            normalized_title = title.casefold()
+            if normalized_title in existing_titles:
+                continue
+            additions.append(f"- {title}")
+            existing_titles.add(normalized_title)
+
+        updated_body = body
+        previous_legacy = declared_legacy_version(body)
+        if previous_legacy is not None and previous_legacy != next_legacy:
+            updated_body, count = re.subn(
+                r"^### Moonlight Legacy v[0-9]+\.[0-9]+\.[0-9]+\s*$",
+                f"### Moonlight Legacy v{legacy_version}",
+                updated_body,
+                count=1,
+                flags=re.MULTILINE,
+            )
+            if count != 1:
+                raise ValueError("could not update the Legacy version in release notes")
+        if additions:
+            updated_body = updated_body.rstrip() + "\n" + "\n".join(additions)
+        if updated_body != body:
+            updated_section = f"## {version}\n\n{updated_body}\n\n"
+            changelog = (
+                changelog[:current_section.start()]
+                + updated_section
+                + changelog[current_section.end():]
+            )
+            changelog_path.write_text(changelog, encoding="utf-8")
 
     changeinfo_path = Path("resources/changeinfo.xml")
     changeinfo = render_changeinfo(changelog)
@@ -681,10 +700,24 @@ def verify_version(version, ref=""):
 
     section = version_section(changelog, version)
     expected_legacy = declared_legacy_version(section.group("body")) if section else None
+    legacy_changelog_path = Path("legacy/CHANGELOG.md")
+    if ref:
+        try:
+            legacy_changelog = repository_text(legacy_changelog_path, ref)
+        except subprocess.CalledProcessError:
+            legacy_changelog = ""
+    else:
+        legacy_changelog = (
+            legacy_changelog_path.read_text(encoding="utf-8")
+            if legacy_changelog_path.exists() else ""
+        )
+    if legacy_changelog:
+        configured_legacy = version_text(configured_legacy_version(ref))
+        if not version_section(legacy_changelog, configured_legacy):
+            raise ValueError("legacy/CHANGELOG.md lacks the configured Legacy release version")
     if expected_legacy is not None:
         if configured_legacy_version(ref) != expected_legacy:
             raise ValueError("Legacy CMake version does not match release notes")
-        legacy_changelog = repository_text("legacy/CHANGELOG.md", ref)
         if not version_section(legacy_changelog, version_text(expected_legacy)):
             raise ValueError("legacy/CHANGELOG.md lacks the Legacy release version")
 

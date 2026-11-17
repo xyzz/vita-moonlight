@@ -17,7 +17,47 @@
 - Reconnect the stream and restore controller state after application resume<br>
 - Use the same build scripts on Linux, WSL and Windows/MSYS2<br>
 - Install VitaSDK packages and the pinned FFmpeg-vita fork with `scripts/prepare/install_all.sh`<br>
-- Apply the Borealis Vita patch during CMake configuration
+- Apply the Borealis Vita patch during CMake configuration<br>
+- Add keyboard and stream controls<br>
+- Correct keyboard overlays and focus<br>
+- Use one action path for front and rear touch zones<br>
+- Serialize device.ini access during discovery<br>
+- Replace global stream state with owned session state<br>
+- Preserve uppercase keyboard input<br>
+- Add decoder presentation modes<br>
+- Fence decoded frames before reusing their buffers<br>
+- Prefer next-frame presentation<br>
+- Compact stream frame statistics<br>
+- Reduce dropped log messages<br>
+- Support custom connection ports<br>
+- Use public protocol headers<br>
+- Simplify GitHub release metadata<br>
+- Normalize release note style<br>
+- Replace proprietary font assets<br>
+- Ignore dirty nested Borealis submodules<br>
+- Harden pull requests and verified releases<br>
+- Support selectable Legacy and Borealis frontends<br>
+- Add first-run frontend welcome<br>
+- Version Legacy independently in combined VPK<br>
+- Deploy noninteractive VPKs and validate dual-frontend packages<br>
+- Format sources and improve connection handling<br>
+- Harden authentication and server data handling<br>
+- Handle invalid data slices without exiting<br>
+- Clarify upstream setup and frontend documentation<br>
+- Guard session startup and automatic bitrate limits<br>
+- Reject invalid AES blocks and failed signatures<br>
+- Remove redundant comments and standardize diagnostic messages<br>
+- Correct Vita diagnostics and protect HTTP data<br>
+- Document credits and controller shortcuts<br>
+- Pin FFmpeg-vita to current decoder revision<br>
+- Clarify libuuid license<br>
+- Update mDNS discovery in Legacy and Borealis<br>
+- Validate PSVita on Windows and Linux<br>
+- Clarify network requirements and bitrate guidance<br>
+- Fix Vita CI on Windows and Linux<br>
+- Fetch submodules before release tests<br>
+- Consolidate release and build fixes<br>
+- Preserve prepared changelog baseline
 ]]></changes>
 <changes app_ver="00.13"><![CDATA[
 ## 0.13.2<br>

@@ -15,6 +15,46 @@
 - Use the same build scripts on Linux, WSL and Windows/MSYS2
 - Install VitaSDK packages and the pinned FFmpeg-vita fork with `scripts/prepare/install_all.sh`
 - Apply the Borealis Vita patch during CMake configuration
+- Add keyboard and stream controls
+- Correct keyboard overlays and focus
+- Use one action path for front and rear touch zones
+- Serialize device.ini access during discovery
+- Replace global stream state with owned session state
+- Preserve uppercase keyboard input
+- Add decoder presentation modes
+- Fence decoded frames before reusing their buffers
+- Prefer next-frame presentation
+- Compact stream frame statistics
+- Reduce dropped log messages
+- Support custom connection ports
+- Use public protocol headers
+- Simplify GitHub release metadata
+- Normalize release note style
+- Replace proprietary font assets
+- Ignore dirty nested Borealis submodules
+- Harden pull requests and verified releases
+- Support selectable Legacy and Borealis frontends
+- Add first-run frontend welcome
+- Version Legacy independently in combined VPK
+- Deploy noninteractive VPKs and validate dual-frontend packages
+- Format sources and improve connection handling
+- Harden authentication and server data handling
+- Handle invalid data slices without exiting
+- Clarify upstream setup and frontend documentation
+- Guard session startup and automatic bitrate limits
+- Reject invalid AES blocks and failed signatures
+- Remove redundant comments and standardize diagnostic messages
+- Correct Vita diagnostics and protect HTTP data
+- Document credits and controller shortcuts
+- Pin FFmpeg-vita to current decoder revision
+- Clarify libuuid license
+- Update mDNS discovery in Legacy and Borealis
+- Validate PSVita on Windows and Linux
+- Clarify network requirements and bitrate guidance
+- Fix Vita CI on Windows and Linux
+- Fetch submodules before release tests
+- Consolidate release and build fixes
+- Preserve prepared changelog baseline
 
 ## 0.13.2
 

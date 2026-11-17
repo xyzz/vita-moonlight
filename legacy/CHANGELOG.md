@@ -1,3 +1,12 @@
+## 0.13.3
+
+- Format sources and improve connection handling
+- Remove redundant comments and standardize diagnostic messages
+- Clarify libuuid license
+- Update mDNS discovery in Legacy and Borealis
+- Fix Vita CI on Windows and Linux
+- Consolidate release and build fixes
+
 ## 0.13.2
 
 - Added optional PS button capture: double press opens the menu; single press is forwarded to Sunshine.

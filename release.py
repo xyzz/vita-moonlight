@@ -16,6 +16,7 @@ if hasattr(sys.stderr, "reconfigure"):
 
 
 VERSION_RE = re.compile(r"^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$")
+PREPARE_RE = re.compile(r"^chore\(release\): prepare (?P<version>.+)$")
 CONVENTIONAL_RE = re.compile(
     r"^(?P<type>[A-Za-z]+)(?:\((?P<scope>[^)]+)\))?(?P<breaking>!)?:\s*(?P<title>.+)$"
 )
@@ -83,9 +84,16 @@ def repository_web_url():
     return remote if re.match(r"https?://", remote) else ""
 
 
+def repository_text(path, ref=""):
+    path = Path(path)
+    if ref:
+        return git("show", f"{ref}:{path.as_posix()}")
+    return path.read_text(encoding="utf-8")
+
+
 def release_tags():
     tags = []
-    for tag in git("tag", "--list").splitlines():
+    for tag in git("tag", "--merged", "HEAD", "--list").splitlines():
         try:
             tags.append((parse_version(tag), tag))
         except ValueError:
@@ -102,6 +110,48 @@ def previous_release_tag(version):
     requested = parse_version(version)
     previous = [(value, tag) for value, tag in release_tags() if value < requested]
     return previous[-1][1] if previous else ""
+
+
+def release_preparations(previous_tag=""):
+    revision = f"{previous_tag}..HEAD" if previous_tag else "HEAD"
+    output = git("log", revision, "--no-merges", "--format=%H%x1f%s")
+    preparations = []
+    for line in output.splitlines():
+        if not line.strip():
+            continue
+        commit, separator, subject = line.partition("\x1f")
+        if not separator:
+            raise ValueError("could not parse release preparation commit")
+        match = PREPARE_RE.fullmatch(subject.strip())
+        if not match:
+            continue
+        label = match.group("version")
+        try:
+            version = parse_version(label)
+        except ValueError as error:
+            raise ValueError(f"invalid release preparation subject: {subject!r}") from error
+        preparations.append((version, label, commit.strip()))
+    return preparations
+
+
+def pending_release(published=None):
+    current, current_tag = published if published is not None else latest_tag()
+    preparations = release_preparations(current_tag)
+    if not preparations:
+        return None
+
+    previous = current
+    for version, label, commit in reversed(preparations):
+        if previous is not None and version <= previous:
+            raise ValueError(
+                f"release preparation {label} at {commit} is not newer than "
+                f"{version_text(previous)}"
+            )
+        previous = version
+
+    version, label, commit = preparations[0]
+    verify_version(label, ref=commit)
+    return version, label, commit
 
 
 def commit_records(previous_tag, target_ref="HEAD"):
@@ -223,8 +273,8 @@ def split_component_records(records):
     return legacy, borealis, shared
 
 
-def configured_legacy_version():
-    content = Path("legacy/CMakeLists.txt").read_text(encoding="utf-8")
+def configured_legacy_version(ref=""):
+    content = repository_text("legacy/CMakeLists.txt", ref)
     values = []
     for name in ("VERSION_MAJOR", "VERSION_MINOR", "VERSION_PATCH"):
         match = re.search(rf'^set\({name}\s+"?([0-9]+)"?\)', content, re.MULTILINE)
@@ -330,7 +380,13 @@ def bump_version(version, bump):
 
 def next_version(requested, bump):
     current, current_tag = latest_tag()
-    records = commit_records(current_tag)
+    pending = pending_release((current, current_tag))
+
+    if pending is not None:
+        candidate, label, _ = pending
+        if requested and parse_version(requested) != candidate:
+            raise ValueError(f"release {label} is already prepared and must be published first")
+        return candidate
 
     if requested:
         candidate = parse_version(requested)
@@ -340,6 +396,7 @@ def next_version(requested, bump):
             )
         return candidate
 
+    records = commit_records(current_tag)
     if current is None or current < (1, 0, 0):
         return 1, 0, 0
     if not records:
@@ -588,8 +645,8 @@ def update_files(version, previous_tag):
         changeinfo_path.write_text(changeinfo, encoding="utf-8")
 
 
-def configured_version():
-    content = Path("CMakeLists.txt").read_text(encoding="utf-8")
+def configured_version(ref=""):
+    content = repository_text("CMakeLists.txt", ref)
     values = {}
     for name in ("VERSION_MAJOR", "VERSION_MINOR", "VERSION_ALTER"):
         match = re.search(rf"set\({name}\s+\"?([0-9]+)\"?\)", content)
@@ -599,18 +656,18 @@ def configured_version():
     return values["VERSION_MAJOR"], values["VERSION_MINOR"], values["VERSION_ALTER"]
 
 
-def verify_version(version):
+def verify_version(version, ref=""):
     expected = parse_version(version)
-    actual = configured_version()
+    actual = configured_version(ref)
     if actual != expected:
         raise ValueError(
             f"CMake version is {version_text(actual)}, expected {version_text(expected)}"
         )
-    changelog = Path("CHANGELOG.md").read_text(encoding="utf-8")
+    changelog = repository_text("CHANGELOG.md", ref)
     if not re.search(rf"^## {re.escape(version)}\s*$", changelog, re.MULTILINE):
         raise ValueError(f"CHANGELOG.md has no {version} section")
 
-    cmake = Path("CMakeLists.txt").read_text(encoding="utf-8")
+    cmake = repository_text("CMakeLists.txt", ref)
     app_version = vita_app_version(version)
     if not re.search(
         rf'set\(PSN_VERSION\s+"{re.escape(app_version)}"\)', cmake
@@ -618,20 +675,20 @@ def verify_version(version):
         raise ValueError(f"CMake PSN version is not {app_version}")
 
     for livearea_path in LIVEAREA_PATHS:
-        livearea = livearea_path.read_text(encoding="utf-8")
+        livearea = repository_text(livearea_path, ref)
         if f">v{version}</str>" not in livearea:
             raise ValueError(f"{livearea_path} does not show v{version}")
 
     section = version_section(changelog, version)
     expected_legacy = declared_legacy_version(section.group("body")) if section else None
     if expected_legacy is not None:
-        if configured_legacy_version() != expected_legacy:
+        if configured_legacy_version(ref) != expected_legacy:
             raise ValueError("Legacy CMake version does not match release notes")
-        legacy_changelog = Path("legacy/CHANGELOG.md").read_text(encoding="utf-8")
+        legacy_changelog = repository_text("legacy/CHANGELOG.md", ref)
         if not version_section(legacy_changelog, version_text(expected_legacy)):
             raise ValueError("legacy/CHANGELOG.md lacks the Legacy release version")
 
-    changeinfo = Path("resources/changeinfo.xml").read_text(encoding="utf-8")
+    changeinfo = repository_text("resources/changeinfo.xml", ref)
     if len(changeinfo.encode("utf-8")) > CHANGEINFO_LIMIT:
         raise ValueError("resources/changeinfo.xml exceeds the Vita LiveArea size limit")
     try:
@@ -649,8 +706,10 @@ def verify_version(version):
         raise ValueError(f"resources/changeinfo.xml has no {app_version} entry")
 
 
-def release_notes(version):
-    changelog = Path("CHANGELOG.md").read_text(encoding="utf-8")
+def release_notes(version, target_ref=""):
+    changelog = repository_text("CHANGELOG.md", target_ref) if target_ref else Path(
+        "CHANGELOG.md"
+    ).read_text(encoding="utf-8")
     match = re.search(
         rf"^## {re.escape(version)}\s*\n(?P<body>.*?)(?=^##\s|\Z)",
         changelog,
@@ -659,11 +718,8 @@ def release_notes(version):
     if not match:
         raise ValueError(f"CHANGELOG.md has no {version} section")
     previous_tag = previous_release_tag(version)
-    target_ref = (
-        version
-        if any(tag == version for _, tag in release_tags())
-        else "HEAD"
-    )
+    if not target_ref:
+        target_ref = version if any(tag == version for _, tag in release_tags()) else "HEAD"
     sections = release_note_groups(commit_records(previous_tag, target_ref), version)
 
     lines = ["## What's Changed", ""]
@@ -724,11 +780,14 @@ def main():
 
     verify_parser = subparsers.add_parser("verify", help="verify release files")
     verify_parser.add_argument("version")
+    verify_parser.add_argument("--ref", default="")
 
     notes_parser = subparsers.add_parser("notes", help="print release notes")
     notes_parser.add_argument("version")
+    notes_parser.add_argument("--ref", default="")
 
     subparsers.add_parser("latest", help="print the latest stable release tag")
+    subparsers.add_parser("pending", help="print the pending prepared release")
 
     args = parser.parse_args()
     try:
@@ -737,12 +796,17 @@ def main():
         elif args.command == "update":
             update_files(args.version, args.previous)
         elif args.command == "verify":
-            verify_version(args.version)
+            verify_version(args.version, args.ref)
         elif args.command == "notes":
-            sys.stdout.write(release_notes(args.version))
+            sys.stdout.write(release_notes(args.version, args.ref))
         elif args.command == "latest":
             _, tag = latest_tag()
             print(tag)
+        elif args.command == "pending":
+            pending = pending_release()
+            if pending is not None:
+                _, label, commit = pending
+                print(label, commit)
     except (ValueError, subprocess.CalledProcessError) as error:
         print(f"release.py: {error}", file=sys.stderr)
         raise SystemExit(1)

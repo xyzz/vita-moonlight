@@ -56,6 +56,7 @@ jobs:
           set -euo pipefail
           git fetch --force --tags origin
           previous_tag="$(python3 release.py latest)"
+          pending_release="$(python3 release.py pending)"
           automatic_version="$(python3 release.py next --bump auto)"
 
           if [ "$RELEASE_MODE" = "manual" ]; then
@@ -66,10 +67,22 @@ jobs:
             selection="auto"
           fi
 
-          python3 release.py update "$version" --previous "$previous_tag"
-          python3 release.py verify "$version"
+          prepared_commit=""
+          if [ -n "$pending_release" ]; then
+            read -r prepared_version prepared_commit <<<"$pending_release"
+            if [ "$version" != "$prepared_version" ]; then
+              echo "Selected release $version does not match prepared release $prepared_version" >&2
+              exit 1
+            fi
+            python3 release.py verify "$version" --ref "$prepared_commit"
+            selection="prepared"
+          else
+            python3 release.py update "$version" --previous "$previous_tag"
+            python3 release.py verify "$version"
+          fi
 
           echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "prepared_commit=$prepared_commit" >> "$GITHUB_OUTPUT"
           echo "Preparing Moonlight Vita $version from ${previous_tag:-the initial release}"
 
           current_version="${previous_tag:-none}"
@@ -80,7 +93,11 @@ jobs:
             echo "| --- | --- | --- | --- |"
             echo "| \`$current_version\` | \`$automatic_version\` | $selection | \`$version\` |"
             echo
-            python3 release.py notes "$version"
+            if [ -n "$prepared_commit" ]; then
+              python3 release.py notes "$version" --ref "$prepared_commit"
+            else
+              python3 release.py notes "$version"
+            fi
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Create verified release commit
@@ -88,9 +105,31 @@ jobs:
         env:
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
           GH_TOKEN: ${{ secrets.RELEASE_TOKEN || github.token }}
+          PREPARED_COMMIT: ${{ steps.version.outputs.prepared_commit }}
           VERSION: ${{ steps.version.outputs.version }}
         run: |
           set -euo pipefail
+
+          if [ -n "$PREPARED_COMMIT" ]; then
+            if ! git merge-base --is-ancestor "$PREPARED_COMMIT" HEAD; then
+              echo "Prepared release commit $PREPARED_COMMIT is not part of the default branch" >&2
+              exit 1
+            fi
+            prepared_subject="$(git log -1 --format=%s "$PREPARED_COMMIT")"
+            if [ "$prepared_subject" != "chore(release): prepare $VERSION" ]; then
+              echo "Prepared release commit subject does not match $VERSION" >&2
+              exit 1
+            fi
+            verified="$(gh api "repos/$GITHUB_REPOSITORY/commits/$PREPARED_COMMIT" --jq '.commit.verification.verified')"
+            if [ "$verified" != "true" ]; then
+              echo "Prepared release commit $PREPARED_COMMIT is not verified by GitHub" >&2
+              exit 1
+            fi
+            echo "sha=$PREPARED_COMMIT" >> "$GITHUB_OUTPUT"
+            echo "Reusing verified release commit $PREPARED_COMMIT"
+            exit 0
+          fi
+
           release_files=(
             CMakeLists.txt
             CHANGELOG.md
@@ -266,6 +305,8 @@ jobs:
             libarchive-tools pkg-config fakeroot patch python3 bzip2 xz-utils
 
       - name: Install VitaSDK
+        env:
+          VITASDK_CHANNEL: '2026.08'
         run: |
           set -euo pipefail
           git clone --depth 1 https://github.com/vitasdk/vdpm.git "$RUNNER_TEMP/vdpm"
@@ -273,6 +314,8 @@ jobs:
           echo "$VITASDK/bin" >> "$GITHUB_PATH"
 
       - name: Install project dependencies
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: ./scripts/prepare/install_all.sh
 
       - name: Build release VPK

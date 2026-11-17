@@ -3,6 +3,12 @@
 `install_all.sh` installs the libraries required by Moonlight into the active
 VitaSDK sysroot. It supports native Linux, WSL and Windows/MSYS2.
 
+Before installing dependencies, it checks recent signed manifests for the
+installed VitaSDK channel. It picks snapshots for the same core and ABI whose
+package database checksum is valid and contains all required packages. VDPM
+then downloads and installs those packages. If that fails, the installer tries
+the next matching snapshot. Stable channels never fall back to `nightly`.
+
 The script installs Vita libraries through VDPM, then builds FFmpeg-vita from a
 specific Git revision. This fork provides the `h264_vita` decoder and the Vita
 pixel formats used by the video pipeline.
@@ -16,9 +22,9 @@ export VITASDK=/usr/local/vitasdk
 export PATH="$VITASDK/bin:$PATH"
 ```
 
-The SDK must provide `vita-makepkg` and `vdpm`. The host also needs Bash, CMake,
-Make, Git, curl, unzip, bsdtar, pkg-config, fakeroot, patch and the standard Unix
-text utilities.
+The SDK must provide `vita-makepkg` and `vdpm`. The host also needs Python 3,
+Bash, CMake, Make, Git, curl, unzip, bsdtar, pkg-config, fakeroot, patch and the
+standard Unix text utilities.
 
 ### Linux and WSL
 
@@ -59,8 +65,9 @@ Windows cannot create them.
 ```
 
 Installed VDPM packages include zlib, bzip2, expat, curl, OpenSSL, Opus,
-libvita2d, FreeType, libpng, libjpeg-turbo, zstd, mbedTLS and SDL2. After those
-packages are ready, the script builds and installs FFmpeg-vita.
+libvita2d, FreeType, libpng, libjpeg-turbo, zstd, mbedTLS and SDL2. The selected
+snapshot is reported in the build log. After those packages are ready, the
+script builds and installs FFmpeg-vita.
 
 Build directories and package archives are removed after installation. Preserve
 them for inspection with:

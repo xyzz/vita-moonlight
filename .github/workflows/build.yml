@@ -98,11 +98,15 @@ jobs:
 
       - name: Install project dependencies (Linux)
         if: runner.os == 'Linux'
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: ./scripts/prepare/install_all.sh
 
       - name: Install project dependencies (Windows)
         if: runner.os == 'Windows'
         shell: msys2 {0}
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: ./scripts/prepare/install_all.sh
 
       - name: Build release VPK (Linux)

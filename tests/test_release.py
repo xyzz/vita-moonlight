@@ -44,6 +44,105 @@ class VersionTests(unittest.TestCase):
         self.assertEqual(release.bump_version((1, 2, 3), "minor"), (1, 3, 0))
         self.assertEqual(release.bump_version((1, 2, 3), "major"), (2, 0, 0))
 
+    def test_release_tags_only_include_current_history(self):
+        with mock.patch(
+            "release.git",
+            return_value="1.0.0\n2.0.0\nvita-alpha",
+        ) as git:
+            self.assertEqual(
+                release.release_tags(),
+                [((1, 0, 0), "1.0.0"), ((2, 0, 0), "2.0.0")],
+            )
+        git.assert_called_once_with("tag", "--merged", "HEAD", "--list")
+
+    def test_release_preparations_use_reachable_history(self):
+        output = (
+            "newer\x1fchore(release): prepare 1.0.1\n"
+            "fix\x1ffix(ui): correct layout\n"
+            "older\x1fchore(release): prepare 1.0.0\n"
+        )
+        with mock.patch("release.git", return_value=output) as git:
+            preparations = release.release_preparations("0.13.2")
+        self.assertEqual(
+            preparations,
+            [
+                ((1, 0, 1), "1.0.1", "newer"),
+                ((1, 0, 0), "1.0.0", "older"),
+            ],
+        )
+        git.assert_called_once_with(
+            "log",
+            "0.13.2..HEAD",
+            "--no-merges",
+            "--format=%H%x1f%s",
+        )
+
+    def test_pending_release_uses_newest_valid_preparation(self):
+        preparations = [
+            ((1, 0, 1), "1.0.1", "newer"),
+            ((1, 0, 0), "1.0.0", "older"),
+        ]
+        with (
+            mock.patch(
+                "release.latest_tag",
+                return_value=((0, 13, 2), "0.13.2"),
+            ),
+            mock.patch("release.release_preparations", return_value=preparations),
+            mock.patch("release.verify_version") as verify,
+        ):
+            self.assertEqual(
+                release.pending_release(),
+                ((1, 0, 1), "1.0.1", "newer"),
+            )
+        verify.assert_called_once_with("1.0.1", ref="newer")
+
+    def test_pending_release_rejects_version_regression(self):
+        preparations = [
+            ((1, 0, 0), "1.0.0", "newer"),
+            ((1, 0, 1), "1.0.1", "older"),
+        ]
+        with mock.patch("release.release_preparations", return_value=preparations):
+            with self.assertRaisesRegex(ValueError, "is not newer than 1.0.1"):
+                release.pending_release(((0, 13, 2), "0.13.2"))
+
+    def test_pending_release_without_tags_uses_latest_preparation(self):
+        with (
+            mock.patch(
+                "release.release_preparations",
+                return_value=[((1, 0, 1), "1.0.1", "prepared")],
+            ),
+            mock.patch("release.verify_version") as verify,
+        ):
+            self.assertEqual(
+                release.pending_release((None, "")),
+                ((1, 0, 1), "1.0.1", "prepared"),
+            )
+        verify.assert_called_once_with("1.0.1", ref="prepared")
+
+    def test_next_version_uses_pending_preparation(self):
+        with (
+            mock.patch(
+                "release.latest_tag",
+                return_value=((0, 13, 2), "0.13.2"),
+            ),
+            mock.patch(
+                "release.pending_release",
+                return_value=((1, 0, 1), "1.0.1", "prepared"),
+            ),
+        ):
+            self.assertEqual(release.next_version("", "auto"), (1, 0, 1))
+            self.assertEqual(release.next_version("1.0.1", "patch"), (1, 0, 1))
+            with self.assertRaisesRegex(ValueError, "must be published first"):
+                release.next_version("1.0.2", "patch")
+
+    def test_next_version_starts_at_1_0_0_without_preparation(self):
+        with (
+            mock.patch("release.latest_tag", return_value=(None, "")),
+            mock.patch("release.pending_release", return_value=None),
+            mock.patch("release.commit_records", return_value=[]),
+        ):
+            self.assertEqual(release.next_version("", "auto"), (1, 0, 0))
+
 
 class ChangelogTests(unittest.TestCase):
     def test_repository_web_url_uses_github_environment(self):
@@ -260,6 +359,41 @@ class ChangelogTests(unittest.TestCase):
             "--format=%aN",
         )
 
+    def test_release_notes_use_explicit_prepared_commit_as_target(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "CHANGELOG.md"
+            path.write_text("## 1.0.1\n\n- Patch release\n", encoding="utf-8")
+            previous = os.getcwd()
+            try:
+                os.chdir(tmp)
+                with (
+                    mock.patch(
+                        "release.repository_text",
+                        return_value="## 1.0.1\n\n- Patch release\n",
+                    ),
+                    mock.patch(
+                        "release.release_tags",
+                        return_value=[((1, 0, 0), "1.0.0")],
+                    ),
+                    mock.patch(
+                        "release.commit_records",
+                        return_value=[("fix(input): preserve shortcuts", "")],
+                    ) as records,
+                    mock.patch("release.repository_web_url", return_value=""),
+                    mock.patch("release.git", return_value="AorsiniYT") as git,
+                ):
+                    release.release_notes("1.0.1", "prepared-commit")
+            finally:
+                os.chdir(previous)
+
+        records.assert_called_once_with("1.0.0", "prepared-commit")
+        git.assert_called_once_with(
+            "log",
+            "1.0.0..prepared-commit",
+            "--no-merges",
+            "--format=%aN",
+        )
+
     def test_changelog_baseline_uses_target_or_latest_previous_version(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "CHANGELOG.md"
@@ -330,6 +464,7 @@ class ComponentReleaseTests(unittest.TestCase):
     def test_global_bumps_for_legacy_only_release(self):
         with (
             mock.patch("release.latest_tag", return_value=((1, 0, 0), "1.0.0")),
+            mock.patch("release.pending_release", return_value=None),
             mock.patch("release.commit_records", return_value=[("fix(legacy): align welcome", "")]),
         ):
             self.assertEqual(release.next_version("", "auto"), (1, 0, 1))

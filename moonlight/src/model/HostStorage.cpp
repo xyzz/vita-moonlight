@@ -253,40 +253,41 @@ std::vector<HostInfo> HostStorage::loadHosts()
         std::string line;
         while (std::getline(ini, line))
         {
-            if (line.find("internal=") == 0)
+            const size_t separator = line.find('=');
+            if (separator == std::string::npos)
+                continue;
+
+            const std::string key   = trim(line.substr(0, separator));
+            const std::string value = sanitize_display(trim(line.substr(separator + 1)));
+            if (key == "internal")
             {
-                std::string v = line.substr(strlen("internal="));
                 std::string endpointAddress;
                 int endpointPort = host.port;
-                v                = sanitize_display(v);
-                if (parseHostEndpoint(v, endpointAddress, endpointPort))
+                if (parseHostEndpoint(value, endpointAddress, endpointPort))
                 {
                     host.ip   = std::move(endpointAddress);
                     host.port = endpointPort;
                 }
                 else
                 {
-                    host.ip = std::move(v);
+                    host.ip = value;
                 }
             }
-            else if (line.find("mac=") == 0)
+            else if (key == "mac")
             {
-                std::string v = line.substr(strlen("mac="));
-                host.mac      = sanitize_display(v);
+                host.mac = value;
             }
-            else if (line.find("port=") == 0)
+            else if (key == "port")
             {
-                host.port = parsePort(line.substr(strlen("port=")), host.port);
+                host.port = parsePort(value, host.port);
             }
-            else if (line.find("paired=") == 0)
+            else if (key == "paired")
             {
-                std::string val = line.substr(strlen("paired="));
-                host.paired     = (val == "true");
+                host.paired = (value == "true");
             }
-            else if (line.find("microphone_port=") == 0)
+            else if (key == "microphone_port")
             {
-                host.microphone_port = parsePort(
-                    line.substr(strlen("microphone_port=")), host.microphone_port);
+                host.microphone_port = parsePort(value, host.microphone_port);
             }
         }
         if (host.ip.empty())

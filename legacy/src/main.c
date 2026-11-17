@@ -181,7 +181,10 @@ int main(int argc, char* argv[])
     vitainput_config(config);
 
     char log_path[MOONLIGHT_PATH_MAX] = { 0 };
-    snprintf(log_path, sizeof(log_path), "%s/moonlight.log", config.key_dir);
+    snprintf(log_path, sizeof(log_path), "%s", out_path);
+    char* log_filename = strrchr(log_path, '/');
+    if (log_filename)
+        snprintf(log_filename + 1, sizeof(log_path) - (size_t)(log_filename + 1 - log_path), "moonlight.log");
     config.log_file = fopen(log_path, "w");
 
     load_all_known_devices();

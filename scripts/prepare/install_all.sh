@@ -53,6 +53,15 @@ EOF
     exit 3
 fi
 
+if command -v python3 >/dev/null 2>&1; then
+    PYTHON=python3
+elif command -v python >/dev/null 2>&1; then
+    PYTHON=python
+else
+    echo "ERROR: Python 3 is required to select a compatible VitaSDK snapshot." >&2
+    exit 3
+fi
+
 if ! command -v vita-makepkg >/dev/null 2>&1 || ! command -v vdpm >/dev/null 2>&1; then
     echo "ERROR: vita-makepkg and vdpm must be available in $VITASDK/bin." >&2
     exit 3
@@ -79,10 +88,80 @@ export VITA_BUILD_JOBS
 export MAKEFLAGS="-j${VITA_BUILD_JOBS}"
 export VDPM_NONINTERACTIVE=1
 
-echo "[prepare] Installing official VitaSDK dependencies..."
-vdpm install \
-    zlib bzip2 expat curl openssl opus libvita2d freetype libpng \
+VDPM_PACKAGES=(
+    zlib bzip2 expat curl openssl opus libvita2d freetype libpng
     libjpeg-turbo zstd mbedtls sdl2
+)
+
+SDK_CHANNEL="${VITASDK_CHANNEL:-}"
+if [ -z "$SDK_CHANNEL" ]; then
+    SDK_CHANNEL="$("$PYTHON" -c 'import json, sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["channel"])' \
+        "$VITASDK/var/lib/vdpm/channel.json")"
+fi
+if [ -z "$SDK_CHANNEL" ]; then
+    echo "ERROR: Could not determine the selected VitaSDK channel." >&2
+    exit 4
+fi
+
+snapshot_dir="$(mktemp -d)"
+trap 'rm -rf "$snapshot_dir"' EXIT
+candidate_list="$snapshot_dir/candidates.tsv"
+
+echo "[prepare] Resolving the newest complete package snapshot for $SDK_CHANNEL..."
+"$PYTHON" "$SCRIPT_DIR/select_vitasdk_snapshot.py" \
+    "$snapshot_dir/candidates" "${VDPM_PACKAGES[@]}" \
+    > "$candidate_list"
+
+install_succeeded=0
+while IFS=$'\t' read -r snapshot_release snapshot_manifest; do
+    [ -n "$snapshot_release" ] && [ -n "$snapshot_manifest" ] || continue
+
+    vdpm_manifest="$snapshot_manifest"
+    if [ "$VITA_HOST" = "msys2" ]; then
+        vdpm_manifest="$(cygpath -w "$snapshot_manifest")"
+    fi
+
+    staged_manifest="$VITASDK/var/lib/vdpm/channel.json.staged"
+    selected_manifest="$VITASDK/var/lib/vdpm/channel.json"
+    refresh_log="$snapshot_dir/vdpm-refresh.log"
+
+    rm -f "$staged_manifest"
+    echo "[prepare] Trying package snapshot $snapshot_release..."
+    if VITASDK_CHANNEL_MANIFEST="$vdpm_manifest" vdpm refresh "$SDK_CHANNEL" >"$refresh_log" 2>&1; then
+        cat "$refresh_log"
+    elif [ "$VITA_HOST" = "msys2" ] && \
+         grep -Fq "could not select the refreshed series" "$refresh_log" && \
+         [ -f "$staged_manifest" ] && [ -f "$selected_manifest" ]; then
+        cat "$refresh_log"
+        echo "[prepare] Completing Windows channel selection after VDPM's rename failed."
+        if ! powershell.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass \
+            -File "$(cygpath -w "$SCRIPT_DIR/../msys2/select-vdpm-channel.ps1")" \
+            "$(cygpath -w "$staged_manifest")" \
+            "$(cygpath -w "$selected_manifest")" \
+            "$(cygpath -w "$snapshot_manifest")"; then
+            echo "ERROR: Could not select the refreshed VitaSDK channel safely." >&2
+            exit 4
+        fi
+    else
+        cat "$refresh_log" >&2
+        echo "[prepare] Refresh failed for $snapshot_release; trying the previous complete snapshot." >&2
+        continue
+    fi
+
+    if vdpm install "${VDPM_PACKAGES[@]}"; then
+        echo "[prepare] Selected package snapshot: $snapshot_release"
+        install_succeeded=1
+        break
+    fi
+
+    echo "[prepare] Dependency installation failed for $snapshot_release; trying the previous complete snapshot." >&2
+done < "$candidate_list"
+
+if [ "$install_succeeded" -ne 1 ]; then
+    echo "ERROR: No validated VitaSDK package snapshot could install all Moonlight dependencies." >&2
+    exit 4
+fi
+
 vita_fix_msys2_sdk_aliases
 
 if [ "$WITH_PVR" -eq 1 ]; then

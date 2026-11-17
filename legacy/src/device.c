@@ -18,9 +18,9 @@
 
 #define INT(v) atoi((v))
 #define BOOL(v) strcmp((v), "true") == 0
-#define write_int(fd, key, value) fprintf(fd, "%s = %d\n", key, value)
-#define write_bool(fd, key, value) fprintf(fd, "%s = %s\n", key, value ? "true" : "false");
-#define write_string(fd, key, value) fprintf(fd, "%s = %s\n", key, value)
+#define write_int(fd, key, value) fprintf(fd, "%s=%d\n", key, value)
+#define write_bool(fd, key, value) fprintf(fd, "%s=%s\n", key, value ? "true" : "false");
+#define write_string(fd, key, value) fprintf(fd, "%s=%s\n", key, value)
 
 bool remove_device(const char* name)
 {
